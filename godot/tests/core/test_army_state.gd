@@ -33,6 +33,8 @@ func _army() -> Army:
 	a.supply = 1
 	a.lost_last = 3
 	a.created_turn = 3
+	a.points = 9
+	a.season_from = Vector2i(3, 9)
 	return a
 
 
@@ -120,6 +122,7 @@ func test_army_round_trip_in_both_forms() -> void:
 		assert_eq(back.units[1].id, 3)
 		assert_eq(back.goal, Vector2i(7, 8))
 		assert_eq(back.moved_from, Vector2i(4, 9))
+		assert_eq([back.points, back.season_from], [9, Vector2i(3, 9)], "army/3: the points and where it set out")
 		assert_eq(var_to_bytes(back.to_dict()), var_to_bytes(d), "save, load, save equal")
 	assert_true(src.to_dict()["route"] is PackedInt32Array, "the route stays packed")
 	assert_true(src.to_dict()["tag"] is String, "plain: a StringName goes out as text")
@@ -152,6 +155,8 @@ func test_army_digest_moves_with_every_field() -> void:
 		func(x: Army) -> void: x.halt_text = "Other",
 		func(x: Army) -> void: x.moved_from = Army.NO_HEX,
 		func(x: Army) -> void: x.supply = 2,
+		func(x: Army) -> void: x.points = 8,
+		func(x: Army) -> void: x.season_from = Army.NO_HEX,
 		func(x: Army) -> void: x.lost_last += 1,
 		func(x: Army) -> void: x.units[0].men += 1,
 		func(x: Army) -> void: x.units[1].paid_goods["grain"] = 9,
@@ -166,7 +171,7 @@ func test_army_digest_moves_with_every_field() -> void:
 		seen[x.digest_text()] = true
 	assert_eq(_army().digest_text(), base, "the same army, the same text")
 	assert_true(base.begins_with("4|SAV|First Army of Turin|5,9|3|march|7,8|501,502,640|winter|blocked|No way|4,9|1|3|"))
-	assert_true(base.ends_with(_army().units[1].digest_text() + "|hold"), "the standing comes last")
+	assert_true(base.ends_with(_army().units[1].digest_text() + "|hold|9|3,9"), "the standing, the points and season_from come last (army/3)")
 
 
 func test_men_unit_and_mustering() -> void:
@@ -190,6 +195,21 @@ func test_army_refusals() -> void:
 	var wrong := good.duplicate()
 	wrong["schema"] = "hexa-godot/army/1"
 	assert_null(Army.from_dict(wrong), "P: a wrong schema")
+	wrong["schema"] = "hexa-godot/army/2"
+	assert_null(Army.from_dict(wrong), "P: an army/2 body is refused (R55)")
+	for key: String in ["points", "season_from"]:
+		var missing := good.duplicate()
+		missing.erase(key)
+		assert_null(Army.from_dict(missing), "P: a body with no %s" % key)
+	var typed := good.duplicate()
+	typed["points"] = "9"
+	assert_null(Army.from_dict(typed), "P: points as text")
+	var negative := good.duplicate()
+	negative["points"] = -1
+	assert_null(Army.from_dict(negative), "P: negative points")
+	var from_text := good.duplicate()
+	from_text["season_from"] = "3,9"
+	assert_null(Army.from_dict(from_text), "P: season_from as text")
 	var str_id := good.duplicate()
 	str_id["id"] = "4"
 	assert_null(Army.from_dict(str_id), "P: a string for id")

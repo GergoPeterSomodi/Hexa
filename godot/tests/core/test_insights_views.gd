@@ -286,9 +286,9 @@ func test_the_pins_of_4_13() -> void:
 	# M8 (m8-build-spec.md 4.2): fourteen phases, ai_orders first.
 	assert_eq(Season.PHASES, [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
 	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm", "set_standing"] as Array[String])
-	# FG2 (fog-build R38): the save format is 7 since the fog build; this pin moved with it.
-	assert_eq(SaveFile.FORMAT, 7)
-	assert_eq(SaveFile.OLDEST_FORMAT, 7)
+	# MV2 (moves-build R55, D22): the save format is 8 since the moves build; this pin moved with it (7 was the fog build).
+	assert_eq(SaveFile.FORMAT, 8)
+	assert_eq(SaveFile.OLDEST_FORMAT, 8)
 	# M7 (4.19): the seven series of the war are appended, so 49.
 	assert_eq(Stats.SERIES.size(), 49)
 	assert_eq(Chronicle.NOTABLE, ["work_started", "work_finished", "work_cancelled", "owners_changed", "country_chosen",

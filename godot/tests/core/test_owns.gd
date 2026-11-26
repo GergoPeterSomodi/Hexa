@@ -176,6 +176,21 @@ func test_every_phase_changes_only_its_owners() -> void:
 	assert_false(seen.has("player"))
 
 
+func test_only_the_ready_units_phase_gives_points_back() -> void:
+	# MV2 (moves-build R13): an army that has spent points keeps them through every phase but ready_units, which refills.
+	var g := _game()
+	g.act("choose_country", {"tag": &"AAA"})
+	var a := ArmyFixture.army(g, &"AAA", HOME, 0, 1)
+	ArmyFixture.spent(g, a, 4)
+	for phase: StringName in Season.PHASES:
+		var before := a.points
+		Season.run_phase(g, phase)
+		if phase == &"ready_units":
+			assert_eq(a.points, Allowance.full(g, a), "ready_units refills")
+		else:
+			assert_eq(a.points, before, "phase %s leaves the points" % phase)
+
+
 func test_a_test_only_write_to_occupier_is_reported() -> void:
 	# The planted fault of 5.3: a phase that writes the occupation directly is outside its owners (stats owns no occupier).
 	var g := _game()

@@ -197,6 +197,11 @@ static func set_hex(_game: Game, army: Army, hex: Vector2i, moved_from: Vector2i
 	army.moved_from = moved_from
 
 
+## The move points left this season (moves-build-spec.md R12), cut to 0 and the army's full (R14): the only writer of `points`.
+static func set_points(game: Game, army: Army, points: int) -> void:
+	army.points = clampi(points, 0, Allowance.full(game, army))
+
+
 ## The order, its goal (NO_HEX for hold and none) and its stored route (copied).
 static func set_order(_game: Game, army: Army, order: StringName, goal: Vector2i, route: PackedInt32Array) -> void:
 	army.order = order
@@ -322,7 +327,8 @@ static func to_dict(game: Game) -> Dictionary:
 
 ## Fills game.armies and the counters from a saved body, or refuses with PROBLEM_BODY and changes nothing. It refuses a
 ## wrong schema, a duplicate or unsorted army id, an id at or above its counter, a unit id twice or at or above its
-## counter, a tag that is no country of the game, a hex off the map or at sea, a company whose kind is no UnitDef or whose
+## counter, a tag that is no country of the game, a hex off the map or at sea, move points above the army's full, a
+## season_from off the map (NO_HEX allowed), a company whose kind is no UnitDef or whose
 ## men are outside 1 to its full strength, an empty army, a route index off the map, a march whose goal is off the map,
 ## and a coordinate outside the 32-bit range.
 static func from_dict(d: Dictionary, game: Game) -> String:
@@ -392,7 +398,7 @@ static func _unit_index(army: Army, id: int) -> int:
 ## The raw numbers of a saved army are checked before Army.from_dict narrows them to 32 bits: every coordinate of a hex,
 ## every route index (0 to the hex count less one) and every unit's home.
 static func _raw_ok(item: Dictionary, game: Game) -> bool:
-	for key: String in ["hex", "goal", "moved_from"]:
+	for key: String in ["hex", "goal", "moved_from", "season_from"]:
 		if not _raw_cell_ok(item.get(key, null)):
 			return false
 	var route: Variant = item.get("route", null)
@@ -435,6 +441,10 @@ static func _army_ok(game: Game, a: Army, unit_ids: Dictionary, next_unit: int) 
 		if u.men < 1 or u.men > ud.men:
 			return false
 		unit_ids[u.id] = true
+	if a.points > Allowance.full(game, a):
+		return false
+	if a.season_from != Army.NO_HEX and game.map.index_of(a.season_from) < 0:
+		return false
 	for index: int in a.route:
 		if index < 0 or index >= game.map.hex_count():
 			return false

@@ -28,6 +28,26 @@ func test_a_live_war_round_trips_and_the_digest_carries_it() -> void:
 	assert_eq(var_to_bytes(Snapshot.of(back)), var_to_bytes(body), "save, load, save: byte-equal")
 
 
+func test_armies_with_spent_points_round_trip_in_a_war_game() -> void:
+	# MV2 (moves-build R55): army/3 in the war game's body; the points are in the digest and come back as saved.
+	var g := WarFixture.game()
+	WarFixture.at_war(g, ArmyFixture.TAG, WarFixture.neighbour_of(g, ArmyFixture.TAG))
+	var town := ArmyFixture.find_town(g)
+	var a := ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 2)
+	var b := ArmyFixture.army(g, ArmyFixture.TAG, town, 2, 1)
+	var before := g.digest()
+	ArmyFixture.spent(g, a, 3)
+	assert_ne(g.digest(), before, "spent points are in the game digest")
+	ArmyFixture.spent(g, b, 0)
+	var body := Snapshot.of(g)
+	var r := _restore(g, _through_bytes(body))
+	assert_not_null(r["game"], str(r["problem"]))
+	var back := r["game"] as Game
+	assert_eq(back.digest(), g.digest())
+	assert_eq([back.armies[0].points, back.armies[1].points], [3, 0])
+	assert_eq(var_to_bytes(Snapshot.of(back)), var_to_bytes(body), "save, load, save: byte-equal")
+
+
 func test_a_forged_war_is_refused_and_the_live_game_keeps_its_digest() -> void:
 	var g := WarFixture.game()
 	var nb := WarFixture.neighbour_of(g, ArmyFixture.TAG)

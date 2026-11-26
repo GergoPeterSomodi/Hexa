@@ -74,6 +74,7 @@ static func run_phase(game: Game, phase: StringName) -> void:
 		&"ready_units":
 			Military.refill.call(game)
 			Armies.recover_morale.call(game)
+			Allowance.refill.call(game)
 		&"vision":
 			Sight.season.call(game)
 

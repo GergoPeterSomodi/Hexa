@@ -211,6 +211,37 @@ func test_digest_moves_with_every_field() -> void:
 	a.units[0].men += 1
 	Armies.set_supply(_g, a, 1, 0)
 	assert_ne(Armies.digest(_g), base, "supply")
+	Armies.set_supply(_g, a, 0, 0)
+	assert_eq(Armies.digest(_g), base)
+	ArmyFixture.spent(_g, a, 5)
+	assert_ne(Armies.digest(_g), base, "points (army/3, R56)")
+	ArmyFixture.spent(_g, a, Allowance.full(_g, a))
+	a.season_from = _hex  # the test sets it: its writer comes with the walks
+	assert_ne(Armies.digest(_g), base, "season_from (army/3, R56)")
+
+
+func test_set_points_clamps_to_zero_and_the_full() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _hex, 0, 1)
+	assert_eq(a.points, 12, "a new army has its full points (pikemen: 12)")
+	Armies.set_points(_g, a, 7)
+	assert_eq(a.points, 7)
+	Armies.set_points(_g, a, -3)
+	assert_eq(a.points, 0, "never below 0 (R14)")
+	Armies.set_points(_g, a, 99)
+	assert_eq(a.points, 12, "never above the full (R14)")
+
+
+func test_points_and_season_from_round_trip_through_json() -> void:
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _hex, 0, 2)
+	ArmyFixture.spent(_g, a, 5)
+	a.season_from = _hex
+	var digest := Armies.digest(_g)
+	var d: Dictionary = JSON.parse_string(JSON.stringify(Armies.to_dict(_g)))
+	_g.armies = []
+	assert_eq(Armies.from_dict(d, _g), "")
+	assert_eq(_g.armies[0].points, 5)
+	assert_eq(_g.armies[0].season_from, _hex)
+	assert_eq(Armies.digest(_g), digest)
 
 
 func test_a_good_body_is_accepted() -> void:
@@ -278,6 +309,43 @@ func test_refuses_a_kind_out_of_range_and_men_outside_one_to_full() -> void:
 	_refused(d)
 	d = _body()
 	d["list"][0]["units"][0]["men"] = 501
+	_refused(d)
+
+
+func test_p_refuses_points_above_the_full_and_a_season_from_off_the_map() -> void:
+	var d := _body()
+	d["list"][0]["points"] = 12
+	assert_eq(Armies.from_dict(d, _g), "", "the full itself is fine")
+	d = _body()
+	d["list"][0]["points"] = 13
+	_refused(d)
+	d = _body()
+	d["list"][0]["points"] = -1
+	_refused(d)
+	d = _body()
+	d["list"][0]["points"] = "12"
+	_refused(d)
+	d = _body()
+	(d["list"][0] as Dictionary).erase("points")
+	_refused(d)
+	d = _body()
+	d["list"][0]["season_from"] = [-3, 2]
+	_refused(d)
+	d = _body()
+	d["list"][0]["season_from"] = [4294967299, 2]
+	_refused(d)
+	d = _body()
+	d["list"][0]["season_from"] = [ArmyFixture.NO_HEX.x, ArmyFixture.NO_HEX.y]
+	assert_eq(Armies.from_dict(d, _g), "", "no hex is the empty value")
+
+
+func test_refuses_points_above_the_full_of_a_slow_company() -> void:
+	# the full is the slowest company's: a bombard (8) in the army cuts it
+	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _hex, 0, 1)
+	Armies.add_units(_g, a, 3, 1, _g.turn - 1, _hex, 0, {})
+	Armies.set_points(_g, a, Allowance.full(_g, a))
+	var d := Armies.to_dict(_g)
+	d["list"][0]["points"] = 9
 	_refused(d)
 
 

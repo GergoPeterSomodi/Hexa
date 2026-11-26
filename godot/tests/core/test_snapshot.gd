@@ -133,6 +133,10 @@ func test_p_wrong_format() -> void:
 	var odd := _body()
 	odd["format"] = "1"
 	_refused(odd, "Cannot be read", "a string")
+	# MV2 (moves-build R55): the format-7 body of the fog build is older
+	var fog := _body()
+	fog["format"] = 7
+	_refused(fog, "Made by an older test build", "a format-7 body")
 
 
 func test_p_missing_pieces() -> void:

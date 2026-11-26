@@ -301,7 +301,8 @@ static func raise_check(game: Game, args: Dictionary) -> Dictionary:
 
 
 ## Raises the companies (after checking again): the ducats and the goods are paid, the men levied (the hex, then its ring
-## in direction order), and the companies join the first army of `tag` on the hex that does not march, else a new army.
+## in direction order), and the companies join the first army of `tag` on the hex that is fresh and does not march (R15),
+## else a new army; the army's points are its full after the companies are in.
 static func raise(game: Game, args: Dictionary) -> Dictionary:
 	var verdict := raise_check(game, args)
 	if not bool(verdict["ok"]):
@@ -324,12 +325,13 @@ static func raise(game: Game, args: Dictionary) -> Dictionary:
 	_levy_ring(game, tag, hex, count * ud.men)
 	var army: Army = null
 	for a: Army in Armies.at(game, hex):
-		if a.tag == tag and a.order != Army.ORDER_MARCH:
+		if a.tag == tag and a.order != Army.ORDER_MARCH and Allowance.fresh(game, a):
 			army = a
 			break
 	if army == null:
 		army = Armies.create(game, tag, hex, army_name(game, tag, hex))
 	var ids := Armies.add_units(game, army, kind, count, game.turn, hex, ud.cost, per_unit)
+	Armies.set_points(game, army, Allowance.full(game, army))
 	Sight.refresh(game)  # the army part of the sight (5.0 R4): a live game sees what a loaded one does
 	game.emit({"kind": "army_raised", "tag": tag, "hex": hex, "army": army.id, "units": Array(ids), "kind_id": kind,
 		"count": count, "men": count * ud.men, "ducats": int(cost["ducats"]), "goods": goods, "name": army.name})
@@ -373,12 +375,13 @@ static func setup_start_armies(game: Game, scenario: ScenarioDef) -> void:
 		_levy_ring(game, tag, hex, count * ud.men)
 		var army: Army = null
 		for a: Army in Armies.at(game, hex):
-			if a.tag == tag and a.order != Army.ORDER_MARCH:
+			if a.tag == tag and a.order != Army.ORDER_MARCH and Allowance.fresh(game, a):
 				army = a
 				break
 		if army == null:
 			army = Armies.create(game, tag, hex, army_name(game, tag, hex))
 		Armies.add_units(game, army, ud.id, count, 0, hex, 0, {})
+		Armies.set_points(game, army, Allowance.full(game, army))
 
 
 # --- disbanding ------------------------------------------------------------------------------------------------------
@@ -456,6 +459,8 @@ static func disband(game: Game, args: Dictionary) -> Dictionary:
 	Armies.remove_units(game, army, ids)
 	if army.units.is_empty():
 		Armies.remove(game, army)
+	else:
+		Allowance.after_disband(game, army)
 	Sight.refresh(game)
 	var event := {"kind": "army_disbanded", "tag": tag, "hex": hex, "army": army_id, "units": Array(ids), "men": men,
 		"refund": refund, "name": army_name}
@@ -589,7 +594,9 @@ static func split_army(game: Game, args: Dictionary) -> Dictionary:
 	var tag := army.tag
 	var ids := _id_array(args.get("units", PackedInt32Array()))
 	var fresh := Armies.create(game, tag, army.hex, army_name(game, tag, army.hex))
+	var before := army.points
 	Armies.move_units(game, army, fresh, ids)
+	Allowance.after_split(game, army, fresh, before)
 	Armies.set_order(game, fresh, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
 	Sight.refresh(game)  # a company's sight may have moved to the new army
 	_changed(game, army, false)
@@ -626,7 +633,10 @@ static func merge_armies(game: Game, args: Dictionary) -> Dictionary:
 	var ids := PackedInt32Array()
 	for u: Unit in army.units:
 		ids.append(u.id)
+	var a_points := army.points
+	var into_points := into.points
 	Armies.move_units(game, army, into, ids)
+	Allowance.after_merge(game, into, a_points, into_points)
 	_changed(game, army, true)
 	Armies.remove(game, army)
 	Sight.refresh(game)

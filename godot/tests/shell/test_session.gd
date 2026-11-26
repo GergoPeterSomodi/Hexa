@@ -522,6 +522,9 @@ func test_load_of_a_newer_format_returns_its_problem() -> void:
 	_rewrite_header("1", "format", SaveFile.FORMAT + 1)
 	assert_eq(Session.load_game("1"), Snapshot.PROBLEM_NEWER)
 	assert_eq(Session.list_saves()[4]["state"], &"newer")
+	_rewrite_header("1", "format", 7)  # MV2 (R55, D22): the fog build's format is an older test build
+	assert_eq(Session.load_game("1"), Snapshot.PROBLEM_OLDER)
+	assert_eq(Session.list_saves()[4]["state"], &"older")
 
 
 func test_load_refuses_a_name_that_is_not_a_slot() -> void:

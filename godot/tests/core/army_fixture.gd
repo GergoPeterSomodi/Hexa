@@ -6,7 +6,9 @@
 ##   rich(game):        TAG has ducats and every good in store.
 ##   find_town(game):   a land hex of TAG with six land neighbours of TAG, or NO_HEX.
 ##   other_tag(game):   the first country that is not TAG.
-##   army(game, tag, hex, kind, count, raised_turn): an army of `tag` on `hex` made through the door (no raise).
+##   army(game, tag, hex, kind, count, raised_turn): an army of `tag` on `hex` made through the door (no raise), with its full
+##                      move points (a fresh army).
+##   spent(game, army, points): the army has only `points` move points left (moves-build-spec.md R12; cut to 0 and its full).
 class_name ArmyFixture
 extends RefCounted
 
@@ -88,7 +90,13 @@ static func army(g: Game, tag: StringName, hex: Vector2i, kind: int, count: int,
 	var a := Armies.create(g, tag, hex, "Army of test")
 	var turn := raised_turn if raised_turn >= 0 else g.turn - 1
 	Armies.add_units(g, a, kind, count, turn, hex, 0, {})
+	Armies.set_points(g, a, Allowance.full(g, a))
 	return a
+
+
+## The army has `points` move points left: what a walk would leave it (the walks come with the moves build).
+static func spent(g: Game, a: Army, points: int) -> void:
+	Armies.set_points(g, a, points)
 
 
 ## The copy of the game's own state a planted check changes: the game's armies as a saved body.

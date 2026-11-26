@@ -3,7 +3,7 @@
 class_name Army
 extends RefCounted
 
-const SCHEMA := "hexa-godot/army/2"
+const SCHEMA := "hexa-godot/army/3"
 const NO_HEX := Vector2i(-1, -1)
 const ORDER_NONE := &""
 const ORDER_HOLD := &"hold"
@@ -37,6 +37,10 @@ var lost_last: int = 0
 var created_turn: int = 0
 ## STANDING_HOLD or STANDING_WITHDRAW (4.7); written only by Armies.
 var standing: StringName = STANDING_HOLD
+## The move points left this season, 0 to the army's full (moves-build-spec.md R12); written only by Armies.set_points.
+var points: int = 0
+## The hex it stood on when it first moved this season; NO_HEX when it has not moved (R40).
+var season_from: Vector2i = NO_HEX
 
 
 func men() -> int:
@@ -72,6 +76,7 @@ func to_dict() -> Dictionary:
 		"order": String(order), "goal": [goal.x, goal.y], "route": route.duplicate(), "waiting": String(waiting),
 		"halt_why": String(halt_why), "halt_text": halt_text, "moved_from": [moved_from.x, moved_from.y],
 		"supply": supply, "lost_last": lost_last, "created_turn": created_turn, "standing": String(standing),
+		"points": points, "season_from": [season_from.x, season_from.y],
 	}
 
 
@@ -82,7 +87,7 @@ static func from_dict(d: Dictionary) -> Army:
 		return null
 	var a := Army.new()
 	var ints := {}
-	for key: String in ["id", "supply", "lost_last", "created_turn"]:
+	for key: String in ["id", "supply", "lost_last", "created_turn", "points"]:
 		var value: Variant = Unit.int32(d.get(key, null))
 		if value == null or int(value) < 0:
 			return null
@@ -94,7 +99,7 @@ static func from_dict(d: Dictionary) -> Army:
 			return null
 		texts[key] = str(value)
 	var cells := {}
-	for key: String in ["hex", "goal", "moved_from"]:
+	for key: String in ["hex", "goal", "moved_from", "season_from"]:
 		var value: Variant = Unit.hex_from(d.get(key, null))
 		if value == null:
 			return null
@@ -119,6 +124,7 @@ static func from_dict(d: Dictionary) -> Army:
 	a.lost_last = ints["lost_last"]
 	a.created_turn = ints["created_turn"]
 	a.standing = StringName(texts["standing"])
+	a.points = ints["points"]
 	a.tag = StringName(texts["tag"])
 	a.name = texts["name"]
 	a.order = StringName(texts["order"])
@@ -128,12 +134,14 @@ static func from_dict(d: Dictionary) -> Army:
 	a.hex = cells["hex"]
 	a.goal = cells["goal"]
 	a.moved_from = cells["moved_from"]
+	a.season_from = cells["season_from"]
 	a.route = path
 	return a
 
 
 ## "id|tag|name|c,r|created_turn|order|goal|route|waiting|halt_why|halt_text|moved_from|supply|lost_last|" and the units'
-## digest texts in id order, joined by ";". The goal and moved_from are "c,r", the route comma-separated indices.
+## digest texts in id order, joined by ";", then "|standing|points|season_from". The goal, moved_from and season_from are "c,r", the
+## route comma-separated indices.
 func digest_text() -> String:
 	var parts := PackedStringArray()
 	for u: Unit in units:
@@ -141,9 +149,10 @@ func digest_text() -> String:
 	var path := PackedStringArray()
 	for index: int in route:
 		path.append(str(index))
-	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s|%s" % [
+	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s|%s|%d|%d,%d" % [
 		id, String(tag), name, hex.x, hex.y, created_turn, String(order), goal.x, goal.y, ",".join(path),
 		String(waiting), String(halt_why), halt_text, moved_from.x, moved_from.y, supply, lost_last, ";".join(parts), String(standing),
+		points, season_from.x, season_from.y,
 	]
 
 

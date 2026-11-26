@@ -419,11 +419,16 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_7_and_a_format_6_save_is_older() -> void:
-	# FG2 (fog-build R38, D16): the format is 7; a format-6 (M8) save reads older and is refused quietly. The
-	# format-5 and older cases below are unchanged (they were older at 6 too).
-	assert_eq(SaveFile.FORMAT, 7)
-	assert_eq(SaveFile.OLDEST_FORMAT, 7)
+func test_the_format_is_8_and_a_format_7_save_is_older() -> void:
+	# MV2 (moves-build R55, D22): the format is 8; a format-7 (fog build) save reads older and is refused quietly. The
+	# format-6 and older cases below are unchanged (they were older at 7 too).
+	assert_eq(SaveFile.FORMAT, 8)
+	assert_eq(SaveFile.OLDEST_FORMAT, 8)
+	var fog := _saved("6")
+	_with_header(fog, "6", func(h: Dictionary) -> void: h["format"] = 7)
+	assert_eq(SaveFile.read_header("6", fog)["state"], &"older", "a format-7 header reads older")
+	assert_eq(SaveFile.read("6", fog)["problem"], "Made by an older test build", "refused quietly")
+	assert_true((SaveFile.read("6", fog)["body"] as Dictionary).is_empty(), "P: a format-7 file that loads")
 	var m8 := _saved("4")
 	_with_header(m8, "4", func(h: Dictionary) -> void: h["format"] = 6)
 	assert_eq(SaveFile.read_header("4", m8)["state"], &"older", "a format-6 header reads older")
@@ -531,7 +536,7 @@ func test_save_load_save_is_byte_equal_with_a_trimmed_log() -> void:
 	assert_eq(_bytes(SaveFile.path_of("4", dir_a)), _bytes(SaveFile.path_of("4", dir_b)), "byte-equal files")
 
 
-# ----- FG2: the format 7 of the fog build (fog-build-spec R38, D16) ----------------------------------------------
+# ----- FG2: the format 7 of the fog build (fog-build-spec R38, D16); MV2 moved the format to 8 --------------------------
 
 
 func test_a_format_6_file_is_refused_without_a_crash() -> void:
@@ -547,20 +552,47 @@ func test_a_format_6_file_is_refused_without_a_crash() -> void:
 
 
 func test_save_load_save_is_byte_equal_on_north_italy_at_turn_8() -> void:
-	# R38: the format-7 body round-trips on the north Italy map. Seven seasons from Spring 1480 reach turn 8.
+	# R38, MV2 R55: the body round-trips on the north Italy map. Seven seasons from Spring 1480 reach turn 8; armies with
+	# spent points (and one with a season_from) stand on it, which the format-8 body (army/3) carries.
 	var g := EconomyFixture.game(&"GEN")
 	for n: int in 7:
 		Season.run(g)
 	assert_eq(g.turn, 8)
+	var town := ArmyFixture.find_town(g)
+	assert_ne(town, ArmyFixture.NO_HEX, "Genoa has a town with land around it")
+	var walked := ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 2)
+	ArmyFixture.spent(g, walked, 5)
+	walked.season_from = town  # set by the test: the writer comes with the walks (MV4)
+	var resting := ArmyFixture.army(g, ArmyFixture.TAG, town, 2, 1)
+	ArmyFixture.spent(g, resting, 0)
+	var untouched := ArmyFixture.army(g, ArmyFixture.TAG, town, 3, 1)
+	assert_true(Allowance.fresh(g, untouched))
 	var dir_a := _dir()
 	assert_eq(SaveFile.write(g, "2", INFO, {}, dir_a), "")
 	var read := SaveFile.read("2", dir_a)
 	assert_eq(read["problem"], "")
-	assert_eq((read["header"] as Dictionary)["format"], 7)
+	assert_eq((read["header"] as Dictionary)["format"], 8)
 	var r := Snapshot.restore(read["body"] as Dictionary, g.map, g.defs)
 	assert_eq(r["problem"], "")
 	var back := r["game"] as Game
 	assert_eq(back.digest(), g.digest())
+	assert_eq([back.armies[0].points, back.armies[1].points, back.armies[2].points], [5, 0, 8], "the points come back as saved")
+	assert_eq(back.armies[0].season_from, town)
 	var dir_b := _dir()
 	assert_eq(SaveFile.write(back, "2", INFO, {}, dir_b), "")
 	assert_eq(_bytes(SaveFile.path_of("2", dir_a)), _bytes(SaveFile.path_of("2", dir_b)), "byte-equal files")
+
+
+func test_p_points_above_the_full_are_refused_on_load() -> void:
+	# R55: a saved army with more move points than its slowest company allows is a damaged body; the live game is unchanged.
+	var g := EconomyFixture.game(&"GEN")
+	var town := ArmyFixture.find_town(g)
+	var a := ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 1)
+	var live := g.digest()
+	var body := bytes_to_var(var_to_bytes(Snapshot.of(g))) as Dictionary
+	assert_eq(Snapshot.restore(body, g.map, g.defs)["problem"], "", "the sound body loads")
+	((body["armies"] as Dictionary)["list"][0] as Dictionary)["points"] = Allowance.full(g, a) + 1
+	var r := Snapshot.restore(body, g.map, g.defs)
+	assert_null(r["game"], "P: points above the full that load")
+	assert_eq(r["problem"], Snapshot.PROBLEM_UNREADABLE)
+	assert_eq(g.digest(), live, "the live game is not changed")
