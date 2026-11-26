@@ -110,7 +110,7 @@ func _runs() -> Array[Dictionary]:
 		var wh := at[0].split("x")
 		if wh.size() != 2:
 			continue
-		var ui := _auto_scale(int(wh[1])) if at.size() < 2 or at[1] == "auto" else float(at[1])
+		var ui := _auto_scale() if at.size() < 2 or at[1] == "auto" else float(at[1])
 		out.append({"name": "%s@%s" % [at[0], str(ui)], "phys": Vector2i(int(wh[0]), int(wh[1])), "ui": ui})
 	return out
 
@@ -213,12 +213,10 @@ func _capture_one(packed: PackedScene, scene_name: String, run: Dictionary, scal
 	return ok
 
 
-## The UI scale the game picks on this screen with display/ui_scale "auto" for a window `height` pixels tall (App._resolved_ui_scale's
-## rule, M9: the screen's scale or the height's, the larger), printed.
-func _auto_scale(height: int) -> float:
+## The UI scale the game picks on this screen with display/ui_scale "auto" (App._resolved_ui_scale's rule), printed.
+func _auto_scale() -> float:
 	var scr := DisplayServer.get_primary_screen()
-	var scale := Display.resolve_ui_scale("auto", OS.get_name(), DisplayServer.screen_get_scale(scr), DisplayServer.screen_get_dpi(scr),
-		height)
+	var scale := Display.resolve_ui_scale("auto", OS.get_name(), DisplayServer.screen_get_scale(scr), DisplayServer.screen_get_dpi(scr))
 	print("shot_ui_tile: auto UI scale %s (screen scale %s, dpi %d)" % [str(scale), str(DisplayServer.screen_get_scale(scr)),
 		DisplayServer.screen_get_dpi(scr)])
 	return scale

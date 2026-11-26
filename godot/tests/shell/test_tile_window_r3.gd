@@ -313,19 +313,6 @@ func test_a_folded_section_stays_folded_on_the_next_tile() -> void:
 	assert_true(((heads[LAND.HEAD_GROUND] as Button).get_meta("body") as Control).visible, "the others stay open")
 
 
-# --- M9: the UI scale from the height ------------------------------------------------------------------------------------
-
-
-func test_auto_scale_follows_the_window_height() -> void:
-	assert_eq(Display.height_scale(0), 0.0, "no height known")
-	assert_almost_eq(Display.height_scale(720), 1.0, 0.001)
-	assert_almost_eq(Display.height_scale(1080), 1.5, 0.001)
-	assert_almost_eq(Display.height_scale(1440), 2.0, 0.001, "1440 lines start at 2.0")
-	assert_almost_eq(Display.resolve_ui_scale("auto", "Windows", 1.0, 96, 1440), 2.0, 0.001, "auto at 1440 lines")
-	assert_almost_eq(Display.resolve_ui_scale("auto", "Windows", 1.0, 144, 720), 1.5, 0.001, "never under the screen's scale")
-	assert_almost_eq(Display.resolve_ui_scale("100", "Windows", 1.0, 96, 1440), 1.0, 0.001, "a chosen scale is kept")
-
-
 # --- L1, L3, L6 ---------------------------------------------------------------------------------------------------------
 
 

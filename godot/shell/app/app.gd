@@ -585,7 +585,7 @@ func _on_menu_requested() -> void:
 	if hides_world():
 		return
 	var top := _stack.top()
-	if top != null:
+	if top != null and top.screen_id != &"country_pick":  # the pick is a game's first view: the menu opens over it
 		if top.screen_id == &"pause_menu":
 			_stack.back()
 		return
@@ -723,8 +723,7 @@ func _resolved_ui_scale(win: Window) -> float:
 		var scr := clampi(win.current_screen if win != null else DisplayServer.get_primary_screen(), 0, DisplayServer.get_screen_count() - 1)
 		scr_scale = DisplayServer.screen_get_scale(scr)
 		scr_dpi = DisplayServer.screen_get_dpi(scr)
-	return Display.resolve_ui_scale(str(_settings.get_value("display/ui_scale")), _settings.platform, scr_scale, scr_dpi,
-		win.size.y if win != null and DisplayServer.get_name() != "headless" else 0)
+	return Display.resolve_ui_scale(str(_settings.get_value("display/ui_scale")), _settings.platform, scr_scale, scr_dpi)
 
 
 func _sync_camera_free_rect() -> void:

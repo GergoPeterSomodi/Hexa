@@ -85,6 +85,34 @@ func test_logical_size_and_tooltip_delay() -> void:
 	assert_almost_eq(Display.tooltip_delay_seconds("long"), 1.0, 0.001)
 
 
+## Issue 461: "auto" is the screen's own scale only, so a large window on a 96 dpi screen draws the UI at 1.0.
+func test_auto_is_the_default_and_ignores_the_window_size() -> void:
+	var s := Settings.new("Windows", false)
+	assert_eq(str(s.get_value("display/ui_scale")), "auto", "auto is the default")
+	for size: Vector2i in [Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]:
+		var win := Window.new()
+		win.size = size
+		add_child_autofree(win)
+		Display.apply(win, s)
+		assert_almost_eq(win.content_scale_factor, 1.0, 0.001, "auto at %s" % size)
+	assert_almost_eq(Display.resolve_ui_scale("auto", "Windows", 1.0, 96), 1.0, 0.001)
+
+
+func test_a_saved_percentage_still_applies() -> void:
+	var path := "user://test_display_ui_scale.cfg"
+	var saved := Settings.new("Windows", false)
+	assert_true(saved.set_value("display/ui_scale", "150"))
+	assert_true(saved.save_to(path))
+	var loaded := Settings.load_from(path)
+	assert_eq(str(loaded.get_value("display/ui_scale")), "150")
+	var win := Window.new()
+	win.size = Vector2i(2560, 1440)
+	add_child_autofree(win)
+	Display.apply(win, loaded)
+	assert_almost_eq(win.content_scale_factor, 1.5, 0.001)
+	DirAccess.remove_absolute(path)
+
+
 func test_headless_safe_apply() -> void:
 	var old_fps := Engine.max_fps
 	var old_low_proc := OS.low_processor_usage_mode
