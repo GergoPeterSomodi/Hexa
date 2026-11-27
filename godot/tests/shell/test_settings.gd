@@ -387,6 +387,27 @@ func test_m6_map_keys_default_validate_and_fall_back() -> void:
 	assert_true(bool(fallen.get_value("map/sight_veil")), "a bad sight veil falls back to on")
 
 
+## moves in the month: the confirm of risky moves (R48), on by default, on the Game page.
+func test_confirm_moves_default_validate_and_fall_back() -> void:
+	var s := Settings.new("macOS", false)
+	assert_true(Settings.SCHEMA.has("game/confirm_moves"))
+	assert_true(bool(s.get_value("game/confirm_moves")), "risky moves ask by default")
+	assert_eq(str(Settings.SCHEMA["game/confirm_moves"]["since"]), "6")
+	assert_eq(str(Settings.SCHEMA["game/confirm_moves"]["page"]), "game")
+	assert_eq(str(Settings.SCHEMA["game/confirm_moves"]["label"]), "Confirm risky moves")
+	assert_false(s.set_value("game/confirm_moves", "no"), "a string is not a bool")
+	var path := _tmp_file("confirm_moves")
+	assert_true(s.set_value("game/confirm_moves", false))
+	assert_true(s.save_to(path))
+	assert_false(bool(Settings.load_from(path, "macOS", false).get_value("game/confirm_moves")), "off round-trips")
+	# planted fault: a bad value in a file falls back to on
+	var bad := _tmp_file("confirm_moves_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[game]\nconfirm_moves = \"never\"\n")
+	f.close()
+	assert_true(bool(Settings.load_from(bad, "macOS", false).get_value("game/confirm_moves")), "a bad value falls back to on")
+
+
 func test_m7_castle_areas_default_validate_and_fall_back() -> void:
 	var s := Settings.new("macOS", false)
 	assert_true(Settings.SCHEMA.has("map/castle_areas"))

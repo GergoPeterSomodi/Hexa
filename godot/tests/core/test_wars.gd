@@ -197,7 +197,7 @@ func test_men_under_arms_is_the_armies_count() -> void:
 
 
 func test_the_body_round_trips_and_the_digest_holds() -> void:
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)  # a save refuses a war begun before season 1
 	WarFixture.ended(g, nb, WarFixture.stranger_of(g, ArmyFixture.TAG), g.turn, &"take")
 	var body := Wars.to_dict(g)
 	var other := WarFixture.game()
@@ -207,7 +207,7 @@ func test_the_body_round_trips_and_the_digest_holds() -> void:
 
 
 func test_a_body_is_refused_when_it_names_no_living_country() -> void:
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)
 	var body := Wars.to_dict(g)
 	var other := WarFixture.game()
 	other.countries[Countries.by_tag(other, nb).id - 1].alive = false
@@ -228,7 +228,7 @@ func test_an_ended_war_may_name_a_country_that_died_since() -> void:
 	assert_eq(other.wars.size(), 1, "and it is kept")
 	assert_eq(Wars.digest(other), Wars.digest(g), "with the same digest")
 	var lg := WarFixture.game()
-	WarFixture.at_war(lg, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(lg, ArmyFixture.TAG, nb)
 	var live := Wars.to_dict(lg)
 	var dead := WarFixture.game()
 	dead.countries[Countries.by_tag(dead, nb).id - 1].alive = false
@@ -236,7 +236,7 @@ func test_an_ended_war_may_name_a_country_that_died_since() -> void:
 
 
 func test_a_body_is_refused_for_forged_seasons_ids_and_pairs() -> void:
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)
 	var body := Wars.to_dict(g)
 	var future := body.duplicate(true)
 	future["wars"][0]["start_turn"] = g.turn + 5

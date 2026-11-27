@@ -2,8 +2,15 @@
 ## ArmyFixture.game(): the 1480 scenario on seed 1480, calm weather, Genoa (ArmyFixture.TAG) chosen, with copied definitions,
 ## so a planted number never reaches the committed war.
 ##   game():                 a fresh game as above.
-##   at_war(g, a, b):        a live War between a and b made in the test (ids and the season as the door would give them).
-##   ended(g, a, b, end, terms): an ended War between a and b, for the truce.
+##   at_war(g, a, b):        a live War between a and b made in the test (the id as the door would give it), begun the season
+##                           before this one: fair warning (moves-build-spec.md R73) shuts the declared enemy's land to the
+##                           declarer in the season the war began, so a fixture war leaves both lands open. In a game's first
+##                           season that start_turn is 0, which a save refuses (War.from_dict): a test that saves or reads
+##                           back such a game sets g.turn to 2 or later first, or uses declared_now (else a case that expects
+##                           a refusal passes for the wrong reason).
+##   declared_now(g, a, b):  at_war with the war begun this season, as the door declares it (a closes b's land to a until the
+##                           next season; a save takes it in any season).
+##   ended(g, a, b, end, terms): an ended War between a and b (begun this season), for the truce.
 ##   army_at(g, tag, hex, count): an army of `count` pikemen made through the armies' door (ArmyFixture.army).
 ##   neighbour_of(g, tag):   a country that shares a border with tag (&"" when none).
 ##   stranger_of(g, tag):    a country that shares no border with tag and is not tag (&"" when none).
@@ -21,14 +28,20 @@ static func at_war(g: Game, a: StringName, b: StringName) -> War:
 	w.id = g.next_war_id
 	w.a = a
 	w.b = b
-	w.start_turn = g.turn
+	w.start_turn = maxi(g.turn - 1, 0)  # fair warning: war declared a season earlier
 	g.next_war_id += 1
 	g.wars.append(w)
 	return w
 
 
-static func ended(g: Game, a: StringName, b: StringName, end: int, terms: StringName = &"white") -> War:
+static func declared_now(g: Game, a: StringName, b: StringName) -> War:
 	var w := at_war(g, a, b)
+	w.start_turn = g.turn
+	return w
+
+
+static func ended(g: Game, a: StringName, b: StringName, end: int, terms: StringName = &"white") -> War:
+	var w := declared_now(g, a, b)
 	w.end_turn = end
 	w.terms = terms
 	return w

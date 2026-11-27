@@ -1,6 +1,7 @@
 ## The war property (docs/architecture/m7-build-spec.md 4.12 to 4.14, 9, done-when 6 to 9; M7 plan B18): 40 seasons of the 1480
 ## scenario as Genoa with real weather and people, Genoa's three armies to start with (as test_men_property), and a war staged
-## at turn 1 through the door (declare_war against a neighbour). Then the RandomPlayer for every country every season: attacks,
+## at turn 1 through the door (declare_war against a neighbour). Fair warning (moves-build-spec.md R73): one season passes before
+## the staged siege march, so the 40 seasons start at turn 2. Then the RandomPlayer for every country every season: attacks,
 ## storms, sieges, peace and declarations included. Every pick goes through the check/do contract (test_check_contract's
 ## contract_problem). Per season, the world's men under arms, garrisons and people change by the closed flows less the losses
 ## booked in battles (killed and wounded not returned), starvation and captures (the garrison men lost). Over the seeds: battles,
@@ -149,21 +150,12 @@ func _losses(g: Game, season: int) -> int:
 			total += int(e["lost"])
 		elif kind == "district_captured":
 			total += int(e.get("garrison_lost", 0))
-	var owner_of := {}
-	for a: Army in g.armies:
-		for u: Unit in a.units:
-			owner_of[u.id] = a.tag
 	for r: BattleRecord in g.battle_records:
 		if r.turn != season:
 			continue
-		var sides: Array[StringName] = [r.attacker, r.defender]
-		var returned: Dictionary = r.end["returned"]
+		var back := r.returned_by_side()
 		for side: int in 2:
-			var back := 0
-			for uid: Variant in returned:
-				if owner_of.get(int(uid), &"") == sides[side]:
-					back += int(returned[uid])
-			total += int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back
+			total += int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back[side]
 	return total
 
 
@@ -207,6 +199,8 @@ func _tally(g: Game) -> void:
 func _play(seed_value: int, save: bool) -> Dictionary:
 	var g := _seeded_game(seed_value)
 	_stage_war(g)
+	# fair warning: war declared a season earlier (the end of the season is logged, so the replay runs it too).
+	assert_true(bool(Season.run(g)["ok"]), "the season of the declaration ends")
 	_stage_siege(g)
 	var luck := Rng.new()
 	luck.seed_with(seed_value)
@@ -244,7 +238,7 @@ func test_war_seasons_conserve_men_and_people_and_fight() -> void:
 	for seed_value: int in SEEDS:
 		var played := _play(seed_value, false)
 		var g := played["game"] as Game
-		assert_eq(g.turn, SEASONS + 1)
+		assert_eq(g.turn, SEASONS + 2)  # fair warning: war declared a season earlier
 		assert_gt(g.wars.size(), 0, "a war was declared (seed %d)" % seed_value)
 	gut.p("counts: %s" % str(_total))
 	assert_gt(int(_total.get("battle_started", 0)), 0, "battles started")

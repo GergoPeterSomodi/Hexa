@@ -16,7 +16,8 @@ const OWNS: Array[String] = []
 ## the record id) or, with `battle` -1, a battle of others is fought on the hex ahead; fog: a deep-fog step took the season's
 ## points, or the next step is one and the army has walked (R36: the rest stands); the halt words of Movement (no_way, blocked,
 ## shaken, enemy, sighted: an enemy army it did not see when the walk began came into sight, the points kept, R32): the march
-## halted. The seen set of the walk is MarchLeg.leg's (Sight.sees at the act's start), so Continue after a sighted halt walks
+## halted; warned: the next hex is land of a country declared war on this season (FairWarning, R73): the points kept, the march
+## stands. The seen set of the walk is MarchLeg.leg's (Sight.sees at the act's start), so Continue after a sighted halt walks
 ## with a new one that holds the army seen (R35).
 const ARRIVED := &""
 const POINTS := &"points"
@@ -78,7 +79,7 @@ static func _storm_here(game: Game, army: Army, out: Dictionary) -> Dictionary:
 static func _why(w: MarchLeg) -> StringName:
 	if w.engaged:
 		return FOUGHT
-	if Movement.HALT_WHYS.has(w.status) or w.status == Movement.WHY_WINTER:
+	if Movement.HALT_WHYS.has(w.status) or w.status == Movement.WHY_WINTER or w.status == FairWarning.WHY:
 		return w.status
 	if w.zoc_ended():
 		return ZOC

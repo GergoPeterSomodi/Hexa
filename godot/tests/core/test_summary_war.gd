@@ -44,7 +44,7 @@ func _season() -> void:
 	assert_true(bool(verdict["ok"]), "the season ends: %s" % verdict["reason"])
 
 
-## Spring 1480: Milan's Army of Alessandria, the declaration, Savoy's three raises and the two marches (test_war_savoy (a)).
+## Spring 1480: Milan's Army of Alessandria, the declaration, Savoy's three raises and the march on own land (test_war_savoy (a)).
 func _spring_1480() -> void:
 	assert_true(bool(_g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})["ok"]), "Milan raises")
 	assert_true(bool(_g.act("declare_war", {"target": MLO, "tag": SAV})["ok"]), "Savoy declares war on Milan")
@@ -53,7 +53,6 @@ func _spring_1480() -> void:
 	_ivrea = Armies.at(_g, IVREA)[0].id
 	_turin = Armies.at(_g, TURIN)[0].id
 	_vercelli = Armies.at(_g, VERCELLI)[0].id
-	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	assert_true(bool(_g.act("march", {"army": _turin, "goal": VERCELLI, "tag": SAV})["ok"]), "the Army of Turin to Vercelli")
 	_season()
 
@@ -61,6 +60,8 @@ func _spring_1480() -> void:
 ## Autumn 1480: the Army of Turin joins Vercelli, Vercelli attacks Alessandria (the battle of the season).
 func _to_autumn() -> void:
 	_spring_1480()
+	# fair warning: war declared a season earlier than this march into Milan's land.
+	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	_season()  # Summer: the walk into Domodossola
 	assert_true(bool(_g.act("merge_armies", {"army": _turin, "into": _vercelli, "tag": SAV})["ok"]), "the Army of Turin joins Vercelli")
 	assert_true(bool(_g.act("march", {"army": _vercelli, "goal": ALESS, "tag": SAV})["ok"]), "Vercelli attacks Alessandria")
@@ -116,8 +117,8 @@ func test_the_autumn_battle_books_the_men_the_stats_book() -> void:
 	assert_false(battle.is_empty(), "a battle line opens the record")
 	var record := Battles.record(_g, int((battle["action"] as Array)[1]))
 	assert_not_null(record, "the record is kept")
-	var mine := SummaryWar.men_booked(_g, record, 0)
-	var theirs := SummaryWar.men_booked(_g, record, 1)
+	var mine := SummaryWar.men_booked(record, 0)
+	var theirs := SummaryWar.men_booked(record, 1)
 	assert_eq(_g.stats.value(SAV, AUTUMN_1480, "battle_losses"), mine, "Savoy's booked men are the stats' battle losses")
 	assert_eq(_g.stats.value(MLO, AUTUMN_1480, "battle_losses"), theirs, "Milan's booked men are the stats' battle losses")
 	assert_true(str(battle["text"]).ends_with("You lost %d men, they %d." % [mine, theirs]), "the sentence carries the booked men: %s" % str(battle["text"]))

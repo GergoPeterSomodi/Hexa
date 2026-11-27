@@ -1,6 +1,6 @@
 ## The M6 App flow (docs/architecture/m6-build-spec.md sections 6.1, 6.5, 6.8, 6.10, 6.11 and 9; L24): New game as Genoa ->
 ## Tab with no army says so -> the Raise tab raises a company at the capital (the Army chip comes) -> the army selected: its
-## panel in the dock -> Tab, R, O -> a march order -> two seasons (the muster, then the walk; the instant replay) -> the report's
+## panel in the dock -> Tab, R, O -> a season (the muster) -> a march order, walked in the order -> a season -> the report's
 ## Armies section -> Esc clears the army before anything else -> the Military page from the Army chip -> F5, F9: the army and
 ## its panel come back -> the Sight switch -> key 6, the Supply mode -> the disband's Confirm through the App.
 ## A second test: the pick and the sandbox refuse the army commands, have no Army chip and no Supply mode.
@@ -124,14 +124,15 @@ func _genoa_army(game: Game) -> Army:
 	return list[0] if not list.is_empty() else null
 
 
-## A hex a few steps from `from` that the army can march to (MovePreview says so), or (-1, -1).
+## A hex a few steps from `from` that the army walks to this season with no risk (MovePreview says so), or (-1, -1).
 func _march_goal(game: Game, army_id: int, from: Vector2i) -> Vector2i:
 	for i: int in game.map.hex_count():
 		var hex := game.map.hex_of(i)
 		if hex == from or absi(hex.x - from.x) + absi(hex.y - from.y) > 4:
 			continue
 		var preview := MovePreview.to(game, GENOA, army_id, hex)
-		if bool((preview["verdict"] as Dictionary).get("ok", false)):
+		if bool((preview["verdict"] as Dictionary).get("ok", false)) and (preview["risks"] as Array).is_empty() \
+				and not ((preview["leg"] as Dictionary)["hexes"] as Array).is_empty():
 			return hex
 	return Vector2i(-1, -1)
 
@@ -203,21 +204,28 @@ func test_m6_flow_raise_orders_seasons_report_ladder_save_and_supply() -> void:
 	await _wait_frames(2)
 	assert_true(AppFlowHelpers.has_toast(app, "holds at"), "O holds the army on its hex")
 
-	# A march order (a right click on a reachable hex) through the map's armies.
-	var goal := _march_goal(game, army.id, capital)
-	assert_ne(goal, Vector2i(-1, -1), "a hex the army can march to")
-	_armies_node(app).command(goal)
-	await _wait_frames(2)
-	assert_true(AppFlowHelpers.has_toast(app, "marches to"), "the march says so")
-	assert_eq(Armies.by_id(game, army.id).goal, goal, "the army's goal is set")
-
-	# The first season musters the army; the second walks it (the replay is instant under game/movement).
+	# The first season musters the army.
 	await _end_season(vp, app)
 	assert_true(_words(app.stack().top()).contains("Armies"), "the report has its Armies section: " + _words(app.stack().top()))
 	await _close_report(vp, app)
+
+	# moves in the month: a march order (a right click on a reachable hex) walks the army before End season. The goal asks
+	# nothing (no risk).
+	army = Armies.by_id(game, army.id)
+	var goal := _march_goal(game, army.id, capital)
+	assert_ne(goal, Vector2i(-1, -1), "a hex the army can march to")
+	_armies_node(app).select_army(army.id)
+	_armies_node(app).command(goal)
+	await _wait_frames(2)
+	assert_eq(app.stack().count(), 0, "a plain march asks nothing")
+	assert_true(AppFlowHelpers.has_toast(app, "walks to"), "the march says so")
+	var stood := Armies.by_id(game, army.id).hex
+	assert_ne(stood, capital, "the army walked from the capital in the order")
+
+	# The next season: the report, and no season replay (instant under game/movement).
 	await _end_season(vp, app)
 	assert_false(app.requests().replay.active(), "no replay runs at instant speed")
-	assert_ne(Armies.by_id(game, army.id).hex, capital, "the army walked from the capital")
+	assert_true(_words(app.stack().top()).contains("Armies"), "the report has its Armies section: " + _words(app.stack().top()))
 	await _close_report(vp, app)
 	await _ladder_and_pages(vp, app, army.id)
 	await _save_and_load(vp, app, army.id)

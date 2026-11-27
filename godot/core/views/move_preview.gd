@@ -17,9 +17,10 @@ const NOT_YOUR_LAND := "not your land"
 const WAY_OUT_TEXT := "Go round their land."
 const RIVER_NAME := "the river"
 const FOG_NO_WAY_TEXT := "no way there by land"
-## The `why` of a leg (moves-build-spec.md R45): how the walk of this season ends. `fog` and `warned` come with the walk's own
-## rules (MV4, MV20); `sighted` never comes from a preview (an army the viewer sees now cannot be newly sighted). `blocked` and
-## `no_way` are the engine's other ends: an army of another country the viewer sees in the way, and a route with no way on.
+## The `why` of a leg (moves-build-spec.md R45): how the walk of this season ends. `fog` comes with the walk's own rules (MV7)
+## and `warned` with fair warning (R73: the leg ends before land the viewer knows is closed this season, and the leg names its
+## country in `border`); `sighted` never comes from a preview (an army the viewer sees now cannot be newly sighted). `blocked`
+## and `no_way` are the engine's other ends: an army of another country the viewer sees in the way, and a route with no way on.
 const WHY_ARRIVES := &"arrives"
 const WHY_POINTS := &"points"
 const WHY_WINTER := &"winter"
@@ -32,6 +33,8 @@ const WHY_NO_WAY := &"no_way"
 ## MV7: a deep-fog step ends the leg (FogStep, R36); `sighted` is a why of the walk the preview never gives (R45).
 const WHY_FOG := FogStep.WHY
 const WHY_SIGHTED := Movement.WHY_SIGHTED
+const WHY_WARNED := FairWarning.WHY
+const BORDER_TEXT := "Stops at the border of %s: you declared war this season."
 const RISK_BATTLE := &"battle"
 const RISK_ENEMY_LAND := &"enemy_land"
 const RISK_OUT_OF_SUPPLY := &"out_of_supply"
@@ -108,6 +111,8 @@ static func to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dict
 static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dictionary:
 	var verdict := Movement.march_check(game, {"army": army_id, "goal": hex, "tag": tag})
 	if not bool(verdict.ok):
+		if FairWarning.is_refusal(str(verdict.reason)):
+			return _warned_refusal(game, hex, str(verdict.reason))
 		var reason := _fog_safe(game, tag, hex, str(verdict.reason))
 		if reason.begins_with(NOT_YOUR_LAND):
 			reason = _foreign_reason(game, tag, hex)
@@ -118,7 +123,7 @@ static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -
 		return _refusal(game, hex, _fog_safe(game, tag, hex, str(res.reason)))
 	var route: PackedInt32Array = res.hexes
 	var waits := str(res.waits) != ""
-	var walk := Movement.walk_plan(game, a, route, game.turn)
+	var walk := _season_walk(game, a, route)
 	var out := _shell(game, hex)
 	out["verdict"] = verdict
 	out["hexes"] = _hexes(game, route)
@@ -150,6 +155,8 @@ static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -
 	_war_words(game, tag, army_id, hex, stand, out, lines)
 	var leg := _leg(game, tag, a, hex, route, StringName((out.war as Dictionary).kind))
 	var risks := _risks(game, tag, a, leg)
+	if StringName(leg.why) == WHY_WARNED:
+		out["way_out"] = FairWarning.HINT_TEXT
 	out["leg"] = leg
 	out["risks"] = risks
 	_leg_lines(game, a, leg, route, risks, lines, 1 if str((out.war as Dictionary).text) != "" else 0)
@@ -213,7 +220,7 @@ static func stored(game: Game, tag: StringName, army_id: int) -> Dictionary:
 
 static func _make_stored(game: Game, a: Army) -> Dictionary:
 	var route := a.route
-	var walk := Movement.walk_plan(game, a, route, game.turn)
+	var walk := _season_walk(game, a, route)
 	return {
 		"hexes": _hexes(game, route),
 		"stops": _stops(game, a, route, walk),
@@ -221,6 +228,21 @@ static func _make_stored(game: Game, a: Army) -> Dictionary:
 		"arrives_turn": int(walk.arrives_turn),
 		"seasons": int(walk.seasons),
 	}
+
+
+## The season-by-season walk of a route (Movement.walk_plan) under fair warning (R73): when this season's walk would cross into
+## land closed to the army's country, this season ends before it and the rest is walked from the next season on.
+static func _season_walk(game: Game, a: Army, route: PackedInt32Array) -> Dictionary:
+	var walk := Movement.walk_plan(game, a, route, game.turn)
+	var bar := FairWarning.first_barred(game, a.tag, _hexes(game, route))
+	if bar < 0 or int((walk.stops as Array)[0].index) <= bar:
+		return walk
+	var probe := _probe(a, a.hex if bar == 0 else game.map.hex_of(route[bar - 1]), a.goal, route.slice(bar))
+	var rest := Movement.walk_plan(game, probe, probe.route, game.turn + 1)
+	var stops: Array = [{"turn": game.turn, "index": bar}]
+	for s: Dictionary in rest.stops:
+		stops.append({"turn": s.turn, "index": int(s.index) + bar})
+	return {"stops": stops, "arrives_turn": rest.arrives_turn, "seasons": int(rest.seasons) + 1}
 
 
 static func _shell(game: Game, hex: Vector2i) -> Dictionary:
@@ -253,6 +275,15 @@ static func _refusal(game: Game, hex: Vector2i, reason: String) -> Dictionary:
 	out["kind"] = &"refusal"
 	out["lines"] = [[reason, TONE_BAD]]
 	out["way_out"] = WAY_OUT_TEXT if reason.begins_with(NOT_YOUR_LAND) else ""
+	return out
+
+
+## Fair warning's refusal (R73): its words in the warning tone and its hint where the way out goes. The verdict keeps both lines,
+## so an order's toast says them too; the words name only the country the viewer declared war on, on a hex it has discovered.
+static func _warned_refusal(game: Game, hex: Vector2i, reason: String) -> Dictionary:
+	var out := _refusal(game, hex, reason)
+	out["lines"] = [[reason.get_slice("\n", 0), TONE_WARN]]
+	out["way_out"] = FairWarning.HINT_TEXT
 	return out
 
 
@@ -464,7 +495,12 @@ static func _leg(game: Game, tag: StringName, a: Army, goal: Vector2i, route: Pa
 	var hexes: Array[Vector2i] = walk.hexes
 	var why: StringName = WHY_POINTS
 	var met := _met(game, tag, hexes)
-	if int(met.cut) >= 0:
+	var bar := FairWarning.first_barred(game, tag, hexes)
+	if bar >= 0 and (int(met.cut) < 0 or bar <= int(met.at)):
+		why = WHY_WARNED
+		out["border"] = FairWarning.enemy_on(game, tag, hexes[bar])
+		hexes = _head(hexes, bar)
+	elif int(met.cut) >= 0:
 		hexes = _head(hexes, int(met.cut))
 		why = StringName(met.kind)
 	elif bool(walk.zoc):
@@ -584,8 +620,8 @@ static func _sees_zoc(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	return false
 
 
-## The first army of another country on the leg that the viewer sees: {cut (hexes kept; -1 none), kind (battle: the walk ends on
-## its hex; blocked: before it), hex, tag}.
+## The first army of another country on the leg that the viewer sees: {cut (hexes kept; -1 none), at (its place on the leg),
+## kind (battle: the walk ends on its hex; blocked: before it), hex, tag}.
 static func _met(game: Game, tag: StringName, hexes: Array[Vector2i]) -> Dictionary:
 	for k: int in hexes.size():
 		if not Knowledge.sees(game, tag, hexes[k]):
@@ -594,8 +630,8 @@ static func _met(game: Game, tag: StringName, hexes: Array[Vector2i]) -> Diction
 			if o.tag == tag:
 				continue
 			if Wars.at_war(game, tag, o.tag):
-				return {"cut": k + 1, "kind": WHY_BATTLE, "hex": hexes[k], "tag": o.tag}
-			return {"cut": k, "kind": WHY_BLOCKED, "hex": hexes[k], "tag": o.tag}
+				return {"cut": k + 1, "at": k, "kind": WHY_BATTLE, "hex": hexes[k], "tag": o.tag}
+			return {"cut": k, "at": k, "kind": WHY_BLOCKED, "hex": hexes[k], "tag": o.tag}
 	return {"cut": -1}
 
 
@@ -645,6 +681,8 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 	if not hexes.is_empty():
 		made.append([_walks_text(leg, why), TONE_PLAIN])
 	match why:
+		WHY_WARNED:
+			made.append([BORDER_TEXT % Words.country_the(game, StringName(leg.border)), TONE_WARN])
 		WHY_POINTS:
 			made.append([_stop_text(game, a, leg, route), TONE_PLAIN])
 		WHY_ZOC:

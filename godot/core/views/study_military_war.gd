@@ -50,8 +50,8 @@ static func battles(game: Game, viewer: StringName) -> Array[Dictionary]:
 			result = "you lost in %s" % days
 			tone = "bad"
 		out.append({"record": r.id, "name": r.name, "result": result,
-			"yours_lost": SummaryWar.men_booked(game, r, side),
-			"theirs_lost": SummaryWar.men_booked(game, r, 1 - side), "tone": tone})
+			"yours_lost": SummaryWar.men_booked(r, side),
+			"theirs_lost": SummaryWar.men_booked(r, 1 - side), "tone": tone})
 	return out
 
 

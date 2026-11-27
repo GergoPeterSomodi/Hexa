@@ -200,14 +200,13 @@ static func _districts_into(game: Game, rows: Array[PackedInt32Array]) -> void:
 			rows[owner_c][men_col] += int(game.state.garrison[i])
 
 
-## This season's battle records: each side's men lost (killed, and the wounded who did not return: the returns are booked to
-## the country whose units they went back to), and the battles each country won and lost.
+## This season's battle records: each side's men lost (killed, and the wounded who did not return: the returns are the side's
+## by BattleRecord.returned_by_side, a company gone since included), and the battles each country won and lost.
 static func _battles_into(game: Game, stats: Stats, rows: Array[PackedInt32Array]) -> void:
 	var men_col := Stats.column("battle_losses")
 	var losses_col := Stats.column("losses")
 	var won_col := Stats.column("battles_won")
 	var lost_col := Stats.column("battles_lost")
-	var owner_of := _owner_of_units(game)
 	for r: BattleRecord in game.battle_records:
 		if r.turn != game.turn:
 			continue
@@ -216,16 +215,12 @@ static func _battles_into(game: Game, stats: Stats, rows: Array[PackedInt32Array
 		var wounded: PackedInt32Array = r.end.get("wounded_total", PackedInt32Array([0, 0]))
 		if killed.size() < 2 or wounded.size() < 2:
 			continue  # a record is validated on load (BattleRecord._side_pair); this keeps a bad one from crashing the phase
-		var returned: Dictionary = r.end.get("returned", {})
+		var returned := r.returned_by_side()
 		for side: int in 2:
 			var c := stats.tags.find(String(sides[side]))
 			if c < 0 or c >= rows.size():
 				continue
-			var back := 0
-			for uid: Variant in returned:
-				if owner_of.get(int(uid), &"") == sides[side]:
-					back += int(returned[uid])
-			var men := int(killed[side]) + int(wounded[side]) - back
+			var men := int(killed[side]) + int(wounded[side]) - returned[side]
 			rows[c][men_col] += men
 			rows[c][losses_col] += men
 		var winner := int(r.end.get("winner", -1))
@@ -242,14 +237,6 @@ static func _battles_into(game: Game, stats: Stats, rows: Array[PackedInt32Array
 
 
 ## The country of every unit the armies hold now (a returned man's unit may have gone since the fight; then it books nowhere).
-static func _owner_of_units(game: Game) -> Dictionary:
-	var out := {}
-	for a: Army in game.armies:
-		for u: Unit in a.units:
-			out[u.id] = a.tag
-	return out
-
-
 ## The M5 series of one country from its open people flows: what grew, what starved and what left (as positive numbers),
 ## and the towns' food need of the season.
 static func _people_into(country: Country, row: PackedInt32Array) -> void:

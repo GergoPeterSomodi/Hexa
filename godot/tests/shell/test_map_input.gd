@@ -327,6 +327,27 @@ func test_m6_keys_emit_their_intents() -> void:
 		"cursor:0", "cursor:1", "cursor:2", "cursor:3", "mode:5"])
 
 
+## moves in the month: R on a halted march walks it in the key press (the map's armies hear the key and give the order).
+func test_r_on_a_halted_march_walks_at_once() -> void:
+	var game := ArmyFixture.game()
+	Session.start_game(game)
+	var scene := (load("res://shell/map/map_scene.tscn") as PackedScene).instantiate() as MapScene
+	scene.preload_next_season = false
+	add_child_autofree(scene)
+	scene.finish_loading()
+	var hex := ArmyFixture.find_town(game)
+	var army := ArmyFixture.army(game, ArmyFixture.TAG, hex, 0, 2)
+	var goal := game.map.neighbour(hex, 0)
+	assert_true(MovesFixture.standing(game, army, goal))
+	assert_true(bool(Session.act("halt", {"army": army.id})["ok"]))
+	var armies := scene.get_node("MapArmies") as MapArmies
+	armies.sync()
+	assert_true(armies.select_army(army.id))
+	scene.map_input()._unhandled_input(_key(KEY_R))
+	assert_eq(army.hex, goal, "the army walked at once")
+	Session.end_game()
+
+
 func test_m6_keys_ignore_other_chords_and_held_repeats() -> void:
 	var log: Array[String] = []
 	_connect_m6(log)

@@ -1,7 +1,8 @@
 ## The AI at war, part one (docs/architecture/m8-build-spec.md 4.9, 4.10, 4.16 (b) and (c), D22 to D26, 9): when it declares (every
 ## condition, the busy bonus, the ratio cap, the prize, one roll a think turn), the worked examples on the duel
 ## (AiFixture.duel), the standing order, shaken and hungry armies, and the besieger's storm. The aims, fair warning, the keeping
-## of a march, refused marches and the fog are in test_ai_war_aims.gd. The steps run one at a time on a seat's brief
+## of a march, refused marches, stop on sight and the fog are in test_ai_war_aims.gd. An order of the AI walks (and a storm is
+## fought) inside the step (moves in the month). The steps run one at a time on a seat's brief
 ## (AiWar.war, AiWar.war_army); a planted fault (P) is a number changed on a duplicate of a temperament or of the shared numbers.
 @warning_ignore_start("integer_division")
 extends GutTest
@@ -36,6 +37,15 @@ func _depot_near(g: Game, from: Vector2i) -> Vector2i:
 			least = AiKnow.hex_distance(from, hex)
 			best = hex
 	return best
+
+
+## The goals of the marches the last step's hook recorded for the army `id`.
+func _marches_of(id: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for act: Dictionary in S.acts:
+		if act["action"] == "march" and int(act["args"]["army"]) == id:
+			out.append(act["args"]["goal"])
+	return out
 
 
 ## The luck state after one draw of 1 to 1,000 from `before`.
@@ -335,37 +345,46 @@ func test_p_an_army_on_its_own_fortress_or_besieging_keeps_to_hold() -> void:
 # ----- shaken, hungry -------------------------------------------------------------------------------------------------------------
 
 
+# Re-pinned for moves in the month: the march to the depot walks inside the step (R9), so the army stands on the depot after it
+# (the order arrived: hold); with its points spent the same order stands for a later season (R20).
 func test_a_shaken_army_marches_to_the_nearest_depot_and_holds_there() -> void:
 	var g := S.at_war(GEN)
 	var from := _non_depot(g)
 	var army := WarFixture.army_at(g, M, from, 4)
-	# moves in the month: an at-once walk would take the army to the depot in the act and clear its order; with its points spent
-	# the order stands as a standing march, so the test still pins the AI's choice of the nearest depot
-	Armies.set_points(g, army, 0)
 	S.morale(g, army, 500)
 	S.step(g, S.brief(g), army)
 	var depot := _depot_near(g, from)
-	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_MARCH, depot], "to the nearest depot")
+	assert_eq(_marches_of(army.id), [depot] as Array[Vector2i], "to the nearest depot")
+	assert_eq([_army(g, army.id).hex, _army(g, army.id).order], [depot, Army.ORDER_HOLD], "walked there in the step")
 	var home := WarFixture.army_at(g, M, depot, 4)
 	S.morale(g, home, 500)
 	S.step(g, S.brief(g), home)
-	assert_ne(_army(g, home.id).order, Army.ORDER_MARCH, "on the depot it holds")
+	assert_eq(_marches_of(home.id).size(), 0, "on the depot it holds")
+	assert_ne(_army(g, home.id).order, Army.ORDER_MARCH)
 	var fit := WarFixture.army_at(g, M, from, 4)
 	S.morale(g, fit, 700)
 	S.step(g, S.brief(g), fit)
-	assert_false(_army(g, fit.id).goal == depot and _army(g, fit.id).order == Army.ORDER_MARCH, "P: 700 is not shaken")
+	assert_false(_marches_of(fit.id).has(depot), "P: 700 is not shaken")
+	var spent := S.at_war(GEN)
+	var tired := WarFixture.army_at(spent, M, from, 4)
+	Armies.set_points(spent, tired, 0)
+	S.morale(spent, tired, 500)
+	S.step(spent, S.brief(spent), tired)
+	assert_eq([tired.hex, tired.order, tired.goal], [from, Army.ORDER_MARCH, depot], "no points left: the march stands")
 
 
+# Re-pinned for moves in the month: the hungry army walks inside the step (R9): onto a depot within reach, else its first leg
+# with the rest of the march standing (R5).
 func test_a_hungry_army_goes_to_the_depot_unless_it_besieges_a_place_that_falls_within_two_seasons() -> void:
 	var g := S.at_war(GEN)
 	var from := _non_depot(g)
 	var army := WarFixture.army_at(g, M, from, 4)
-	# moves in the month: an at-once walk would arrive at the depot in the act; points spent, the order stands (see the test above)
-	Armies.set_points(g, army, 0)
 	Armies.set_supply(g, army, 2, 0)
 	g.version += 1
 	S.step(g, S.brief(g), army)
-	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_MARCH, _depot_near(g, from)], "hungry: to the depot")
+	var depot := _depot_near(g, from)
+	assert_eq(_marches_of(army.id), [depot] as Array[Vector2i], "hungry: to the depot")
+	assert_eq([_army(g, army.id).hex, _army(g, army.id).order], [depot, Army.ORDER_HOLD], "walked there in the step")
 	var near := S.at_war(GEN)
 	var holder := WarFixture.army_at(near, M, WALLS, 4)
 	Armies.set_supply(near, holder, 2, 0)
@@ -375,23 +394,30 @@ func test_a_hungry_army_goes_to_the_depot_unless_it_besieges_a_place_that_falls_
 	assert_ne(_army(near, holder.id).order, Army.ORDER_MARCH, "the place falls in 2: it keeps the siege")
 	var far := S.at_war(GEN)
 	var starving := WarFixture.army_at(far, M, WALLS, 4)
-	Armies.set_points(far, starving, 0)  # moves in the month: an at-once walk would arrive at the depot; the order stands
 	Armies.set_supply(far, starving, 2, 0)
 	S.siege(far, WALLS, M, 0, 1)
 	assert_gt(int(AiKnow.own_siege(far, M, WALLS)["falls_in"]), 2)
+	var home := _depot_near(far, WALLS)
+	var route := Movement.plan(far, starving, home).hexes as PackedInt32Array
 	S.step(far, S.brief(far), starving)
-	assert_eq(_army(far, starving.id).order, Army.ORDER_MARCH, "P: it falls later than 2 seasons: the hungry army leaves")
+	var left := _army(far, starving.id)
+	assert_eq(_marches_of(left.id), [home] as Array[Vector2i], "P: it falls later than 2 seasons: the hungry army leaves")
+	assert_eq([left.order, left.goal, left.points], [Army.ORDER_MARCH, home, 0], "the depot is seasons away: the march stands")
+	assert_ne(left.hex, WALLS, "its first leg walked in the step")
+	assert_true(route.has(far.map.index_of(left.hex)), "along the route")
 
 
 # ----- storms ---------------------------------------------------------------------------------------------------------------------
 
 
-func _storm_scene(progress: int, seasons: int) -> Dictionary:
+## Milan besieging Genoa's walls. By default the besieger has spent its points (re-pinned for moves in the month: a storm with
+## points left is fought in the act, R29, and its order is gone), so the storm order stands and the tests pin when the AI gives
+## it; `fresh` keeps the points, for what happens when the storm is fought at once.
+func _storm_scene(progress: int, seasons: int, fresh: bool = false) -> Dictionary:
 	var g := S.at_war(GEN)
 	var army := WarFixture.army_at(g, M, WALLS, 4)
-	# moves in the month: a storm with points left is fought in the act (R29) and its order is spent; the besieger has spent its
-	# points, so the storm order stands for the battles phase and the tests still pin when the AI gives it
-	Armies.set_points(g, army, 0)
+	if not fresh:
+		Armies.set_points(g, army, 0)
 	S.siege(g, WALLS, M, progress, seasons)
 	return {"g": g, "army": army}
 
@@ -405,6 +431,35 @@ func test_a_besieger_storms_at_the_meter_the_seasons_and_the_odds() -> void:
 	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_STORM, WALLS], "meter 5 of 10 is the opportunist's half")
 	assert_eq(S.acts.size(), 1, "nothing else: the siege goes on")
 	assert_eq(S.acts[0]["action"], "storm")
+
+
+# moves in the month (R9, R29): the storm the AI orders with points left is fought inside its own turn.
+func test_a_storm_with_points_left_is_fought_inside_the_ais_step() -> void:
+	var s := _storm_scene(5, 2, true)
+	var g: Game = s["g"]
+	var army: Army = s["army"]
+	assert_gt(army.points, 0)
+	assert_gt(Occupation.garrison_of(g, WALLS), 0)
+	var drawn := g.luck.world.get_state()
+	var b := S.brief(g)
+	var hook := S.hook(g)
+	AiWar.war_army(hook, g, b, army.id)
+	assert_eq(S.acts.size(), 1)
+	assert_eq(S.acts[0]["action"], "storm")
+	assert_eq(g.battle_records.size(), 1, "P: a storm left for the battles phase")
+	assert_eq(g.battles.size(), 0, "no battle is open after the act")
+	assert_ne(g.luck.world.get_state(), drawn, "its days are drawn in the act (R31)")
+	assert_eq([Occupation.garrison_of(g, WALLS), AiKnow.controller_of(g, WALLS)], [0, M], "the walls are taken")
+	assert_true(AiKnow.own_siege(g, M, WALLS).is_empty(), "and the siege is over")
+	var after := _army(g, army.id)
+	assert_eq([after.hex, after.order, after.points], [WALLS, Army.ORDER_NONE, 0], "the winner stands there, its season over")
+	assert_lt(after.men(), 2000, "the fight cost men")
+	# A further step of the same turn works with the game as it is now: no second storm, and no walk without points.
+	AiWar.war_army(S.hook(g), g, b, army.id)
+	for act: Dictionary in S.acts:
+		assert_ne(act["action"], "storm", "no storm on a place already taken")
+	assert_eq(_army(g, army.id).hex, WALLS, "no points: it does not walk again this season")
+	assert_eq(g.battle_records.size(), 1)
 
 
 func test_p_no_storm_before_two_seasons_under_the_share_or_under_the_odds() -> void:

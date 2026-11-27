@@ -2,7 +2,7 @@
 ## was ordered to march. `of` reads the walk dictionary that WalkNow gives (steps, from, to, stopped, text, points, full,
 ## standing, battle: spec section 4) and the game after the walk, and gives {text, tone}. One text for each way a walk ends:
 ## walked, walked with a standing rest, stored, stopped on sight, a battle, a zone of control, and the other stops (a closed pass,
-## a way blocked, a shaken army, unmapped land). Fog (R57): only the viewer's own army has words; a country, an army or a place is
+## a way blocked, a shaken army, unmapped land, the border of a country declared war on this season). Fog (R57): only the viewer's own army has words; a country, an army or a place is
 ## named only where the viewer sees it or has discovered it, and the words of a blocked way and of a zone of control are made here
 ## from what the viewer sees, never taken from the engine's text. Pure core/views/ code: no nodes, no engine calls, no luck.
 class_name MoveWords
@@ -47,6 +47,8 @@ static func of(game: Game, viewer: StringName, army_id: int, walk: Dictionary) -
 			return _warn("%s stops at %s: the way is held against it." % [who, at])
 		&"fog":
 			return _warn("%s stops at %s: it spends its season finding the way through unmapped land." % [who, at])
+		&"warned":
+			return _warn("%s stops at the border%s: you declared war this season." % [who, _border(game, a)])
 	return _warn("%s stops at %s." % [who, at])
 
 
@@ -77,6 +79,15 @@ static func _points(game: Game, viewer: StringName, a: Army, who: String, walk: 
 	if bool(walk.get("standing", false)) and a.goal != Army.NO_HEX:
 		return _plain("%s; it marches on to %s%s" % [head, _named(game, viewer, a.goal), STORED_TAIL])
 	return _plain("%s: %s." % [head, _left(walk)])
+
+
+## " of the Duchy of Milan": the country whose land the army's next step enters, declared war on this season (the viewer's own
+## declaration, so it may be named); "" when the army's route does not tell.
+static func _border(game: Game, a: Army) -> String:
+	if a.route.is_empty():
+		return ""
+	var enemy := FairWarning.enemy_on(game, a.tag, game.map.hex_of(a.route[0]))
+	return " of " + Words.country_the(game, enemy) if enemy != &"" else ""
 
 
 ## A closed pass: the army waits for spring where it stands (the pass is named by the engine's text, a place of the map).

@@ -144,3 +144,17 @@ func test_another_countrys_army_has_no_toast() -> void:
 	assert_eq(MoveWords.of(_g, MovesFixture.SAVOY, -5, _walk(&"", Vector2i(5, 7))).text, "")
 	assert_eq(_words({}).text, "", "no walk, no words")
 	assert_true(str(_words(_walk(&"", Vector2i(5, 7)), &"").text).begins_with("The "), "the viewer of no country reads every army")
+
+
+## Fair warning (R73; MV20): the toast of a walk stopped at the border of the country declared war on this season.
+## P: a toast without the country, or naming it to a viewer whose army it is not.
+func test_a_walk_stopped_at_the_border_names_the_declared_enemy() -> void:
+	_g = MovesFixture.declared_now()
+	var a := ArmyFixture.army(_g, MovesFixture.SAVOY, Vector2i(4, 7), 0, 1)
+	Sight.refresh(_g)
+	var r := _g.act("march", {"army": a.id, "goal": Vector2i(6, 9), "tag": MovesFixture.SAVOY})
+	assert_eq(r.walk.stopped, &"warned")
+	var w := MoveWords.of(_g, MovesFixture.SAVOY, a.id, r.walk)
+	assert_eq(w.text, "The %s stops at the border of the Duchy of Milan: you declared war this season." % a.name)
+	assert_eq(w.tone, &"warn")
+	assert_eq(MoveWords.of(_g, MovesFixture.MILAN, a.id, r.walk).text, "", "not Milan's order to read")

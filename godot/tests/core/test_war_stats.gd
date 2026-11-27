@@ -22,6 +22,10 @@ func _game() -> Game:
 	_siege_army(g)
 	var neighbour := WarFixture.neighbour_of(g, ArmyFixture.TAG)
 	assert_true(bool(g.act("declare_war", {"target": neighbour, "tag": ArmyFixture.TAG})["ok"]), "the war is declared")
+	# fair warning: war declared a season earlier (moves-build-spec.md R73); the season of the declaration ends, its events
+	# cleared, so the first season checked holds the staged storm.
+	assert_true(bool(Season.run(g)["ok"]), "the season of the declaration ends")
+	g.events.clear()
 	_stage_siege(g)
 	return g
 
@@ -57,7 +61,7 @@ func _stage_siege(g: Game) -> void:
 			if Occupation.garrison_of(g, fort) <= 0 or not Wars.at_war(g, ArmyFixture.TAG, Occupation.controller_tag(g, fort)):
 				continue
 			# Moves in the month (moves-build-spec.md R1, R29, MV4): orders walk and fight in their act, which changes the seeded
-			# run; the staged army storms the fortress (fought now, in turn 1) so the storm's series are still worked, and the
+			# run; the staged army storms the fortress (fought now, in turn 2) so the storm's series are still worked, and the
 			# season's stats must count a battle fought at once. The check is unchanged.
 			var storm := {"army": a.id, "goal": fort, "tag": ArmyFixture.TAG}
 			if bool(g.check("storm", storm).ok):
@@ -71,21 +75,13 @@ func _stage_siege(g: Game) -> void:
 func _expected(g: Game, season: int) -> Dictionary:
 	var expect := {"battle_losses": {}, "battles_won": {}, "battles_lost": {}, "garrison_lost": {}, "districts_held": {},
 		"districts_lost": {}, "garrison_men": {}}
-	var owner_of := {}
-	for a: Army in g.armies:
-		for u: Unit in a.units:
-			owner_of[u.id] = a.tag
 	for r: BattleRecord in g.battle_records:
 		if r.turn != season:
 			continue
 		var sides: Array[StringName] = [r.attacker, r.defender]
-		var returned: Dictionary = r.end["returned"]
+		var back := r.returned_by_side()
 		for side: int in 2:
-			var back := 0
-			for uid: Variant in returned:
-				if owner_of.get(int(uid), &"") == sides[side]:
-					back += int(returned[uid])
-			_add(expect["battle_losses"], sides[side], int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back)
+			_add(expect["battle_losses"], sides[side], int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back[side])
 		var winner := int(r.end["winner"])
 		# The record's loser is a tag (battle_end writes it); its side is the other side of the int winner.
 		var loser := 1 - winner if winner >= 0 else -1
@@ -119,7 +115,7 @@ func test_the_seven_war_series_match_their_recomputation_every_season() -> void:
 	var worked := {}
 	for _n: int in SEASONS:
 		# Moves in the month: a season's events run from the end of the last season, so the first holds the staged storm's (in
-		# turn 1, before the loop); they are cleared after each season's check.
+		# turn 2, before the loop); they are cleared after each season's check.
 		for c: Country in g.countries:
 			for _t: int in 8:
 				var pick: Dictionary = RandomPlayer.next(g, c.tag, luck)

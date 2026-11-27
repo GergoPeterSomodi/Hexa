@@ -1,5 +1,6 @@
 ## Non-pausing Studiolo help overlay listing every Bindings.DEFAULTS action with live bone KeyCaps
-## in three columns plus platform gesture lines, and marking state/help_seen on enter
+## in three columns plus platform gesture lines and the line that army moves are final (moves-build-spec.md R54), and marking
+## state/help_seen on enter
 ## (docs/architecture/ui-and-controls-spec.md section 4.6;
 ## docs/architecture/ui-style-and-feedback-spec.md section 2).
 class_name HelpOverlay
@@ -19,6 +20,7 @@ var _columns: Array[VBoxContainer] = []
 var _action_caps: Dictionary[StringName, HBoxContainer] = {}
 var _action_labels: Dictionary[StringName, Label] = {}
 var _gestures_box: VBoxContainer = null
+var _moves_note: Label = null
 var _close_btn: KitButton = null
 var _connected_settings: Settings = null
 var _ui_built: bool = false
@@ -118,6 +120,12 @@ func gesture_lines() -> Array[String]:
 	return out
 
 
+## The line about army moves (R54).
+func moves_note() -> String:
+	_ensure_ui()
+	return _moves_note.text if _moves_note != null else ""
+
+
 ## Refreshes every action's KeyCap badges from the live InputMap and platform gesture lines.
 func refresh_bindings(p_platform: String = "") -> void:
 	_ensure_ui()
@@ -170,6 +178,14 @@ func _ensure_ui() -> void:
 	_gestures_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_gestures_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_columns[2].add_child(_gestures_box)
+
+	_moves_note = Label.new()
+	_moves_note.name = &"MovesNote"
+	_moves_note.theme_type_variation = &"Hint"
+	_moves_note.text = KeyHints.MOVES_NOTE
+	_moves_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_moves_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_columns[2].add_child(_moves_note)
 
 	var foot := _frame.footer()
 	var note := Label.new()

@@ -583,6 +583,9 @@ static func continue_check(game: Game, args: Dictionary) -> Dictionary:
 		# A halted storm resumes as a storm: its checks again (a war may have ended, a garrison gone).
 		var s := storm_check(game, {"army": army.id, "goal": army.goal, "tag": army.tag})
 		return {"ok": bool(s.ok), "reason": str(s.reason)}
+	var warned := FairWarning.refusal(game, army.tag, army.goal)  # R73: no entry in the season of the declaration
+	if warned != "":
+		return {"ok": false, "reason": warned}
 	var g := goal_verdict(game, army, army.tag, army.goal)
 	return {"ok": bool(g.ok), "reason": str(g.reason)}
 
@@ -671,6 +674,9 @@ static func _storm_verdict(game: Game, args: Dictionary) -> Dictionary:
 		return _verdict("armies cannot walk on water")
 	if not _storm_in_view(game, army.tag, g):
 		return _verdict(UNSEEN_TEXT)  # one sentence for every place the country cannot see: no walls, no war, no hint (4.15)
+	var warned := FairWarning.refusal(game, army.tag, g)  # R73
+	if warned != "":
+		return _verdict(warned)
 	if Occupation.fortress_level(game, g) == 0:
 		return _verdict("no walls to storm at %s" % Military.hex_text(game, g))
 	var ctl := Occupation.controller_tag(game, g)
@@ -747,6 +753,9 @@ static func _march_verdict(game: Game, args: Dictionary) -> Dictionary:
 	if not bool(v.ok):
 		return {"ok": false, "reason": str(v.reason), "army": null, "plan": {}}
 	var army: Army = v.army
+	var warned := FairWarning.refusal(game, army.tag, goal as Vector2i)  # R73
+	if warned != "":
+		return {"ok": false, "reason": warned, "army": army, "plan": {}}
 	var g := goal_verdict(game, army, army.tag, goal as Vector2i)
 	return {"ok": bool(g.ok), "reason": str(g.reason), "army": army, "plan": g.plan}
 

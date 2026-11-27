@@ -44,12 +44,8 @@ func _census(g: Game) -> Dictionary:
 
 
 ## Adds the season's battle losses to `lost` (by tag): each side's killed and wounded men, less the wounded who came back
-## (booked to the country whose units they went back to; a unit gone since books nowhere). Counts the battles.
+## (to the side of the company that fought, a company gone since included). Counts the battles.
 func _battle_losses(g: Game, season: int, lost: Dictionary) -> void:
-	var owner_of := {}
-	for a: Army in g.armies:
-		for u: Unit in a.units:
-			owner_of[u.id] = a.tag
 	for r: BattleRecord in g.battle_records:
 		if r.turn != season:
 			continue
@@ -57,13 +53,9 @@ func _battle_losses(g: Game, season: int, lost: Dictionary) -> void:
 		var sides: Array[StringName] = [r.attacker, r.defender]
 		_fought[r.attacker] = true
 		_fought[r.defender] = true
-		var returned: Dictionary = r.end["returned"]
+		var back := r.returned_by_side()
 		for side: int in 2:
-			var back := 0
-			for uid: Variant in returned:
-				if owner_of.get(int(uid), &"") == sides[side]:
-					back += int(returned[uid])
-			var men := int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back
+			var men := int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back[side]
 			lost[sides[side]] = int(lost.get(sides[side], 0)) + men
 
 
@@ -205,6 +197,16 @@ func _open_flows(g: Game) -> Dictionary:
 	return out
 
 
+## Every halted march (no order, its goal kept) is told to go on, through the door; a refusal is taken as it is. Fair warning
+## (moves-build-spec.md R73) changed the run, and the random player's own picks no longer hit a halted army in these seasons.
+func _continue_halted(g: Game) -> void:
+	for a: Army in g.armies.duplicate():
+		if a.order != Army.ORDER_NONE or a.goal == Army.NO_HEX or Armies.by_id(g, a.id) == null:
+			continue
+		if bool(g.act("continue_march", {"army": a.id, "tag": a.tag})["ok"]):
+			_count("continue_march")
+
+
 ## Every army that holds (it arrived, or never marched) is sent to a land hex of its country two to three hexes off, now
 ## and then (the order goes through the door; a refusal is taken as it is).
 func _remarch(g: Game) -> void:
@@ -242,6 +244,7 @@ func _run(g: Game) -> void:
 		_act_all(g)
 		if not g.wars.is_empty():
 			_seen["war_seasons"] = int(_seen.get("war_seasons", 0)) + 1
+		_continue_halted(g)
 		_remarch(g)
 		# Every third season the country's food is gone before the supply phase (which runs before production): its armies
 		# on its land go hungry (a rig through the door, logged; a dev transfer, like the rest of the tests' rigs).

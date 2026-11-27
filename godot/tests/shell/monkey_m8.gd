@@ -21,6 +21,8 @@ const M8_STEP_PERCENT := 30
 const M8_WAIT_LIMIT := 240
 ## Frames a whole season (the countries' turn and the phases) may take before a step gives up waiting for its end.
 const M8_SEASON_WAIT := 2400
+## The seasons one forced step may end while it looks for a season replay to skip (_m8_force_skip).
+const M8_FORCE_SEASONS := 16
 ## The console lines the M8 steps type: the computer's switches and the watch (refused once the game has begun).
 const M8_CONSOLE_LINES: Array[String] = ["ai MLO", "ai off", "ai on", "ai pass MLO", "ai play MLO", "ai", "watch"]
 
@@ -64,13 +66,46 @@ func _m8_check(app: App, prev_game: Game, from_len: int, prev_turn: int, prev_un
 
 
 ## issue 457: the replay skip is held by the seed's sequence (a replay is up at a step's start only by chance, and the fixed
-## clock makes the chance the same every run), so a seed that has skipped none by FORCE_M8_SKIP_STEP ends one season and skips
-## its replay, as the counter needs. A season that has no replay just passes.
-func _m8_force_skip(vp: SubViewport, app: App) -> void:
-	if not _m8 or Session.game == null or app.stack().count() > 0 or app.requests().flow.state() != SeasonFlow.State.IDLE:
+## clock makes the chance the same every run), so a seed that has skipped none by FORCE_M8_SKIP_STEP ends seasons here. The
+## player's own marches play live (moves-build-spec.md R49), so a season replay holds only the walks that arrive while the season
+## runs and many seasons have none: while the skip counter is 0 the step ends season after season, up to M8_FORCE_SEASONS, until
+## one has a replay, and skips it. With a skip already counted it ends one season, for the other counters.
+func _m8_force_skip(rng: Rng, vp: SubViewport, app: App) -> void:
+	if not _m8:
 		return
-	await _m8_wait_until(func() -> bool: return SimClock.msec() >= app.requests().flow.guard_until, 600)
-	_send_chord(vp, KEY_SPACE)
+	for _season: int in M8_FORCE_SEASONS:
+		if not await _m8_settle(rng, vp, app):
+			return
+		await _m8_force_season(vp, app)
+		if int(_n["m8_skips"]) > 0:
+			return
+
+
+## Brings the app to where a season can be forced: the Confirms answered and the other screens closed (the report, the study),
+## so the flow is IDLE, or a season or its replay already under way. False with no game to play, or when it does not get there.
+func _m8_settle(rng: Rng, vp: SubViewport, app: App) -> bool:
+	for _try: int in 8:
+		if Session.game == null or Session.player_tag() == &"" or app.is_starting():
+			return false
+		var state := app.requests().flow.state()
+		if state == SeasonFlow.State.RUNNING or state == SeasonFlow.State.REPLAY:
+			return true
+		if app.stack().top() is Confirm:
+			await _m7_answer(rng, vp, app, false)
+		elif app.stack().count() > 0:
+			await _m7_close_all(vp, app)
+		elif state == SeasonFlow.State.IDLE:
+			return true
+		await _wait_frames(2)
+	return false
+
+
+## One forced season: Space (unless one is under way), F5, a click and a pan while the countries move, then Space skips its replay
+## when it has one. A season with no replay just passes.
+func _m8_force_season(vp: SubViewport, app: App) -> void:
+	if app.requests().flow.state() == SeasonFlow.State.IDLE:
+		await _m8_wait_until(func() -> bool: return SimClock.msec() >= app.requests().flow.guard_until, 600)
+		_send_chord(vp, KEY_SPACE)
 	# The flow turns RUNNING a few frames before the session's season is up (F5 and a click are refused only in the season): wait for it.
 	await _m8_wait_until(func() -> bool: return Session.in_season() or app.requests().flow.state() != SeasonFlow.State.RUNNING, 120)
 	if app.requests().flow.state() == SeasonFlow.State.RUNNING and Session.in_season():  # the season is up: F5 and a pan come next

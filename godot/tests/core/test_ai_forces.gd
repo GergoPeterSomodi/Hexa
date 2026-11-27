@@ -562,25 +562,67 @@ func test_the_forces_step_acts_only_for_its_seat() -> void:
 		assert_eq(act["args"]["tag"], SEAT)
 
 
+# Re-pinned for moves in the month: the march to the post walks inside the step (R9). A post more than a season away leaves the
+# march standing after the first leg (no second order); a post within reach is reached in the step.
 func test_an_army_off_its_post_marches_to_it_and_one_on_it_stays() -> void:
 	var towns := _towns(2)
 	var army := _army(towns[0])
-	# moves in the month: an at-once walk would arrive at the post in the act and clear the order; the army has spent its
-	# points, so the order stands as a standing march and the test still checks "already marching: no second order"
-	Armies.set_points(_g, army, 0)
+	var far := _far_town(army)
 	var b := _brief()
-	b.posts = [towns[1]] as Array[Vector2i]
+	b.posts = [far] as Array[Vector2i]
 	AiForces.peace_army(_hook, _g, b, army.id)
 	var marches := _acts_of("march")
 	assert_eq(marches.size(), 1)
-	assert_eq(marches[0]["args"]["goal"], towns[1])
-	assert_eq(army.order, Army.ORDER_MARCH)
-	assert_eq(army.goal, towns[1])
+	assert_eq(marches[0]["args"]["goal"], far)
+	assert_ne(army.hex, towns[0], "its first leg walked in the step")
+	assert_eq([army.order, army.goal], [Army.ORDER_MARCH, far], "the rest stands")
 	AiForces.peace_army(_hook, _g, b, army.id)
 	assert_eq(_acts_of("march").size(), 1, "already marching to its post: no second order")
 	var on := _army(towns[1])
+	b.posts = [towns[1]] as Array[Vector2i]
 	AiForces.peace_army(_hook, _g, b, on.id)
 	assert_eq(_acts_of("march").size(), 1, "an army on its post gives no march")
+	var near := _army(towns[1])
+	var next := ImproveRules.neighbour(towns[1], 0)
+	b.posts = [next] as Array[Vector2i]
+	AiForces.peace_army(_hook, _g, b, near.id)
+	assert_eq([near.hex, near.order], [next, Army.ORDER_HOLD], "a post one step away: there in the step")
+	AiForces.peace_army(_hook, _g, b, near.id)
+	assert_eq(_acts_of("march").size(), 2, "and no further order on it")
+
+
+## moves in the month (R41): a march of the forces' step halted on sight asks for one more step. In a turn an army at peace has
+## no enemy to see, so the step is called here in a war scene (AiWarScene): knights of sight 2 walking past an unseen company.
+func test_a_march_to_the_post_halted_on_sight_asks_for_one_more_step() -> void:
+	_g = AiWarScene.at_war(AiFixture.VENICE)
+	_hook = AiFixture.solo(_g, SEAT)
+	var knights := _army(Vector2i(20, 5), 4, 2)
+	ArmyFixture.army(_g, AiFixture.VENICE, Vector2i(18, 4), 0, 1, 0)
+	Sight.refresh(_g)
+	var b := _brief()
+	b.posts = [Vector2i(19, 3)] as Array[Vector2i]
+	assert_eq(b.seen.filter(func(e: Dictionary) -> bool: return e["hex"] == Vector2i(18, 4)).size(), 0)
+	AiForces.peace_army(_hook, _g, b, knights.id)
+	assert_eq(knights.halt_why, Movement.WHY_SIGHTED, "the walk halted on sight")
+	assert_eq(_pushed(), ["army %d" % knights.id] as Array[String], "P: a halt with no further step")
+	assert_eq(b.seen, AiKnow.seen_enemies(_g, SEAT), "and the seat looked again")
+	_hook = AiFixture.solo(_g, SEAT)
+	var foot := _army(Vector2i(9, 9))
+	b.posts = [ImproveRules.neighbour(Vector2i(9, 9), 0)] as Array[Vector2i]
+	AiForces.peace_army(_hook, _g, b, foot.id)
+	assert_ne(foot.hex, Vector2i(9, 9), "a march with nothing new to see")
+	assert_eq(_pushed(), [] as Array[String], "P: a march not halted on sight asks for no step")
+
+
+## The first land hex of the seat's own land (index order) that `army` needs more than one season to reach.
+func _far_town(army: Army) -> Vector2i:
+	for i: int in AiKnow.land_of(_g, SEAT):
+		var hex := AiKnow.hex_of(_g, i)
+		var plan := Movement.plan(_g, army, hex)
+		if bool(plan.ok) and int(Movement.walk_plan(_g, army, plan.hexes, _g.turn).seasons) > 1:
+			return hex
+	assert_true(false, "the seat has land more than a season away")
+	return Army.NO_HEX
 
 
 func test_an_army_on_its_post_but_marching_elsewhere_halts() -> void:

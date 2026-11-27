@@ -127,20 +127,13 @@ static func active_enemies(game: Game, tag: StringName, turn: int) -> Array[Stri
 
 
 ## The men of a battle record that side booked as lost (Stats' rule: killed, plus the wounded, less the wounded who went back
-## to their units). Side 0 is the attacker, 1 the defender.
-static func men_booked(game: Game, r: BattleRecord, side: int) -> int:
+## to their units, BattleRecord.returned_by_side). Side 0 is the attacker, 1 the defender.
+static func men_booked(r: BattleRecord, side: int) -> int:
 	var killed: PackedInt32Array = r.end.get("killed", PackedInt32Array([0, 0]))
 	var wounded: PackedInt32Array = r.end.get("wounded_total", PackedInt32Array([0, 0]))
 	if killed.size() < 2 or wounded.size() < 2 or (side != SIDE_ATTACKER and side != SIDE_DEFENDER):
 		return 0
-	var side_tag := r.attacker if side == SIDE_ATTACKER else r.defender
-	var owner := _owners(game)
-	var back := 0
-	var returned: Dictionary = r.end.get("returned", {})
-	for uid: Variant in returned:
-		if owner.get(int(uid), &"") == side_tag:
-			back += int(returned[uid])
-	return int(killed[side]) + int(wounded[side]) - back
+	return int(killed[side]) + int(wounded[side]) - r.returned_by_side()[side]
 
 
 # ----- the section -----------------------------------------------------------------------------------------------------
@@ -169,8 +162,8 @@ static func _battle_line(game: Game, entry: Dictionary, tag: StringName) -> Dict
 	var mine := 0
 	var theirs := 0
 	if record != null:
-		mine = men_booked(game, record, mine_side)
-		theirs = men_booked(game, record, their_side)
+		mine = men_booked(record, mine_side)
+		theirs = men_booked(record, their_side)
 	else:
 		mine = _pair(entry, "killed", tag) + _pair(entry, "wounded", tag)
 	var how := str(entry.get("how", ""))
@@ -373,14 +366,6 @@ static func _dict_total(entry: Dictionary, key: String) -> int:
 	for who: Variant in counts:
 		total += int(counts[who])
 	return total
-
-
-static func _owners(game: Game) -> Dictionary:
-	var out := {}
-	for a: Army in game.armies:
-		for u: Unit in a.units:
-			out[u.id] = a.tag
-	return out
 
 
 ## True when every line is a sub line (no event, no siege): the season is quiet in war.

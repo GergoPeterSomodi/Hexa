@@ -215,8 +215,8 @@ static func ceded(game: Game, war: War, terms: StringName, actor: StringName) ->
 
 ## Books a fought battle to its live war (4.2): the battles each side won and the men each lost (killed, plus the wounded
 ## who did not return). A battle with no live war between its two sides books nothing. The record's end gives killed and
-## wounded_total per side (0 attacker, 1 defender) and returned by unit key; a key's side is read from the record's input
-## fighters. The writer of the war's counts is this function only.
+## wounded_total per side (0 attacker, 1 defender); the returned are BattleRecord.returned_by_side's. The writer of the war's
+## counts is this function only.
 static func book_battle(game: Game, record: BattleRecord) -> void:
 	var w := War.live_between(game.wars, record.attacker, record.defender)
 	if w == null:
@@ -225,7 +225,7 @@ static func book_battle(game: Game, record: BattleRecord) -> void:
 	var wounded := _pair_of(record.end.get("wounded_total", null))
 	if killed.is_empty() or wounded.is_empty():
 		return
-	var returned := _returned_by_side(record)
+	var returned := record.returned_by_side()
 	for side: int in 2:
 		var tag := record.attacker if side == 0 else record.defender
 		var lost: int = killed[side] + wounded[side] - returned[side]
@@ -291,9 +291,9 @@ static func season(game: Game) -> void:
 ## The peace's steps (4.9) for one live war, in order: the battles, then the sieges, between the two end (their doors); the
 ## land that moves and the occupations that clear are read; the war ends (end_turn, terms, moved); the occupations clear
 ## (Occupation.release, the garrisons of the ceded hexes 0); peace_made; the land moves (Territory.transfer, owners_changed);
-## the armies of either on closed land go to their nearest own hex with room, or home with none; then the halts, the disbands
-## and the controllers (Occupation.flush). Terms take and yield move districts; white and timer move none. The actor is the
-## side that asks; with &"" (the timer) the war's first party is named as the tag.
+## every army on land now closed to it (a third country's too) goes to its nearest own hex with room, or home with none; then
+## the halts, the disbands and the controllers (Occupation.flush). Terms take and yield move districts; white and timer move
+## none. The actor is the side that asks; with &"" (the timer) the war's first party is named as the tag.
 static func end_war(game: Game, war: War, terms: StringName, actor: StringName) -> void:
 	if war == null or not war.live() or game.map == null or game.state == null:
 		return
@@ -314,7 +314,7 @@ static func end_war(game: Game, war: War, terms: StringName, actor: StringName) 
 	if not moved.is_empty():
 		Territory.transfer(game, moved, Countries.by_tag(game, winner).id)
 	var later: Array[Dictionary] = []
-	_send_armies_home(game, war, later)
+	_send_armies_home(game, later)
 	for event: Dictionary in later:
 		game.emit(event)
 	Occupation.flush(game)
@@ -369,12 +369,15 @@ static func _occupied_between(game: Game, a: StringName, b: StringName) -> Array
 	return out
 
 
-## The armies of the two countries that stand on land now closed to them (4.9): each goes to its nearest own hex (hex distance,
-## ties by index) where its companies fit the stack limit, or home when there is none. Their halts and disbands are queued in
-## `later`, so their events come after the owners change.
-static func _send_armies_home(game: Game, war: War, later: Array[Dictionary]) -> void:
+## Every army that stands on land now closed to it (4.9): the two countries', and a third country's on land that changed hands
+## (issue #467). In army id order, each goes to its nearest own hex (hex distance, ties by index) where its companies fit the
+## stack limit, or home when there is none. Their halts and disbands are queued in `later`, so their events come after the
+## owners change.
+static func _send_armies_home(game: Game, later: Array[Dictionary]) -> void:
 	var limit := Military.stack_limit(game, &"")
-	for army: Army in _armies_of(game, war.a, war.b):
+	var armies: Array[Army] = []
+	armies.assign(game.armies)  # a copy: a disband removes an army
+	for army: Army in armies:
 		if _open(game, army.tag, army.hex):
 			continue
 		var fits: Callable = func(i: int) -> bool: return not Armies.held_by_other(game, army.tag, game.map.hex_of(i)) and Armies.units_at(game, army.tag, game.map.hex_of(i), PackedInt32Array([army.id])) + army.units.size() <= limit
@@ -464,15 +467,6 @@ static func _open(game: Game, tag: StringName, hex: Vector2i) -> bool:
 		return true
 	var theirs := Countries.by_id(game, owner)
 	return theirs != null and bool(Movement.hostile.call(game, tag, theirs.tag))
-
-
-## The armies of a or b, in id order (a copy: the caller may remove some of them).
-static func _armies_of(game: Game, a: StringName, b: StringName) -> Array[Army]:
-	var out: Array[Army] = []
-	for army: Army in game.armies:
-		if army.tag == a or army.tag == b:
-			out.append(army)
-	return out
 
 
 # --- the saved body and the digest -----------------------------------------------------------------------------------
@@ -610,26 +604,6 @@ static func _pairs_ok(list: Array[War]) -> bool:
 					and list[i].other(list[j].b) != &"" and list[i].other(list[j].a) == list[j].b:
 				return false
 	return true
-
-
-## The men each side returned (0 attacker, 1 defender): end.returned by unit key, the key's side from the input fighters.
-static func _returned_by_side(record: BattleRecord) -> PackedInt32Array:
-	var out := PackedInt32Array([0, 0])
-	var side_of: Dictionary = {}
-	var fighters: Variant = record.input.get("fighters", [])
-	if fighters is Array:
-		for f: Variant in fighters as Array:
-			if f is Dictionary:
-				var fd := f as Dictionary
-				side_of[int(str(fd.get("key", 0)))] = int(str(fd.get("side", -1)))
-	var returned: Variant = record.end.get("returned", {})
-	if returned is Dictionary:
-		var map := returned as Dictionary
-		for k: Variant in map:
-			var side := int(side_of.get(int(str(k)), -1))
-			if side == 0 or side == 1:
-				out[side] += int(map[k])
-	return out
 
 
 static func _def(game: Game) -> WarDef:

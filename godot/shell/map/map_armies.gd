@@ -2,7 +2,9 @@
 ## token, a second click on a stack, Tab), the order cursor (Alt+arrows, O and a right click), the route of the cursor or of the hex
 ## under the pointer, the stored route of a march in progress (thin), the reach of the selected army and R. A child of the
 ## map scene, made once the scene's layers exist, as MapPeople is. It reads the game through ArmyView and MovePreview and
-## orders only through Session.act; it never changes the game.
+## orders only through Session.act; it never changes the game. The orders of an army (march, halt, Continue and storm; the
+## army panel's buttons come here too) go through its MoveOrders: a running live walk lands first, a risky move is asked about,
+## the toast is MoveWords' and a battle the walk opened is told (moves-build-spec.md R48 to R53).
 class_name MapArmies
 extends Node
 
@@ -10,6 +12,11 @@ signal army_selected(army_id: int)
 signal army_cleared
 ## An order's toast (spec 6.10): the App shows it (GameRequests); a refusal is `refused` on the scene, as before.
 signal said(text: String, tone: StringName)
+## An order's walk fought a battle (R53): the App opens the dock on its record once the walk has played.
+signal battle_opened(record: int)
+
+## The group the armies' layer is found by: the army panel's orders and the map hover's points mark.
+const GROUP := &"map_armies"
 
 ## The process priority of the layer: after every other node of the frame (the default is 0).
 const SYNC_PRIORITY := 1000
@@ -20,7 +27,8 @@ const REACH_LAYER := "reach"
 const REACH_NEXT_LAYER := "reach_next"
 ## The order kind of a march (Army.ORDER_MARCH; the view's order.kind).
 const MARCH_KIND := &"march"
-## The tone of an order toast (spec 6.10); a refusal is a warning (`refused`).
+## The tone of the toast of a hold and of the replay's line (spec 6.10); a walk's toast takes MoveWords' tone and a refusal is
+## a warning (`refused`).
 const TOAST_TONE := &"plain"
 ## Supply states that feed an army (SupplyView.at's state); any other state is out of supply.
 const INSIDE_STATES: Array[StringName] = [&"depot", &"in", &"winter_cut"]
@@ -30,6 +38,7 @@ const REPLAY_BLOCKED := "The moves are still playing: Space skips them."
 
 ## () -> bool, set by GameRequests: true while the movement replay runs, so no order is given (M6 6.4).
 var orders_blocked: Callable = Callable()
+var _orders := MoveOrders.new()
 var _scene: MapScene = null
 var _view: TileMapView = null
 var _tokens: ArmyTokens = null
@@ -57,6 +66,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	add_to_group(GROUP)
 	_scene = get_parent() as MapScene
 	_view = _scene.view()
 	_tokens = ArmyTokens.new()
@@ -294,22 +304,43 @@ func show_army(army_id: int) -> bool:
 	return true
 
 
+## What the orders ask and skip (the App sets its settings and callables).
+func orders() -> MoveOrders:
+	return _orders
+
+
+## The armies' layer of the map in `node`'s tree, or null (a panel or a card with no map).
+static func in_tree(node: Node) -> MapArmies:
+	return node.get_tree().get_first_node_in_group(GROUP) as MapArmies if node.is_inside_tree() else null
+
+
 ## R: continue the halted march of the selected army; a refusal is said.
 func continue_march() -> bool:
 	if _replay_blocks():
 		return false
 	if _army < 0:
 		return _refuse("Select an army first.")
-	var verdict := Session.act("continue_march", {"army": _army})
+	return continue_army(_army)
+
+
+## Continue (R, the army panel's button) for an army of yours: asked first when risky. False when refused (the refusal is said);
+## true when the order was given or its question is up.
+func continue_army(army_id: int) -> bool:
+	if _replay_blocks():
+		return false
+	_orders.skip_live()
+	var verdict := Session.check("continue_march", {"army": army_id})
 	if not bool(verdict.get("ok", false)):
 		return _refuse(str(verdict.get("reason", "")))
-	sync()
-	_say(_continued_words(), TOAST_TONE)
+	var game := Session.game
+	_orders.run(_name_of(game, army_id), MoveOrders.continue_risks(game, Session.player_tag(), army_id),
+			_give_continue.bind(game, army_id))
 	return true
 
 
-## A command at `hex` (a right click, or O at the cursor) with an army of yours selected: a march to it, or a halt when it is
-## the army's own hex. False with no army selected (the scene then deselects, and the hex menu comes later).
+## A command at `hex` (a right click, or O at the cursor) with an army of yours selected: a march to it (asked first when
+## risky), or a halt when it is the army's own hex. False with no army selected (the scene then deselects, and the hex menu
+## comes later).
 func command(hex: Vector2i) -> bool:
 	if _replay_blocks():
 		return true
@@ -322,64 +353,104 @@ func command(hex: Vector2i) -> bool:
 		return false
 	if game.map == null or not game.map.has(hex):
 		return true
-	var here := ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i
-	var verdict: Dictionary
-	var words := ""
-	if hex == here:
-		words = _holds_words(game, hex)
-		verdict = Session.act("halt", {"army": _army})
+	_orders.skip_live()
+	if hex == (ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i):
+		_halt(game, hex)
 	else:
-		words = _marches_words(game, hex)
-		verdict = Session.act("march", {"army": _army, "goal": hex})
-	if bool(verdict.get("ok", false)):
-		_set_cursor(hex)
-		sync()
-		_say(words, TOAST_TONE)
-	else:
-		_refuse(_said_reason(hex, verdict))
+		_orders.run(_name_of(game, _army), MoveOrders.march_risks(game, Session.player_tag(), _army, hex),
+				_give_march.bind(game, _army, hex))
 	return true
 
 
-## The order toasts (spec 6.10): "The Army of Turin marches to Vercelli (6, 9): there in Autumn 1480.", "The Army of Turin holds
-## at Vercelli (6, 9).", and for a march on (R) "The Army of Turin marches on to Susa (4, 9)." Made before the order is given
-## (the preview of a march the army already walks is not the same), except the march on, which reads the order it now has.
-func _marches_words(game: Game, hex: Vector2i) -> String:
-	var name := str(ArmyView.panel(game, Session.player_tag(), _army).get("name", "The army"))
-	var preview := MovePreview.to(game, Session.player_tag(), _army, hex)
-	var arrives := int(preview.get("arrives_turn", -1))
-	var when := ": there in %s" % Calendar.date_text(arrives, game.start_year) if arrives >= 0 else ""
-	var war := _war_words(game, name, hex, arrives)
-	if war != "":
-		return war
-	return "The %s marches to %s%s." % [name, Words.place(game, hex), when]
-
-
-## The toasts of a war march (spec 6.10): "The Army of Vercelli marches on Alessandria (7, 9): Favourable, there in Autumn 1480."
-## for an attack and "... marches to besiege Pavia (10, 9): falls in about 4 seasons." for a siege; "" for any other march.
-func _war_words(game: Game, name: String, hex: Vector2i, arrives: int) -> String:
-	var odds := OddsView.of(game, Session.player_tag(), _army, hex)
-	var kind := StringName(str(odds.get("kind", "")))
-	if kind == OddsView.KIND_ATTACK and str(odds.get("word", "")) != "":
-		var there := ", there in %s" % Calendar.date_text(arrives, game.start_year) if arrives >= 0 else ""
-		return "The %s marches on %s: %s%s." % [name, Words.place(game, hex), str(odds["word"]), there]
-	if kind == OddsView.KIND_SIEGE:
-		var parts := str(odds.get("kind_text", "")).split(" · ")
-		if parts.size() == 2:
-			return "The %s marches to besiege %s: %s." % [name, Words.place(game, hex), parts[1]]
-	return ""
-
-
-func _holds_words(game: Game, hex: Vector2i) -> String:
-	var name := str(ArmyView.panel(game, Session.player_tag(), _army).get("name", "The army"))
-	return "The %s holds at %s." % [name, Words.place(game, hex)]
-
-
-func _continued_words() -> String:
+## An army of yours storms the fortress at `hex` (Shift+right click, Shift+O, the panel's Storm), asked first when risky. False
+## when refused (the refusal is said) or there is no such army or hex; true when the order was given or its question is up.
+func storm(army_id: int, hex: Vector2i) -> bool:
+	if _replay_blocks():
+		return false
 	var game := Session.game
-	var panel := ArmyView.panel(game, Session.player_tag(), _army)
-	var name := str(panel.get("name", "The army"))
-	var goal := (panel.get("order", {}) as Dictionary).get("goal", MapInput.NO_HEX) as Vector2i
-	return "The %s marches on to %s." % [name, Words.place(game, goal)]
+	if game == null or game.map == null or not game.map.has(hex) or not _mine(game, army_id):
+		return false
+	_orders.skip_live()
+	var verdict := Session.check("storm", {"army": army_id, "goal": hex})
+	if not bool(verdict.get("ok", false)):
+		return _refuse(str(verdict.get("reason", "")))
+	_orders.run(_name_of(game, army_id), MoveOrders.storm_risks(game, Session.player_tag(), army_id, hex),
+			_give_storm.bind(game, army_id, hex))
+	return true
+
+
+## Halts the selected army on its own hex: "The Army of Turin holds at Vercelli (6, 9)."
+func _halt(game: Game, hex: Vector2i) -> void:
+	var words := "The %s holds at %s." % [_name_of(game, _army), Words.place(game, hex)]
+	var verdict := Session.act("halt", {"army": _army})
+	if not bool(verdict.get("ok", false)):
+		_refuse(str(verdict.get("reason", "")))
+		return
+	_set_cursor(hex)
+	sync()
+	_say(words, TOAST_TONE)
+
+
+## Gives the march (at once, or after "Move"): the army walks in the act.
+func _give_march(game: Game, army_id: int, hex: Vector2i) -> void:
+	if not _still(game, army_id):
+		return
+	var army_name := _name_of(game, army_id)
+	var verdict := Session.act("march", {"army": army_id, "goal": hex})
+	if not bool(verdict.get("ok", false)):
+		_refuse(_said_reason(army_id, hex, verdict))
+		return
+	if army_id == _army:
+		_set_cursor(hex)
+	var walk := verdict.get("walk", {}) as Dictionary
+	_walked(MoveOrders.words(game, Session.player_tag(), army_id, army_name, walk), walk)
+
+
+func _give_continue(game: Game, army_id: int) -> void:
+	if not _still(game, army_id):
+		return
+	var army_name := _name_of(game, army_id)
+	var verdict := Session.act("continue_march", {"army": army_id})
+	if not bool(verdict.get("ok", false)):
+		_refuse(str(verdict.get("reason", "")))
+		return
+	var walk := verdict.get("walk", {}) as Dictionary
+	_walked(MoveOrders.words(game, Session.player_tag(), army_id, army_name, walk), walk)
+
+
+func _give_storm(game: Game, army_id: int, hex: Vector2i) -> void:
+	if not _still(game, army_id):
+		return
+	var tag := Session.player_tag()
+	var army_name := _name_of(game, army_id)
+	var odds := OddsView.of(game, tag, army_id, hex, true)  # the word as it reads before the walk
+	var word := str(odds.get("word", ""))
+	if word.is_empty():
+		word = str(odds.get("storm_word", ""))
+	var verdict := Session.act("storm", {"army": army_id, "goal": hex})
+	if not bool(verdict.get("ok", false)):
+		_refuse(str(verdict.get("reason", "")))
+		return
+	var walk := verdict.get("walk", {}) as Dictionary
+	_walked(MoveOrders.storm_words(game, tag, army_id, army_name, walk, hex, word), walk)
+
+
+## After an order's walk: the layer follows the game, the toast is said and a battle fought is told.
+func _walked(words: Dictionary, walk: Dictionary) -> void:
+	sync()
+	if str(words.get("text", "")) != "":
+		_say(str(words["text"]), StringName(words.get("tone", TOAST_TONE)))
+	if int(walk.get("battle", -1)) >= 0:
+		battle_opened.emit(int(walk["battle"]))
+
+
+## Whether an order asked about in `game` may still be given: the same game, the army still the player's.
+func _still(game: Game, army_id: int) -> bool:
+	return Session.game == game and _mine(game, army_id)
+
+
+func _name_of(game: Game, army_id: int) -> String:
+	return str(ArmyView.panel(game, Session.player_tag(), army_id).get("name", "The army"))
 
 
 ## Says an order's words on the scene's `said` signal (the App's toast).
@@ -387,14 +458,14 @@ func _say(text: String, tone: StringName) -> void:
 	said.emit(text, tone)
 
 
-## The words of a refused order: MovePreview's, the same as the move card's (spec 6.7), else the action's own reason.
-func _said_reason(hex: Vector2i, verdict: Dictionary) -> String:
+## The words of a refused march: MovePreview's, the same as the move card's (spec 6.7), else the action's own reason.
+func _said_reason(army_id: int, hex: Vector2i, verdict: Dictionary) -> String:
 	var reason := str(verdict.get("reason", ""))
 	var game := Session.game
-	if hex == (ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i):
+	if hex == (ArmyView.panel(game, Session.player_tag(), army_id)["hex"] as Vector2i):
 		return reason
-	var said := MovePreview.to(game, Session.player_tag(), _army, hex)["verdict"] as Dictionary
-	return reason if bool(said.get("ok", false)) else str(said.get("reason", reason))
+	var preview := MovePreview.to(game, Session.player_tag(), army_id, hex)["verdict"] as Dictionary
+	return reason if bool(preview.get("ok", false)) else str(preview.get("reason", reason))
 
 
 ## Alt+arrows: with no army selected the selected hex moves (from the camera's hex when none); with one, the order cursor

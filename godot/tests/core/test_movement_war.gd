@@ -561,6 +561,7 @@ func test_a_halted_storm_whose_checks_fail_is_refused_with_the_reason() -> void:
 
 
 func test_a_halted_storm_survives_a_save_and_a_load() -> void:
+	_g.turn = 2  # fair warning: the fixture's war began a season earlier, and a save refuses a war begun before season 1
 	var c := _halted_storm()
 	if c.is_empty():
 		pending("no Milan fortress with men in it beside Savoy's land")

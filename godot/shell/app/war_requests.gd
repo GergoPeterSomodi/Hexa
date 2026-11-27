@@ -5,6 +5,9 @@
 ## availability and the map's war layer (MapWars) getting its settings. GameRequests owns one (`war`) and passes the signals and
 ## requests on. It reads the App only through its public accessors and changes the game only through Session. The whole war UI
 ## answers only from milestone 7 (`milestone`, the App's Bindings.SHELL_MILESTONE), as M6's army chip does.
+## It also gives the map's orders (MapArmies.orders()) the settings, the App's stack for the question of a risky move and the
+## live walk's skip, and opens the dock on the battle an order fought once its live walk has played (moves-build-spec.md R48,
+## R53).
 class_name WarRequests
 extends RefCounted
 
@@ -25,6 +28,8 @@ var _req: GameRequests = null
 var _scene: MapScene = null
 var _dock: BattleDock = null
 var _links: Array[Array] = []
+## The record of a battle an order fought whose live walk is still playing: the dock opens on it when it ends (-1: none).
+var _waiting_battle := -1
 
 
 func _init(app: Node, requests: RefCounted) -> void:
@@ -45,6 +50,9 @@ func connect_signals(link: Callable) -> void:
 	link.call(Events, &"war_declared", _on_war_declared)
 	link.call(Events, &"peace_made", _on_peace_made)
 	link.call(Events, &"game_started", _on_game_started)
+	link.call(Events, &"game_ended", _forget_battle)
+	if _req.replay != null:
+		link.call(_req.replay, &"live_finished", _on_live_finished)
 
 
 ## A request from a screen, the report, the log or the console that this class answers. False for any other.
@@ -84,6 +92,12 @@ func bind_scene(scene: MapScene) -> void:
 	var armies := scene.get_node_or_null("MapArmies") as MapArmies
 	if armies != null and armies.hex_menu() != null:
 		_connect(armies.hex_menu().chosen, _on_menu_chosen)
+	if armies != null:
+		_connect(armies.battle_opened, _on_battle_opened)
+		var orders := armies.orders()
+		orders.settings = _app.settings()
+		orders.ask = _push_screen
+		orders.live_skip = _skip_live
 
 
 func unbind_scene(scene: MapScene) -> void:
@@ -95,6 +109,10 @@ func unbind_scene(scene: MapScene) -> void:
 	_links.clear()
 	if scene != null and is_instance_valid(scene) and scene.map_input() != null:
 		scene.map_input().storm_ready = Callable()
+	var armies := scene.get_node_or_null("MapArmies") as MapArmies if scene != null and is_instance_valid(scene) else null
+	if armies != null:
+		armies.orders().ask = Callable()
+		armies.orders().live_skip = Callable()
 	if scene == _scene:
 		_scene = null
 
@@ -133,30 +151,13 @@ func _on_storm_key() -> void:
 	storm_at(armies.cursor_hex())
 
 
-## The selected army storms the fortress at `hex` (Session.act "storm"); the toast of 6.10 or the refusal's reason. True when
-## the order was given.
+## The selected army storms the fortress at `hex` (MapArmies.storm: asked first when risky, then Session.act "storm", the toast
+## and the battle's dock). True when the order was given or its question is up.
 func storm_at(hex: Vector2i) -> bool:
 	var armies := _armies()
-	var game := Session.game
-	if armies == null or game == null or armies.selected_army() < 0 or game.map == null or not game.map.has(hex):
+	if armies == null or armies.selected_army() < 0:
 		return false
-	if _req.replay != null and _req.replay.active():
-		_toast(MapArmies.REPLAY_BLOCKED, &"plain")
-		return false
-	var tag := Session.player_tag()
-	var army := armies.selected_army()
-	var name := str(ArmyView.panel(game, tag, army).get("name", "The army"))
-	var odds := OddsView.of(game, tag, army, hex, true)
-	var verdict := Session.act("storm", {"army": army, "goal": hex})
-	if not bool(verdict.get("ok", false)):
-		_toast(str(verdict.get("reason", "")), &"warn")
-		return false
-	var word := str(odds.get("word", ""))
-	if word.is_empty():
-		word = str(odds.get("storm_word", ""))
-	var tail := ": %s" % word if not word.is_empty() else ""
-	_toast("The %s marches to storm %s%s." % [name, Words.place(game, hex), tail], &"plain")
-	return true
+	return armies.storm(armies.selected_army(), hex)
 
 
 ## A siege dial was clicked: its hex is selected (the hex panel shows the siege).
@@ -250,6 +251,33 @@ func _reduce_motion() -> bool:
 	return _app.settings() != null and bool(_app.settings().get_value("accessibility/reduce_motion"))
 
 
+## An order's walk fought a battle (R53): the dock opens on it when the live walk has played, at once when none plays (the
+## instant speed, reduce motion, nothing seen, a storm fought where the army stands).
+func _on_battle_opened(record: int) -> void:
+	if _req.replay != null and _req.replay.live_active():
+		_waiting_battle = record
+	else:
+		open_battle(record)
+
+
+## The live walk ended, by its clock or a skip: the dock of the battle that waited for it opens.
+func _on_live_finished(_record: int) -> void:
+	if _waiting_battle < 0:
+		return
+	var record := _waiting_battle
+	_waiting_battle = -1
+	open_battle(record)
+
+
+## A new game, a load or the game's end drops a waiting battle (a cancelled walk never finishes).
+func _forget_battle() -> void:
+	_waiting_battle = -1
+
+
+func _skip_live() -> bool:
+	return _req.replay != null and _req.replay.skip_live()
+
+
 # ----- the war alert, the country panel ---------------------------------------------------------------------------------
 
 
@@ -287,6 +315,7 @@ static func _latest_peace(game: Game) -> Dictionary:
 
 ## The Castle areas switch of the Layers popover is there in a game with countries only (the sandbox has no war).
 func _on_game_started() -> void:
+	_forget_battle()
 	var has_war := enabled() and Session.game != null and Session.game.has_countries()
 	_app.hud().layers_popover().set_castle_available(has_war)
 

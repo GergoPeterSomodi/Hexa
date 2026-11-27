@@ -47,7 +47,7 @@ func _season() -> void:
 	assert_true(bool(verdict["ok"]), "the season ends: %s" % verdict["reason"])
 
 
-## Spring 1480: the declaration on Milan and the three raises and two marches of Savoy (test_summary_war's story).
+## Spring 1480: the declaration on Milan, Savoy's three raises and the march on own land (test_summary_war's story).
 func _spring_1480() -> void:
 	assert_true(bool(_g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})["ok"]), "Milan raises")
 	assert_true(bool(_g.act("declare_war", {"target": MLO, "tag": SAV})["ok"]), "Savoy declares war on Milan")
@@ -56,7 +56,6 @@ func _spring_1480() -> void:
 	_ivrea = Armies.at(_g, IVREA)[0].id
 	_turin = Armies.at(_g, TURIN)[0].id
 	_vercelli = Armies.at(_g, VERCELLI)[0].id
-	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	assert_true(bool(_g.act("march", {"army": _turin, "goal": VERCELLI, "tag": SAV})["ok"]), "the Army of Turin to Vercelli")
 	_season()
 
@@ -64,6 +63,8 @@ func _spring_1480() -> void:
 ## Autumn 1480: the Army of Turin joins Vercelli, which attacks Alessandria: the battle of the season.
 func _to_autumn() -> void:
 	_spring_1480()
+	# fair warning: war declared a season earlier than this march into Milan's land.
+	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	_season()
 	assert_true(bool(_g.act("merge_armies", {"army": _turin, "into": _vercelli, "tag": SAV})["ok"]), "the Army of Turin joins Vercelli")
 	assert_true(bool(_g.act("march", {"army": _vercelli, "goal": ALESS, "tag": SAV})["ok"]), "Vercelli attacks Alessandria")

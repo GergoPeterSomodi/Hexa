@@ -131,6 +131,28 @@ static func from_dict(d: Dictionary) -> BattleRecord:
 	return r
 
 
+## The wounded who went back to their companies, per side (0 attacker, 1 defender): end.returned by unit key, each key's side
+## read from the input's fighters. Never from the armies alive: a company may be gone since (it fought again in the season),
+## and its return still counts for its side. The one reading for the war's books, the stats and the battle's words.
+func returned_by_side() -> PackedInt32Array:
+	var out := PackedInt32Array([0, 0])
+	var side_of: Dictionary = {}
+	var fighters: Variant = input.get("fighters", [])
+	if fighters is Array:
+		for f: Variant in fighters as Array:
+			if f is Dictionary:
+				var fd := f as Dictionary
+				side_of[int(str(fd.get("key", 0)))] = int(str(fd.get("side", -1)))
+	var returned: Variant = end.get("returned", {})
+	if returned is Dictionary:
+		var map := returned as Dictionary
+		for k: Variant in map:
+			var side := int(side_of.get(int(str(k)), -1))
+			if side == 0 or side == 1:
+				out[side] += int(map[k])
+	return out
+
+
 ## sha-256 (hex text) of the saved dict less the witnesses (who saw it does not change what happened).
 func digest() -> String:
 	var d := to_dict()

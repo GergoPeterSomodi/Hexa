@@ -1,12 +1,16 @@
 ## The door's text rule (docs/architecture/m8-build-spec.md 4.3, 9): outside core/ai/ai_know.gd no file of core/ai/ names the game's own
 ## fields or the systems whose state the AI may not read, or calls the game's check and act (AiKnow.check and AiKnow.act are the
-## door's); `game.player` is read only by ai_turn.gd, which skips the player's seat. P: fixture texts with each token are reported.
+## door's); `game.player` is read only by ai_turn.gd, which skips the player's seat. No file of core/ai/, the door included, names
+## a walk engine: the computer's armies walk through the same actions as the player's (moves-build-spec.md R9). P: fixture texts
+## with each token are reported.
 extends GutTest
 
 const ROOT := "res://core/ai"
 const TOKENS: Array[String] = ["game.state", "game.armies", "game.countries", "game.wars", "game.sieges", "game.battles",
 	"game.battle_records", "game.luck", "game.stats", "game.chronicle", "Armies.", "Stats.", "Sieges.", "Occupation.", "Treasury.",
-	"Stores.", "People.", "Wars.men_under_arms", "Sight.", "Knowledge.discovered"]
+	"Stores.", "People.", "Wars.men_under_arms", "Sight.", "Knowledge.discovered", "Allowance."]
+## The walk engines no file of core/ai/ may name (moves-build-spec.md R9).
+const ENGINES: Array[String] = ["WalkNow", "MarchLeg", "MovementPhase"]
 const CALLS := "(?<!AiKnow)\\.(act|check)\\("
 
 
@@ -21,6 +25,9 @@ func _problems(text: String, file: String) -> Array[String]:
 			out.append("%s: a call of the game's act or check" % file)
 	if file != "ai_turn.gd" and text.contains("game.player"):
 		out.append("%s: game.player" % file)
+	for engine: String in ENGINES:
+		if text.contains(engine):
+			out.append("%s: %s" % [file, engine])
 	return out
 
 
@@ -45,6 +52,13 @@ func test_p_every_token_is_reported_outside_the_door() -> void:
 	for token: String in TOKENS:
 		assert_eq(_problems("var x := %s(1)" % token, "ai_war.gd").size(), 1, token)
 		assert_eq(_problems("var x := %s(1)" % token, "ai_know.gd").size(), 0, "the door itself may: " + token)
+
+
+## moves in the month (R9): the walk is the action's; a file of the AI that names an engine is reported, the door too.
+func test_p_a_walk_engine_named_in_any_ai_file_is_reported() -> void:
+	for engine: String in ENGINES:
+		for file: String in ["ai_war.gd", "ai_know.gd", "ai_turn.gd"]:
+			assert_eq(_problems("var x := %s.walk(game, army)" % engine, file), ["%s: %s" % [file, engine]] as Array[String])
 
 
 func test_p_the_games_act_and_check_are_reported_the_doors_are_not() -> void:

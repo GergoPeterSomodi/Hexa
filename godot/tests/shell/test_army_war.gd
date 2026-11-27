@@ -1,8 +1,10 @@
 ## The war part of the army panel (docs/architecture/m7-build-spec.md 6.8; M7 B26; ArmyWar in shell/panels/army_war.gd): the standing
 ## (Hold | Withdraw through set_standing), the morale and its refusal, the siege of a besieging army and its Storm button, the battle
 ## and the last battle with "Open the battle" (battle_requested with the record id). Every enabled state and reason equals the rules'
-## check; a click goes through Session.act; the parts fit the dock width; the controls take the keyboard. Planted faults: a Storm
-## button that is enabled against storm_check; a standing change that does not reach Session.act; an "Open the battle" with no record.
+## check; a click goes through Session.act; the parts fit the dock width; the controls take the keyboard. With a map, Storm goes
+## through the map's orders and asks first (moves-build-spec.md R48). Planted faults: a Storm button that is enabled against
+## storm_check; a standing change that does not reach Session.act; an "Open the battle" with no record; a Storm that acts before
+## the answer.
 extends GutTest
 
 const PANEL := "res://shell/panels/army_panel.tscn"
@@ -113,6 +115,34 @@ func test_a_storm_click_goes_through_session_act() -> void:
 		assert_ne(army.order, Army.ORDER_STORM, "a refused storm changes nothing")
 		assert_eq(_war().reason_text(), str(verdict["reason"]).substr(0, 1).to_upper() + str(verdict["reason"]).substr(1) + ".",
 			"and its reason shows")
+
+
+## moves in the month: with a map, the Storm button asks about its battle before it acts (the lone panel above acts at once).
+func test_the_storm_button_asks_through_the_maps_orders() -> void:
+	var set_up := _siege_set_up()
+	var scene := (load("res://shell/map/map_scene.tscn") as PackedScene).instantiate() as MapScene
+	scene.preload_next_season = false
+	add_child_autofree(scene)
+	scene.finish_loading()
+	Sight.refresh(_g)  # Genoa sees the fortress its army stands on
+	var asked: Array[Confirm] = []
+	(scene.get_node("MapArmies") as MapArmies).orders().ask = func(screen: Screen) -> void:
+		add_child_autofree(screen)
+		asked.append(screen as Confirm)
+	await _show(set_up.army)
+	var verdict := Session.check("storm", {"army": set_up.army.id, "goal": set_up.hex})
+	assert_true(bool(verdict["ok"]), "the storm is allowed: %s" % str(verdict["reason"]))
+	var before := Session.unsaved_actions
+	_war().storm_button().pressed.emit()
+	assert_eq(asked.size(), 1, "the Storm button asks")
+	assert_eq(Session.unsaved_actions, before, "P: nothing is ordered before the answer")
+	if asked.is_empty():
+		return
+	var screen: Confirm = asked[0]
+	screen.button_for(&"confirm").pressed.emit()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(Session.unsaved_actions, before + 1, "Move storms")
 
 
 func test_the_standing_segments_match_the_checks() -> void:

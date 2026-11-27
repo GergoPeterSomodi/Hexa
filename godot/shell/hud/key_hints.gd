@@ -1,5 +1,6 @@
 ## Studiolo bottom contextual bone KeyCap hint strip reflecting live InputMap bindings
-## (docs/architecture/ui-style-and-feedback-spec.md section 2; ui-style-and-feedback-plan.md U14).
+## (docs/architecture/ui-style-and-feedback-spec.md section 2; ui-style-and-feedback-plan.md U14). While an army of yours is selected
+## it starts with the line that army moves are final (moves-build-spec.md R54).
 class_name KeyHints
 extends HBoxContainer
 
@@ -26,12 +27,17 @@ const SELECTED_ITEMS: Array[Array] = [
 	[&"view_hud", "hide HUD"],
 ]
 
+## The line of R54, here and in the help overlay.
+const MOVES_NOTE := "Army moves are final: an army walks when you give the order."
+
 var hints_enabled: bool = true:
 	set(value):
 		hints_enabled = value
 		visible = hints_enabled
 
 var _has_selection: bool = false
+var _army_selected: bool = false
+var _note: Label = null
 var _compact: bool = false
 var _platform: String = OS.get_name()
 var _caps: Array[KeyCap] = []
@@ -47,10 +53,17 @@ func _init() -> void:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Events.army_selected.connect(_on_army_selected)
+	Events.army_cleared.connect(_on_army_cleared)
+	Events.game_ended.connect(_on_army_cleared)
 	_rebuild()
 
 
 func _exit_tree() -> void:
+	if Events.army_selected.is_connected(_on_army_selected):
+		Events.army_selected.disconnect(_on_army_selected)
+		Events.army_cleared.disconnect(_on_army_cleared)
+		Events.game_ended.disconnect(_on_army_cleared)
 	_disconnect_settings()
 	PanelKit.free_retired(_retired)
 
@@ -108,12 +121,44 @@ func hint_actions() -> Array[StringName]:
 	return _actions.duplicate()
 
 
+## The line about army moves, "" while no army is selected.
+func note_text() -> String:
+	return _note.text if _note != null else ""
+
+
+## The line's label, or null while no army is selected (for the tests and the layout).
+func note_label() -> Label:
+	return _note
+
+
+func _on_army_selected(_army_id: int) -> void:
+	_set_army(true)
+
+
+func _on_army_cleared() -> void:
+	_set_army(false)
+
+
+func _set_army(on: bool) -> void:
+	if _army_selected == on:
+		return
+	_army_selected = on
+	_rebuild()
+
+
 func _rebuild() -> void:
 	if not InputMap.has_action(&"app_back"):
 		Bindings.ensure()
 	PanelKit.clear_children(self, _retired)
 	_caps.clear()
 	_actions.clear()
+	_note = null
+	if _army_selected:
+		_note = Label.new()
+		_note.name = &"MovesNote"
+		_note.text = MOVES_NOTE
+		_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_note)
 
 	var items: Array[Array] = SELECTED_ITEMS if _has_selection else (COMPACT_IDLE_ITEMS if _compact else IDLE_ITEMS)
 	for entry: Array in items:

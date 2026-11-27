@@ -1,6 +1,7 @@
 ## The M7 App flow (docs/architecture/m7-build-spec.md sections 6.1, 6.4 to 6.11 and 9; B28; done-when 10): New game as Savoy ->
-## the console's Milanese army -> the declaration through the country panel's Confirm -> a raise and a march with the odds card
-## and its toast -> seasons with a siege of Pavia -> the replay's battle badge, the report's War section and its battle link ->
+## the console's Milanese army -> the declaration through the country panel's Confirm -> a raise, a season (the muster; fair
+## warning passes) and a march with the odds card: the risk's question, the battle fought in the order, the dock after the live
+## walk -> a season with a siege of Pavia -> the battle badge, the report's War section and its battle link ->
 ## B and Esc with the dock -> F5 and F9 in the siege -> a peace from the country panel. Smaller tests: the war alert at idle and
 ## in DECISIONS, Storm (Shift+O and Shift+right click), the Castle areas switch and its Options row both ways, the milestone
 ## gate and the sandbox. The App runs headless in a SubViewport on a temporary save folder; every event comes from the rules.
@@ -157,6 +158,39 @@ func _give_money(game: Game, tag: StringName) -> void:
 	Session.dev_goods(tag, iron, 20 - c.stock[iron])
 
 
+## The army attacks Milan's army at Alessandria: the odds card, the question about the battle, the battle fought in the order
+## (moves in the month), the dock once the live walk has played. Returns the battle's record id; the dock is closed again.
+func _attack_alessandria(vp: SubViewport, app: App, army_id: int) -> int:
+	var game := Session.game
+	_armies_node(app).select_army(army_id)
+	await _wait_frames(2)
+	app.hud().map_hover().order_cursor_moved(ALESS, Vector2(640.0, 360.0))
+	await _wait_frames(2)
+	var odds := app.hud().odds_card()
+	assert_true(odds.is_open(), "the odds card shows over Milan's army")
+	assert_true(_words(odds).contains("Attack"), _words(odds))
+	app.settings().set_value("accessibility/reduce_motion", false)  # the flow's App is made with motion reduced
+	app.settings().set_value("game/movement", "slow")
+	assert_true(_armies_node(app).command(ALESS), "the order is given")
+	assert_true(await _wait_until(func() -> bool: return app.stack().top() is Confirm, 60), "a risky march asks")
+	assert_lt(BattleView.latest_of(game, SAV), 0, "nothing is fought before the answer")
+	(app.stack().top() as Confirm).button_for(&"confirm").pressed.emit()
+	var replay := app.requests().replay
+	assert_true(await _wait_until(func() -> bool: return replay.live_active(), 30), "the walk plays live")
+	var fought := BattleView.latest_of(game, SAV)
+	assert_gte(fought, 0, "the battle was fought at the order")
+	assert_null(app.requests().war.dock(), "no dock while the walk plays")
+	assert_true(AppFlowHelpers.has_toast(app, "attacks at"), "the attack toast: " + str(AppFlowHelpers.toasts(app)))
+	assert_true(await _wait_until(func() -> bool: return not replay.live_active()), "the walk ends")
+	assert_not_null(app.requests().war.dock(), "the dock opens after the walk")
+	if app.requests().war.dock() != null:
+		assert_eq(app.requests().war.dock().shown_record(), fought, "at that battle")
+	_key(vp, KEY_ESCAPE)
+	assert_true(await _wait_until(func() -> bool: return app.requests().war.dock() == null), "Esc closes the dock")
+	_armies_node(app).clear_army()
+	return fought
+
+
 ## One long flow in the order of spec 9 (done-when 10).
 func test_m7_flow_declare_march_odds_battle_siege_dock_save_and_peace() -> void:
 	var env := await _savoy()
@@ -180,33 +214,25 @@ func test_m7_flow_declare_march_odds_battle_siege_dock_save_and_peace() -> void:
 	app.hud().debug_overlay().refresh_metrics()
 	assert_true(app.hud().debug_overlay().m7_text().begins_with("wars 1 · "), app.hud().debug_overlay().m7_text())
 
-	# Savoy raises at Vercelli; the army is selected; the odds card of Alessandria; the march says "marches on".
+	# Savoy raises at Vercelli; a season passes (the muster; moves in the month R73: no march into Milan's land in the season of
+	# the declaration). The army is selected: the odds card of Alessandria; the march asks about its battle.
 	assert_true(DevCommands.run("raise 6 9 pikemen 2", app.context()).begins_with("Done"), "Savoy raises two companies")
 	var army := Armies.at(game, VERCELLI)[0]
-	_armies_node(app).select_army(army.id)
-	await _wait_frames(2)
-	app.hud().map_hover().order_cursor_moved(ALESS, Vector2(640.0, 360.0))
-	await _wait_frames(2)
-	var odds := app.hud().odds_card()
-	assert_true(odds.is_open(), "the odds card shows over Milan's army")
-	assert_true(_words(odds).contains("Attack"), _words(odds))
-	assert_true(_armies_node(app).command(ALESS), "the order is given")
-	await _wait_frames(2)
-	assert_true(AppFlowHelpers.has_toast(app, "marches on"), "the attack toast: " + str(AppFlowHelpers.toasts(app)))
-	_armies_node(app).clear_army()
+	await _end_season(vp, app)
+	await _close_report(vp, app)
+	assert_lt(BattleView.latest_of(game, SAV), 0, "no battle yet")
+	var fought := await _attack_alessandria(vp, app, army.id)
 
-	# Savoy's other army sits before Pavia (the siege); the seasons run until the battle is fought.
+	# Savoy's other army sits before Pavia (the siege); one season runs. The replay would play only the computer's walks and the
+	# standing marches: the player's own live walk is not played again, and with neither no replay runs.
 	ArmyFixture.army(game, SAV, PAVIA, 0, 4)
 	game.version += 1
-	var fought := -1
-	for _season: int in 6:
-		await _end_season(vp, app)
-		if fought < 0:
-			fought = BattleView.latest_of(game, SAV)
-			if fought >= 0:
-				break
-		await _close_report(vp, app)
-	assert_gte(fought, 0, "a battle was fought")
+	var states: Array[int] = []
+	app.requests().flow.state_changed.connect(func(state: int) -> void: states.append(state))
+	await _end_season(vp, app)
+	assert_false(states.has(SeasonFlow.State.REPLAY), "the player's walk is not replayed after the season")
+	app.settings().set_value("game/movement", "instant")
+	app.settings().set_value("accessibility/reduce_motion", true)
 	var report := app.stack().top() as SeasonReport
 	assert_true(_words(report).contains("War"), "the report has its War section: " + _words(report))
 	var marks := app.map_scene().get_node("WarMarks") as WarMarks
@@ -379,8 +405,9 @@ func test_the_sandbox_has_no_castle_switch_and_refuses_declare() -> void:
 	assert_true(AppFlowHelpers.has_toast(app, WarRequests.NO_BATTLE), "B with no battle says so")
 
 
-## Savoy and Milan go to war, Savoy raises at Vercelli and marches on Alessandria; seasons run until Savoy has fought a battle.
-## Returns its record id (the report is closed; no army is selected).
+## Savoy and Milan go to war, Savoy raises at Vercelli; a season passes (the muster; no march into Milan's land in the season of
+## the declaration), then it marches on Alessandria and the battle is fought in the order. Returns its record id, or the one of
+## a later season (the report is closed; no army is selected).
 func _fight_a_battle(vp: SubViewport, app: App) -> int:
 	var game := Session.game
 	_give_money(game, SAV)
@@ -388,7 +415,11 @@ func _fight_a_battle(vp: SubViewport, app: App) -> int:
 	DevCommands.run("declare MLO", app.context())
 	DevCommands.run("raise 6 9 pikemen 2", app.context())
 	var army := Armies.at(game, VERCELLI)[0]
+	await _end_season(vp, app)
+	await _close_report(vp, app)
 	DevCommands.run("march %d 7 9" % army.id, app.context())
+	if BattleView.latest_of(game, SAV) >= 0:
+		return BattleView.latest_of(game, SAV)
 	for _season: int in 6:
 		await _end_season(vp, app)
 		await _close_report(vp, app)

@@ -435,8 +435,10 @@ func _action_button(text: String, action: String, kind: KitButton.Kind, icon: St
 
 func _on_action_pressed(action: String) -> void:
 	match action:
-		"halt", "continue_march":
+		"halt":
 			_act(action, {"army": _army})
+		"continue_march":
+			_continue()
 		"split_army":
 			_act(action, {"army": _army, "units": ticked_units()})
 			_ticked = {}
@@ -445,6 +447,17 @@ func _on_action_pressed(action: String) -> void:
 				show_army(_join_into)
 		"disband":
 			_disband()
+
+
+## Continue is the map's order, as R is (MapArmies.continue_army: asked first when risky, its toast and its battle's dock,
+## moves-build-spec.md R48); with no map it acts here.
+func _continue() -> void:
+	var armies := MapArmies.in_tree(self)
+	if armies == null:
+		_act("continue_march", {"army": _army})
+		return
+	_clear_notice()
+	armies.continue_army(_army)
 
 
 ## Runs an action through Session.act; a refusal shows its reason. Returns whether it was done.

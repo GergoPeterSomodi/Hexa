@@ -227,10 +227,16 @@ static func _order(turn: AiTurn, game: Game, brief: AiBrief, army: Army) -> void
 		_march(turn, game, brief, army, goal, best["kind"] as StringName)
 
 
-## The march to `goal`; a walk-in claims its hex; a refused march is told to the brief and asks for one more step, else it holds.
+## The march to `goal`, walked inside the act (moves in the month, R9). A walk halted on sight (R41, D17) refreshes what the
+## seat sees and asks for one more step, so the army decides again (its goal not claimed); a walk-in claims its hex; a refused
+## march is told to the brief and asks for one more step, else it holds.
 static func _march(turn: AiTurn, game: Game, brief: AiBrief, army: Army, goal: Vector2i, kind: StringName) -> void:
-	if bool(AiKnow.act(turn, game, brief.tag, "march", {"army": army.id, "goal": goal}).get("ok", false)):
-		if kind == WALK_IN:
+	var result := AiKnow.act(turn, game, brief.tag, "march", {"army": army.id, "goal": goal})
+	if bool(result.get("ok", false)):
+		if brief.halted_on_sight(result):
+			turn.note(brief.tag, "army %d halted on sight on its way to %s" % [army.id, goal])
+			turn.army_retry(game, brief.tag, army.id)
+		elif kind == WALK_IN:
 			brief.claims[AiKnow.index_of(game, goal)] = army.id
 		return
 	var tried: Array = brief.refused.get(army.id, [])

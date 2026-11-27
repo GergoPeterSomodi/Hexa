@@ -324,7 +324,8 @@ func test_game_page_shows_the_milestone_three_rows_and_the_two_works_rows_of_mil
 	for row: OptionRow in options.page_rows(&"game"):
 		keys.append(row.key())
 	keys.sort()
-	assert_eq(keys, ["game/autosave", "game/confirm_works", "game/movement", "game/preview_on_map", "game/season_report", "game/task_flag"], "M6: the movement replay row shows")
+	assert_eq(keys, ["game/autosave", "game/confirm_moves", "game/confirm_works", "game/movement", "game/preview_on_map", "game/season_report", "game/task_flag"], "M6: the movement replay row shows; moves in the month: Confirm risky moves")
+	assert_eq(options.option_row("game/confirm_moves").key(), "game/confirm_moves", "Confirm risky moves on the Game page")
 	assert_not_null(options.option_row("graphics/season_change"), "Season change on Graphics")
 	assert_not_null(options.option_row("dev/save_json"), "Write saves as JSON too on Advanced")
 	assert_not_null(options.option_row("game/confirm_works"), "Confirm works shows from milestone 4")

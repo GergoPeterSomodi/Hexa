@@ -1,5 +1,6 @@
 ## A seat's picture of the game for its turn (docs/architecture/m8-build-spec.md 4.5, 5.5): made once a turn, through AiKnow only,
-## so what is in it is what the seat's country may know. The step modules read the brief and AiKnow, nothing else.
+## so what is in it is what the seat's country may know. The step modules read the brief and AiKnow, nothing else. One part is
+## made again within the turn: `seen`, after a march of the seat halted on sight (moves-build-spec.md R41, R42).
 @warning_ignore_start("integer_division")
 class_name AiBrief
 extends RefCounted
@@ -92,6 +93,17 @@ func post_of(army_id: int) -> Vector2i:
 		if ranked[i].id == army_id:
 			return posts[i % posts.size()]
 	return Army.NO_HEX
+
+
+## Moves in the month (moves-build-spec.md R41, D17): true when the walk of `result` (an accepted march's) halted because an
+## enemy army came into the walking army's sight. The seat then reads what it sees now (`seen`; the rest of the brief stays as
+## made at the seat's start, R42), so the army's next step decides with it.
+func halted_on_sight(result: Dictionary) -> bool:
+	var walk: Dictionary = result.get("walk", {})
+	if _game == null or StringName(walk.get("stopped", &"")) != Movement.WHY_SIGHTED:
+		return false
+	seen = AiKnow.seen_enemies(_game, tag)
+	return true
 
 
 ## The hexes within prize_range of the seat's land, as keys (AiKnow.land_field). Built on first use and again once the game's

@@ -2,7 +2,9 @@
 ## taxes (done-when 1 to 5 of the spec's M7 section; M7 plan B17). Every number is produced by the real code through Game.act
 ## and Season.run. The fixture only sets the Pavia army (WarFixture.army_at), which the action log does not carry, so the
 ## replay test runs the story without it. Numbers the spec gave by hand that the rules do not give are corrected in the spec
-## text (4.16 (e): three districts and +3, not two and +2) and pinned here.
+## text (4.16 (e): three districts and +3, not two and +2) and pinned here. Fair warning (moves-build-spec.md R73): the march into
+## Milan's land (Domodossola) is ordered in Summer, a season after the Spring declaration; the new companies muster through
+## Spring either way, so every pinned number stands.
 extends GutTest
 
 const SAV := &"SAV"
@@ -65,7 +67,7 @@ func _events(kind: String, from: int = 0) -> Array[Dictionary]:
 	return out
 
 
-## Spring 1480: Milan's Army of Alessandria, the declaration, Savoy's three raises, the Pavia army (d), and the two marches.
+## Spring 1480: Milan's Army of Alessandria, the declaration, Savoy's three raises, the Pavia army (d), and the march on own land.
 func _spring_1480(with_pavia: bool = true) -> void:
 	var milan := _g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})
 	assert_true(bool(milan["ok"]), "Milan raises its Army of Alessandria")
@@ -78,7 +80,6 @@ func _spring_1480(with_pavia: bool = true) -> void:
 	_vercelli = Armies.at(_g, VERCELLI)[0].id
 	if with_pavia:
 		WarFixture.army_at(_g, SAV, PAVIA, 4)
-	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	assert_true(bool(_g.act("march", {"army": _turin, "goal": VERCELLI, "tag": SAV})["ok"]), "the Army of Turin to Vercelli")
 	_season()
 
@@ -86,6 +87,8 @@ func _spring_1480(with_pavia: bool = true) -> void:
 ## Summer 1480: the Army of Ivrea walks into Domodossola, the Army of Turin reaches Vercelli.
 func _to_summer(with_pavia: bool = true) -> void:
 	_spring_1480(with_pavia)
+	# fair warning: war declared a season earlier than this march into Milan's land (refused in Spring).
+	assert_true(bool(_g.act("march", {"army": _ivrea, "goal": DOMO, "tag": SAV})["ok"]), "the Army of Ivrea to Domodossola")
 	_season()
 
 

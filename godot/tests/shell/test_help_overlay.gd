@@ -57,6 +57,27 @@ func test_help_overlay_is_non_pausing_three_columns_and_lists_every_default_acti
 			assert_eq(caps[i].label().text, expected[i], "KeyCap %d text for %s" % [i, String(action)])
 
 
+## moves in the month (R54): the help overlay says moves are final, and so do the key hints while an army is selected.
+func test_help_and_key_hints_say_army_moves_are_final() -> void:
+	var words := "Army moves are final: an army walks when you give the order."
+	var help := ScreenIds.make(&"help") as HelpOverlay
+	_harness.stack.push(help)
+	await _harness.wait_frames(self, 2)
+	assert_eq(help.moves_note(), words)
+	var hints := KeyHints.new()
+	add_child_autofree(hints)
+	assert_eq(hints.note_text(), "", "no line with no army")
+	var actions := hints.hint_actions()
+	Events.army_selected.emit(1)
+	assert_eq(hints.note_text(), words)
+	assert_eq(hints.hint_actions(), actions, "the key caps stay")
+	assert_eq(hints.get_child(0), hints.note_label(), "the line leads, so the room never cuts it first")
+	hints.set_context(true)
+	assert_eq(hints.note_text(), words, "kept when the context changes")
+	Events.army_cleared.emit()
+	assert_eq(hints.note_text(), "")
+
+
 func test_help_overlay_shows_platform_gestures_and_updates_live_on_rebind() -> void:
 	var help := ScreenIds.make(&"help") as HelpOverlay
 	help.platform_override = "macOS"

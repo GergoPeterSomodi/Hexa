@@ -4,7 +4,8 @@
 ## through this phase is not taken (blocked). A step into contact (an army of a country at war with the walk's, a battle on the hex,
 ## or the fortress of a storm) is Battles' engage: taken, the walk ends on the battle hex; refused, the walk stops before it (shaken,
 ## battle or blocked). A taken step moves the army at once, so the armies' hexes are true for the later ticks. A walk that would leave
-## more than the stack limit of one country on a hex steps back, the last army in id order first, until every hex fits. Then the
+## more than the stack limit of one country on a hex steps back, the last army in id order first, until every hex fits (a
+## battle keeps room for the armies that may come back: MarchLeg). Then the
 ## steps are applied through Armies (set_hex, the orders, the halts), each walk emits unit_moved, the halts emit march_halted, the
 ## explored hexes grow along the walks and the sight is refreshed. Luck: none. Integer maths. Armies are written only through
 ## Armies; the rules are Movement's and Battles'. The walk engine itself is MarchLeg (march_leg.gd); this phase plans every leg, runs
@@ -61,4 +62,4 @@ static func _ticks(game: Game, walks: Array, occ: Dictionary) -> void:
 	for k: int in longest:
 		for w: MarchLeg in walks:
 			if w.walked.size() > k:
-				MarchLeg.step(game, w, k, occ)
+				MarchLeg.step(game, w, k, occ, walks)

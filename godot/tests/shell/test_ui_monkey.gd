@@ -41,7 +41,7 @@ const TILE_SEEDS: Array[int] = [1507, 1508, 1509]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
-## An M8 seed with no replay skip (or no refused F5) by this step plays one forced season (monkey_m8.gd _m8_force_skip).
+## An M8 seed with no replay skip (or no refused F5) by this step plays forced seasons (monkey_m8.gd _m8_force_skip).
 const FORCE_M8_SKIP_STEP := 200
 const FORCE_M8_EVERY := 40
 const COUNTER_KEYS: Array[String] = [
@@ -937,7 +937,7 @@ func _m3_before_step(rng: Rng, app: App, step: int) -> void:
 	if _m7 and step >= FORCE_M7_STEP and not _m4_coverage_due():
 		await _m7_force(rng, vp, app)
 	if _m8 and step >= FORCE_M8_SKIP_STEP and step % FORCE_M8_EVERY == 0 and _m8_starved():
-		await _m8_force_skip(vp, app)
+		await _m8_force_skip(rng, vp, app)
 
 
 func _m3_clear_screens(app: App) -> void:

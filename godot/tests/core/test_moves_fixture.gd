@@ -1,7 +1,8 @@
 ## The moves fixtures (docs/architecture/moves-build-spec.md 8, MV0): standing, duel and thin (tests/core/moves_fixture.gd).
 ## Planted faults these cases catch: a standing march that walks the army (the hex and moved_from must stay), a duel with no
-## war, a duel whose near army is not three hexes away, an unseen army that Savoy sees or that is not two steps from its sight,
-## a duel that is not the same each time, and a thin that leaves Savoy whole or changes Milan's explored set.
+## war or one declared this season, a duel whose near army is not three hexes away, an unseen army that Savoy sees, that is not
+## two steps from its sight or that stands on the near army's hex, a duel that is not the same each time, and a thin that leaves
+## Savoy whole or changes Milan's explored set.
 extends GutTest
 
 const SAV := MovesFixture.SAVOY
@@ -35,6 +36,14 @@ func _two_steps_own(g: Game, from: Vector2i) -> Vector2i:
 func test_duel_has_savoy_and_milan_at_war() -> void:
 	var g := MovesFixture.duel()
 	assert_true(Wars.at_war(g, SAV, MLO), "Savoy and Milan are at war in the duel")
+
+
+func test_duel_war_is_a_season_old_and_declared_now_is_of_this_season() -> void:
+	var g := MovesFixture.duel()
+	assert_eq(Wars.war_between(g, SAV, MLO).start_turn, g.turn - 1, "P: a duel that shuts Milan's land (fair warning)")
+	var now := MovesFixture.declared_now()
+	var war := Wars.war_between(now, SAV, MLO)
+	assert_eq([war.a, war.start_turn], [SAV, now.turn], "declared by Savoy this season")
 
 
 func test_duel_has_the_three_named_armies_of_their_countries() -> void:
@@ -82,6 +91,8 @@ func test_duel_puts_the_unseen_army_two_hexes_out_of_savoys_sight() -> void:
 			if g.map.index_of(far) >= 0 and Sight.sees(g, SAV, far):
 				reached = true
 	assert_true(reached, "a hex two steps from the unseen army is seen by Savoy")
+	assert_ne(unseen.hex, _near(g).hex, "P: both Milanese armies on one hex")
+	assert_eq(Armies.at(g, unseen.hex).size(), 1, "the unseen army stands alone")
 
 
 func test_duel_is_the_same_each_time() -> void:

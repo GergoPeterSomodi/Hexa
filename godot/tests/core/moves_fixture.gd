@@ -1,10 +1,13 @@
 ## The moves fixtures (docs/architecture/moves-build-spec.md 8, MV0): north Italy's 1480 game where Savoy (SAV) is the player and
 ## Milan (MLO) its war enemy. Every game has its own copies of the definitions (ArmyFixture.defs), so a planted number never
 ## reaches the committed ones. A test's state edit, as WarFixture does; never used by the game.
-##   duel():           Savoy and Milan at war; three armies, all named, made through the armies' door (ArmyFixture.army):
+##   duel():           Savoy and Milan at war since the season before (WarFixture.at_war: fair warning, R73, shuts no land);
+##                     three armies, all named, made through the armies' door (ArmyFixture.army):
 ##                     NAME_HOME, a Savoyard army on its first own land hex that has Milanese land three hexes away; NAME_NEAR, a Milanese army three hexes from it;
 ##                     NAME_UNSEEN, a Milanese army two hexes beyond Savoy's sight (no hex next to it is seen by Savoy, and a
-##                     hex two steps from it is). Milan is an AI seat (AiPlayers.attach), Savoy the passive player.
+##                     hex two steps from it is), on a hex of its own (never the near army's). Milan is an AI seat
+##                     (AiPlayers.attach), Savoy the passive player.
+##   declared_now():   duel() with Savoy's war on Milan declared this season (start_turn = the turn), for the fair-warning cases.
 ##   thin():           duel() with Savoy thin at radius 2 (FogFixture.thin).
 ##   standing(g, army, goal): the army gets a march order to goal with the stored route Movement.plan gives, and nothing walks:
 ##                     its hex and moved_from stay (the walk of MV4 is never called). False when Movement.plan refuses the goal.
@@ -41,6 +44,14 @@ static func duel(defs: GameDefs = null) -> Game:
 		if c.tag != MILAN:
 			passive.append(c.tag)
 	AiPlayers.attach(g, passive)
+	return g
+
+
+## The duel with its war declared this season by Savoy: Milan's land is shut to Savoy's armies until the next (R73).
+static func declared_now() -> Game:
+	var g := duel()
+	Wars.war_between(g, SAVOY, MILAN).start_turn = g.turn
+	g.version += 1
 	return g
 
 
@@ -96,11 +107,12 @@ static func _land_at(g: Game, tag: StringName, from: Vector2i, distance: int) ->
 	return Army.NO_HEX
 
 
-## The first land hex of `tag` that Savoy does not see, no neighbour of which Savoy sees, and with a hex two steps away that it sees.
+## The first land hex of `tag` with no army on it that Savoy does not see, no neighbour of which Savoy sees, and with a hex two
+## steps away that it sees (the near army's hex fits the sight rule too, so a held hex is passed over).
 static func _unseen(g: Game, tag: StringName) -> Vector2i:
 	for i: int in g.map.hex_count():
 		var hex := g.map.hex_of(i)
-		if not _owner_is(g, hex, tag) or Sight.sees(g, SAVOY, hex):
+		if not _owner_is(g, hex, tag) or Sight.sees(g, SAVOY, hex) or not Armies.at(g, hex).is_empty():
 			continue
 		if _two_steps_seen(g, hex):
 			return hex

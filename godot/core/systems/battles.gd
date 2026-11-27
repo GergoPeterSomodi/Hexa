@@ -189,9 +189,25 @@ static func _storm(game: Game, army: Army, hex: Vector2i, tick: int) -> bool:
 
 ## An army takes its place in the battle on its hex, on its side (engage_check refuses a battle of the other side).
 static func _join(game: Game, b: Battle, army: Army) -> void:
+	_step_in(game, army, b.hex, army.hex)
+	_enrol(game, b, army)
+
+
+## An army the room cut sends back onto its start hex, where its country was attacked after it walked off (MarchLeg): it
+## stands there and takes its place among the defenders, as if it had not left; its order and route stay. False (no change)
+## where no battle is fought against its country, or for an army already in one.
+static func fall_back_in(game: Game, army: Army, hex: Vector2i) -> bool:
+	var b := at(game, hex)
+	if b == null or b.defender != army.tag or of_army(game, army.id) != null:
+		return false
+	Armies.set_hex(game, army, hex, Army.NO_HEX)
+	_enrol(game, b, army)
+	return true
+
+
+## Adds an army standing on the battle hex to its country's side, and emits battle_joined.
+static func _enrol(game: Game, b: Battle, army: Army) -> void:
 	var side := _side(b, army.tag)
-	var stand := army.hex
-	_step_in(game, army, b.hex, stand)
 	var key := String(army.tag)
 	var ids := _ids(b, key)
 	ids.append(army.id)

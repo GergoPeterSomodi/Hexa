@@ -414,6 +414,14 @@ const SCHEMA: Dictionary = {
 		"label": "Movement replay speed",
 		"applies": "immediate",
 	},
+	"game/confirm_moves": {
+		"type": TYPE_BOOL,
+		"default": true,
+		"page": "game",
+		"since": "6",
+		"label": "Confirm risky moves",
+		"applies": "immediate",
+	},
 	"game/confirm_loss": {
 		"type": TYPE_BOOL,
 		"default": true,

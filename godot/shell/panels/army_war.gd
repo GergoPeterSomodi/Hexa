@@ -2,8 +2,10 @@
 ## Segmented Hold | Withdraw, each price in its hover), its morale (a bar, the word, "too shaken" in Reason), its siege and the Storm
 ## button of a besieging army (with the Shift+O key cap), its battle in progress and the last battle of its country, each with
 ## "Open the battle" (battle_requested with the record id; the App's dock listens). Every enabled state and reason is the rules'
-## check (Session.check); a click goes through Session.act. It is a child of ArmyPanel (the panel stays under 800 lines) and
-## keeps its buttons out of the panel's verdict loop (no "action" meta), so its checks are its own.
+## check (Session.check); a click goes through Session.act. Storm goes through the map's orders (MapArmies.storm: the question
+## of a risky move, the toast, the battle's dock), as Shift+O does; with no map it acts here. It is a child of ArmyPanel (the
+## panel stays under 800 lines) and keeps its buttons out of the panel's verdict loop (no "action" meta), so its checks are
+## its own.
 @warning_ignore_start("integer_division")
 class_name ArmyWar
 extends VBoxContainer
@@ -158,11 +160,18 @@ func _on_standing(id: Variant) -> void:
 	_standing.select(_standing_now)
 
 
-## The storm of the besieged hex (storm, with the goal the hex): a refusal shows its reason.
+## The storm of the besieged hex (storm, with the goal the hex): a refusal shows its reason here; an allowed one is the map's
+## order (asked first when risky, moves-build-spec.md R48). With no map it acts at once.
 func _on_storm(hex: Vector2i) -> void:
-	var verdict := Session.act("storm", {"army": _army, "goal": hex})
+	var args := {"army": _army, "goal": hex}
+	var armies := MapArmies.in_tree(self)
+	var verdict := Session.check("storm", args) if armies != null else Session.act("storm", args)
 	if not bool(verdict["ok"]):
 		_show_reason(str(verdict["reason"]))
+		return
+	if armies != null:
+		_show_reason("")
+		armies.storm(_army, hex)
 
 
 func _show_reason(text: String) -> void:

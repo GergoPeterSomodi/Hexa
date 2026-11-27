@@ -1,6 +1,7 @@
 ## The war state through the save body (docs/architecture/m7-build-spec.md 4.20, 9; M7 plan B13): a live war made in a test is
 ## saved and loaded byte-equal and keeps its digest; a forged or damaged war body is refused with the body problem and the
-## live game is not changed; a sandbox body keeps its empty war and refuses a name in it.
+## live game is not changed; a sandbox body keeps its empty war and refuses a name in it. The wars of a game in its first season
+## are declared in it (WarFixture.declared_now): a save refuses a war begun before season 1.
 extends GutTest
 
 
@@ -17,7 +18,7 @@ func test_a_live_war_round_trips_and_the_digest_carries_it() -> void:
 	var nb := WarFixture.neighbour_of(g, ArmyFixture.TAG)
 	assert_ne(nb, &"", "Genoa has a neighbour")
 	var empty_digest := g.digest()
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)
 	assert_ne(g.digest(), empty_digest, "the war is in the digest")
 	var body := Snapshot.of(g)
 	var r := _restore(g, _through_bytes(body))
@@ -31,7 +32,7 @@ func test_a_live_war_round_trips_and_the_digest_carries_it() -> void:
 func test_armies_with_spent_points_round_trip_in_a_war_game() -> void:
 	# MV2 (moves-build R55): army/3 in the war game's body; the points are in the digest and come back as saved.
 	var g := WarFixture.game()
-	WarFixture.at_war(g, ArmyFixture.TAG, WarFixture.neighbour_of(g, ArmyFixture.TAG))
+	WarFixture.declared_now(g, ArmyFixture.TAG, WarFixture.neighbour_of(g, ArmyFixture.TAG))
 	var town := ArmyFixture.find_town(g)
 	var a := ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 2)
 	var b := ArmyFixture.army(g, ArmyFixture.TAG, town, 2, 1)
@@ -51,7 +52,7 @@ func test_armies_with_spent_points_round_trip_in_a_war_game() -> void:
 func test_a_forged_war_is_refused_and_the_live_game_keeps_its_digest() -> void:
 	var g := WarFixture.game()
 	var nb := WarFixture.neighbour_of(g, ArmyFixture.TAG)
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)
 	var live := g.digest()
 	var body := _through_bytes(Snapshot.of(g))
 	var wars := (body["war"] as Dictionary)["wars"] as Array
@@ -64,7 +65,7 @@ func test_a_forged_war_is_refused_and_the_live_game_keeps_its_digest() -> void:
 
 func test_a_damaged_war_body_is_refused() -> void:
 	var g := WarFixture.game()
-	WarFixture.at_war(g, ArmyFixture.TAG, WarFixture.neighbour_of(g, ArmyFixture.TAG))
+	WarFixture.declared_now(g, ArmyFixture.TAG, WarFixture.neighbour_of(g, ArmyFixture.TAG))
 	var wrong_schema := _through_bytes(Snapshot.of(g))
 	(wrong_schema["war"] as Dictionary)["schema"] = "hexa-godot/war/0"
 	assert_eq(_restore(g, wrong_schema)["problem"], Snapshot.PROBLEM_UNREADABLE, "a wrong schema")
@@ -95,7 +96,7 @@ func test_a_sandbox_body_keeps_its_empty_war_and_refuses_a_name_in_it() -> void:
 func _war_world() -> Dictionary:
 	var g := WarFixture.game()
 	var foe := WarFixture.neighbour_of(g, ArmyFixture.TAG)
-	WarFixture.at_war(g, ArmyFixture.TAG, foe)
+	WarFixture.declared_now(g, ArmyFixture.TAG, foe)
 	var fort := g.war_cache.fortresses(g)
 	var owned := Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG))
 	var plain := -1
@@ -227,7 +228,7 @@ func test_a_thin_start_at_war_round_trips_byte_equal() -> void:
 	var g := WarFixture.game()
 	var nb := WarFixture.neighbour_of(g, ArmyFixture.TAG)
 	FogFixture.thin(g, ArmyFixture.TAG, 1)
-	WarFixture.at_war(g, ArmyFixture.TAG, nb)
+	WarFixture.declared_now(g, ArmyFixture.TAG, nb)
 	var body := Snapshot.of(g)
 	var r := _restore(g, _through_bytes(body))
 	assert_not_null(r["game"], str(r["problem"]))

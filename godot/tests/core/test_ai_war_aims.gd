@@ -2,7 +2,8 @@
 ## (retake, relief by attack and by rally, attack by the odds, walk-ins fanned out by claims, approach), fair warning, the keeping
 ## of a march under the switch, the refused marches, that nothing the seat cannot see moves its aims, and that the step stays in
 ## its door. The declaring, the worked examples, the standing order and the storms are in test_ai_war.gd. A planted fault (P) is a
-## number changed on a duplicate of a temperament or of the shared numbers.
+## number changed on a duplicate of a temperament or of the shared numbers. Moves in the month (moves-build-spec.md R9, R41,
+## R42): an order of the AI walks and may fight inside its step, and a march halted on sight gets one more step.
 @warning_ignore_start("integer_division")
 extends GutTest
 
@@ -13,6 +14,13 @@ const VEN := AiWarScene.VEN
 const WALLS := AiWarScene.WALLS
 const FORT := AiWarScene.FORT
 const STAND := AiWarScene.STAND
+const KNIGHTS := 2
+## The sighted scene: Milan's knights (sight 2) here, whose best aim walks them toward SIGHT_AIM; a Venetian company on
+## SIGHT_FOE, which Milan does not see until the first step of that march.
+const SIGHT_FROM := Vector2i(20, 5)
+const SIGHT_STOP := Vector2i(20, 4)
+const SIGHT_AIM := Vector2i(19, 3)
+const SIGHT_FOE := Vector2i(18, 4)
 
 
 func _army(g: Game, id: int) -> Army:
@@ -148,10 +156,12 @@ func test_approach_is_the_nearest_enemy_hex_when_nothing_else_is_in_reach() -> v
 	assert_eq(list[0]["score"], 100 - least)
 	assert_eq(AiKnow.hex_distance(army.hex, list[0]["goal"]), least)
 	assert_eq(AiKnow.owner_of(g, list[0]["goal"]), GEN)
-	# moves in the month: an at-once walk would move the army on its approach in the act; points spent, the march stands
-	Armies.set_points(g, army, 0)
 	S.step(g, S.brief(g), army)
-	assert_eq([_army(g, army.id).order, _army(g, army.id).goal], [Army.ORDER_MARCH, list[0]["goal"]])
+	# Re-pinned for moves in the month: the approach walks inside the step (R9) and its goal is within the season's points, so
+	# the army stands there with the order arrived.
+	assert_eq([S.acts.size(), S.acts[0]["action"], S.acts[0]["args"]["goal"]], [1, "march", list[0]["goal"]])
+	assert_eq([_army(g, army.id).hex, _army(g, army.id).order], [list[0]["goal"], Army.ORDER_HOLD])
+	assert_lt(_army(g, army.id).points, Allowance.full(g, army), "the walk spent its points")
 
 
 # ----- fair warning -----------------------------------------------------------------------------------------------------------------
@@ -234,16 +244,21 @@ func _run_one_army(g: Game, army: Army) -> AiTurn:
 
 func test_a_refused_march_asks_for_the_next_aim_at_most_order_tries_times() -> void:
 	var s := _blocked_scene()
-	# moves in the month: an at-once walk would take the army to its next aim in the act (and an arrival clears the order); with
-	# its points spent the march stands, so the test still pins that the next aim is ordered after the refusal
-	Armies.set_points(s["g"], s["mine"], 0)
 	var hook := _run_one_army(s["g"], s["mine"])
 	var refused := 0
+	var done: Array[String] = []
 	for line: String in hook.trace_of(M):
 		refused += 1 if line.begins_with("refused march") else 0
+		if line.begins_with("did march"):
+			done.append(line)
 	assert_eq(refused, 1, "the attack on an army another country stands beside is refused, the next aim is ordered")
 	assert_eq(hook.refusals(), refused)
-	assert_eq((s["mine"] as Army).order, Army.ORDER_MARCH, "and the army marches on the next aim")
+	var mine: Army = s["mine"]
+	assert_eq(done, ["did march army=%d goal=%s" % [mine.id, Vector2i(13, 6)]] as Array[String], "the next aim, a siege")
+	# Re-pinned for moves in the month: that march walks inside the step. Its way leads through the hex of the two armies, which
+	# the walk may not enter: it halts before it with the points kept, and only a halt on sight gets another step (R41).
+	assert_eq([mine.hex, mine.order, mine.goal, mine.halt_why], [Vector2i(10, 5), Army.ORDER_NONE, Vector2i(13, 6), Movement.WHY_ENEMY])
+	assert_eq(hook.steps_done(), 3, "the brief, the army and the one retry of the refusal: no step for this halt")
 	var all := S.at_war(GEN)
 	var army := WarFixture.army_at(all, M, STAND, 4)
 	all.defs.stack_limit = 3
@@ -255,6 +270,116 @@ func test_a_refused_march_asks_for_the_next_aim_at_most_order_tries_times() -> v
 	one.defs.stack_limit = 3
 	S.ai(one, {"order_tries": 1})
 	assert_eq(_run_one_army(one, single).refusals(), 1, "P: the tries are the game's number")
+
+
+# ----- moves in the month: the walk and the fight inside the step, and stop on sight (R9, R41, R42) -------------------------------
+
+
+## One army's step and what it pushes, as _run_one_army, with every march the AI was told of: {hook, marches: [{goal, stopped,
+## hex, order, halt, points}], each as the army stood right after that act}.
+func _run_watched(g: Game, army: Army) -> Dictionary:
+	var hook := S.hook(g)
+	var marches: Array[Dictionary] = []
+	hook.judge = func(_t: StringName, action: String, args: Dictionary, _v: Dictionary, result: Dictionary) -> void:
+		if action != "march":
+			return
+		var a := Armies.by_id(g, int(args["army"]))
+		marches.append({"goal": args["goal"], "stopped": StringName((result["walk"] as Dictionary)["stopped"]), "hex": a.hex,
+			"order": a.order, "halt": a.halt_why, "points": a.points})
+	Sight.refresh(g)
+	g.version += 1
+	hook.begin(g)
+	hook.push_step(AiTurn.BRIEF, 0)
+	hook.push_step(AiTurn.ARMY, army.id)
+	var guard := 0
+	while not hook.step(g) and guard < 10:
+		guard += 1
+	return {"hook": hook, "marches": marches}
+
+
+func _sight_scene() -> Dictionary:
+	var g := S.at_war(VEN)
+	var mine := ArmyFixture.army(g, M, SIGHT_FROM, KNIGHTS, 4, 0)
+	var foe := ArmyFixture.army(g, VEN, SIGHT_FOE, 0, 1, 0)
+	Sight.refresh(g)
+	assert_false(Sight.sees(g, M, SIGHT_FOE), "the foe starts out of Milan's sight")
+	assert_eq(MarchLeg.army_sight(g, mine), 2, "knights see two hexes")
+	return {"g": g, "mine": mine, "foe": foe}
+
+
+func test_a_march_halted_on_sight_gets_one_more_step_and_the_army_acts_on_what_it_now_sees() -> void:
+	var s := _sight_scene()
+	var g: Game = s["g"]
+	var mine: Army = s["mine"]
+	var run := _run_watched(g, mine)
+	var hook: AiTurn = run["hook"]
+	var marches: Array[Dictionary] = run["marches"]
+	assert_eq(marches.size(), 2, "P: a sighted halt that leaves the army halted for the season")
+	if marches.size() != 2:
+		return
+	var first: Dictionary = marches[0]
+	assert_eq([first["goal"], first["stopped"], first["hex"]], [SIGHT_AIM, WalkNow.SIGHTED, SIGHT_STOP], "the walk-in, cut on sight")
+	assert_eq([first["order"], first["halt"]], [Army.ORDER_NONE, Movement.WHY_SIGHTED])
+	assert_gt(int(first["points"]), 0, "with points left to answer with")
+	var second: Dictionary = marches[1]
+	assert_eq(second["goal"], SIGHT_FOE, "P: the retried step decides with the army it now sees: it attacks it")
+	assert_eq([second["order"], second["halt"]], [Army.ORDER_MARCH, &""], "the army is not left halted")
+	assert_eq(ImproveRules.hex_distance(mine.hex, SIGHT_FOE), 1, "it walked on in the same turn, up to the enemy")
+	assert_eq(mine.points, 0, "where the zone of control ends its season (R25)")
+	var lines := hook.trace_of(M)
+	assert_true(lines.has("army %d halted on sight on its way to %s" % [mine.id, SIGHT_AIM]), str(lines))
+	assert_true("\n".join(lines).contains("army %d aim attack %s" % [mine.id, SIGHT_FOE]), str(lines))
+	assert_eq(hook.refusals(), 0)
+	var brief := hook.brief_of(M)
+	assert_true(brief.seen.any(func(e: Dictionary) -> bool: return e["hex"] == SIGHT_FOE), "the brief's seen was made again")
+	assert_true(brief.claims.is_empty(), "the walk-in it did not finish is not claimed")
+
+
+func test_p_the_retry_of_a_sighted_halt_is_bounded_by_order_tries() -> void:
+	var s := _sight_scene()
+	var g: Game = s["g"]
+	var mine: Army = s["mine"]
+	S.ai(g, {"order_tries": 1})
+	var run := _run_watched(g, mine)
+	assert_eq((run["marches"] as Array).size(), 1, "one try a season: no step after the halt")
+	assert_eq([mine.hex, mine.order, mine.halt_why], [SIGHT_STOP, Army.ORDER_NONE, Movement.WHY_SIGHTED], "it stays halted")
+
+
+func test_only_a_halt_on_sight_makes_the_seat_look_again_and_only_at_what_it_sees() -> void:
+	var s := _sight_scene()
+	var g: Game = s["g"]
+	var b := S.brief(g)
+	assert_eq(b.seen.filter(func(e: Dictionary) -> bool: return e["hex"] == SIGHT_FOE).size(), 0)
+	var men := b.men
+	ArmyFixture.army(g, M, Vector2i(19, 4), 0, 1, 0)
+	Sight.refresh(g)
+	assert_true(Sight.sees(g, M, SIGHT_FOE), "now seen")
+	for walk: Dictionary in [{"stopped": &""}, {"stopped": &"points"}, {"stopped": &"zoc"}, {"stopped": &"enemy"}]:
+		assert_false(b.halted_on_sight({"ok": true, "walk": walk}), str(walk))
+	assert_false(b.halted_on_sight({"ok": false, "reason": "no"}), "a refusal walked nothing")
+	assert_eq(b.seen.filter(func(e: Dictionary) -> bool: return e["hex"] == SIGHT_FOE).size(), 0, "P: seen is made again only then")
+	assert_true(b.halted_on_sight({"ok": true, "walk": {"stopped": Movement.WHY_SIGHTED}}))
+	assert_eq(b.seen, AiKnow.seen_enemies(g, M), "what the seat sees now")
+	assert_eq(b.seen.filter(func(e: Dictionary) -> bool: return e["hex"] == SIGHT_FOE).size(), 1)
+	assert_eq(b.men, men, "the rest of the brief stays as the seat's start made it (R42)")
+
+
+# moves in the month (R9, R26, R27): an attack the AI orders within reach is fought inside its turn.
+func test_an_attack_within_reach_is_fought_inside_the_ais_step() -> void:
+	var s := S.near_scene(3)
+	var g: Game = s["g"]
+	var mine: Army = s["mine"]
+	var theirs: Army = s["theirs"]
+	S.step(g, S.brief(g), mine)
+	assert_eq([S.acts[-1]["action"], S.acts[-1]["args"]["goal"]], ["march", Vector2i(11, 5)])
+	assert_eq(g.battle_records.size(), 1, "P: a battle left for the battles phase")
+	assert_eq(g.battles.size(), 0)
+	var won := _army(g, mine.id)
+	assert_eq([won.hex, won.order, won.points], [Vector2i(11, 5), Army.ORDER_NONE, 0], "the winner halted, its season over")
+	var beaten := _army(g, theirs.id)
+	assert_not_null(beaten, "the beaten army retreats")
+	assert_ne(beaten.hex, Vector2i(11, 5))
+	assert_eq(beaten.points, 0, "and does not walk again this season (R27)")
 
 
 # ----- what the seat cannot see ---------------------------------------------------------------------------------------------------------

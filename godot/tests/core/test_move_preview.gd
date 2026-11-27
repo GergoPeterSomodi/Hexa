@@ -289,10 +289,6 @@ const NEXT_DOOR := Vector2i(5, 7)
 const MILAN_BORDER := Vector2i(6, 6)
 
 
-func _duel() -> Game:
-	return MovesFixture.duel()
-
-
 func _home(g: Game) -> Army:
 	return MovesFixture.named(g, MovesFixture.NAME_HOME)
 
@@ -320,7 +316,7 @@ func _kinds(p: Dictionary) -> Array[StringName]:
 
 
 func test_a_long_march_walks_its_points_and_leaves_the_rest_standing() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var p := _leg(g, a, FAR_GOAL)
 	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
@@ -339,7 +335,7 @@ func test_a_long_march_walks_its_points_and_leaves_the_rest_standing() -> void:
 
 
 func test_the_points_left_shorten_the_leg() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	ArmyFixture.spent(g, a, 5)
 	g.version += 1
@@ -352,7 +348,7 @@ func test_the_points_left_shorten_the_leg() -> void:
 
 
 func test_a_march_next_door_arrives() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var p := _leg(g, a, NEXT_DOOR)
 	var leg: Dictionary = p.leg
@@ -364,7 +360,7 @@ func test_a_march_next_door_arrives() -> void:
 
 
 func test_an_army_with_no_points_walks_nothing_and_says_when_it_sets_out() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	ArmyFixture.spent(g, a, 0)
 	g.version += 1
@@ -377,7 +373,7 @@ func test_an_army_with_no_points_walks_nothing_and_says_when_it_sets_out() -> vo
 
 
 func test_a_mustering_army_walks_nothing() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := ArmyFixture.army(g, MovesFixture.SAVOY, _home(g).hex, 0, 1, g.turn)
 	var p := _leg(g, a, NEXT_DOOR)
 	assert_eq(p.leg.why, &"mustering")
@@ -386,7 +382,7 @@ func test_a_mustering_army_walks_nothing() -> void:
 
 
 func test_a_seen_zone_of_control_ends_the_leg_and_the_season() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	ArmyFixture.army(g, MovesFixture.MILAN, Vector2i(6, 8), 0, 1)
 	Sight.refresh(g)
@@ -401,7 +397,7 @@ func test_a_seen_zone_of_control_ends_the_leg_and_the_season() -> void:
 
 
 func test_a_march_onto_a_seen_army_at_war_is_a_battle_with_its_risk() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	ArmyFixture.army(g, MovesFixture.MILAN, MILAN_BORDER, 0, 1)
 	Sight.refresh(g)
@@ -418,7 +414,7 @@ func test_a_march_onto_a_seen_army_at_war_is_a_battle_with_its_risk() -> void:
 
 
 func test_an_army_of_a_country_at_peace_in_sight_blocks_the_leg() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var route: Array = _leg(g, a, FAR_GOAL).hexes
 	ArmyFixture.army(g, &"GEN", route[2], 0, 1)
@@ -432,7 +428,7 @@ func test_an_army_of_a_country_at_peace_in_sight_blocks_the_leg() -> void:
 
 
 func test_risks_enemy_land_and_out_of_supply_follow_the_leg_end() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var own := _leg(g, a, FAR_GOAL)
 	assert_false(_kinds(own).has(&"enemy_land"), "a walk through its own land enters no enemy land")
@@ -449,7 +445,7 @@ func test_risks_enemy_land_and_out_of_supply_follow_the_leg_end() -> void:
 
 func test_an_army_the_viewer_does_not_see_makes_no_risk_and_no_stop() -> void:
 	# P: a risk or a leg end that moves with an unseen army. The Milanese army on the goal (7, 4) is out of Savoy's sight.
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var near := MovesFixture.named(g, MovesFixture.NAME_NEAR)
 	assert_false(Knowledge.sees(g, MovesFixture.SAVOY, near.hex), "the fixture's army is out of sight")
@@ -465,8 +461,8 @@ func test_an_army_the_viewer_does_not_see_makes_no_risk_and_no_stop() -> void:
 
 ## R57, the twin: a game that differs only in an army the viewer cannot see gives the same preview for every order of the viewer's army.
 func test_twin_games_that_differ_in_an_unseen_army_give_equal_previews() -> void:
-	var one := _duel()
-	var two := _duel()
+	var one := MovesFixture.duel()
+	var two := MovesFixture.duel()
 	var a1 := _home(one)
 	var a2 := _home(two)
 	var route: Array = _leg(one, a1, MovesFixture.named(one, MovesFixture.NAME_NEAR).hex).hexes
@@ -491,7 +487,7 @@ func test_twin_games_that_differ_in_an_unseen_army_give_equal_previews() -> void
 
 
 func test_the_leg_is_cached_with_the_preview_and_a_refusal_has_none() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	var a := _home(g)
 	var p := _leg(g, a, FAR_GOAL)
 	assert_eq(MovePreview.leg_of(g, MovesFixture.SAVOY, a.id, FAR_GOAL), p.leg)
@@ -550,7 +546,7 @@ func test_an_army_that_has_walked_stops_before_the_fog_step_in_the_preview() -> 
 
 
 func test_north_italy_gives_no_fog_leg() -> void:
-	var g := _duel()
+	var g := MovesFixture.duel()
 	for b: Army in g.armies.duplicate():
 		if b.tag == MovesFixture.MILAN:
 			Armies.remove(g, b)
@@ -558,3 +554,86 @@ func test_north_italy_gives_no_fog_leg() -> void:
 	var p := _leg(g, a, FOG_GOAL)
 	assert_ne(p.leg.why, MovePreview.WHY_FOG, "P: a fog step on north Italy")
 	assert_false(_has_line(p, "Unmapped land"))
+
+
+# --- fair warning (moves-build-spec.md R73; MV20) -------------------------------------------------------------------------
+# The duel declared by Savoy this season (MovesFixture.declared_now). A Savoyard army on (4, 7) walks east: (5, 7), (6, 7) are
+# Savoy's, (7, 8) and (7, 9) Milan's, (6, 9) beyond them Savoy's again.
+
+const WARNED_START := Vector2i(4, 7)
+const WARNED_LAST := Vector2i(6, 7)
+const WARNED_ENEMY := Vector2i(7, 9)
+const WARNED_BEYOND := Vector2i(6, 9)
+const WARNED_WORDS := "You declared war on the Duchy of Milan this season. Your armies may not enter its land until next season."
+const WARNED_HINT := "Hint: march to your own or unclaimed land, or wait for the next season."
+
+
+func _walker(g: Game) -> Army:
+	var a := ArmyFixture.army(g, MovesFixture.SAVOY, WARNED_START, 0, 1)
+	Sight.refresh(g)
+	return a
+
+
+## P: the refusal in the bad tone, without the hint, or swapped for the fog's no-way words; refused the next season too.
+func test_a_march_into_the_declared_land_is_refused_in_the_warning_tone_with_the_hint() -> void:
+	var g := MovesFixture.declared_now()
+	var a := _walker(g)
+	var p := _leg(g, a, WARNED_ENEMY)
+	assert_false(bool(p.verdict.ok))
+	assert_eq(str(p.verdict.reason), WARNED_WORDS + "
+" + WARNED_HINT, "the toast reads both lines")
+	assert_eq(p.kind, &"refusal")
+	assert_eq(p.lines, [[WARNED_WORDS, &"warn"]], "P: the warning tone")
+	assert_eq(p.way_out, WARNED_HINT, "P: the hint under it")
+	assert_true((p.leg.hexes as Array).is_empty())
+	g.turn += 1
+	g.version += 1
+	assert_true(bool(_leg(g, a, WARNED_ENEMY).verdict.ok), "P: open the next season")
+
+
+## An explored goal out of sight keeps the words (they name only the declared enemy). P: the fog's no-way words instead.
+func test_the_warned_refusal_of_an_explored_unseen_goal_keeps_its_words() -> void:
+	var g := MovesFixture.declared_now()
+	var a := _walker(g)
+	var goal := Army.NO_HEX
+	for i: int in g.map.hex_count():
+		var h := g.map.hex_of(i)
+		if g.map.is_land(h) and Territory.owner_tag(g, h) == MovesFixture.MILAN and Sight.explored(g, MovesFixture.SAVOY, h) 				and not Sight.sees(g, MovesFixture.SAVOY, h):
+			goal = h
+			break
+	assert_ne(goal, Army.NO_HEX, "an explored Milanese hex out of sight")
+	assert_eq(_leg(g, a, goal).lines[0][0], WARNED_WORDS, "P")
+
+
+## P: a leg that walks in; points spent at the border; an arrival this season on the card; a walk that differs from the leg.
+func test_a_march_across_the_declared_land_stops_at_the_border() -> void:
+	var g := MovesFixture.declared_now()
+	var a := _walker(g)
+	var before := a.points
+	var p := _leg(g, a, WARNED_BEYOND)
+	assert_true(bool(p.verdict.ok), str(p.verdict.reason))
+	var leg: Dictionary = p.leg
+	assert_eq(leg.why, &"warned")
+	assert_eq(leg.hexes, [Vector2i(5, 7), WARNED_LAST] as Array[Vector2i], "P: the leg ends before the border")
+	assert_eq(leg.end, WARNED_LAST)
+	assert_eq(leg.border, MovesFixture.MILAN)
+	assert_eq(int(leg.points_after), before - int(leg.cost), "P: the points left are kept")
+	assert_gt(int(leg.points_after), 0)
+	var line := "Stops at the border of the Duchy of Milan: you declared war this season."
+	assert_true((p.lines as Array).has([line, &"warn"]), str(p.lines))
+	assert_eq(p.way_out, WARNED_HINT)
+	assert_false(_kinds(p).has(&"enemy_land"), "this season enters no enemy land")
+	assert_eq(int(p.arrives_turn), g.turn + 1, "P: there next season, not this one")
+	assert_eq(int(p.seasons), 2)
+	assert_eq([(p.stops as Array)[0].hex, (p.stops as Array)[0].turn], [WARNED_LAST, g.turn], "this season's stop is the border")
+	assert_eq((p.stops as Array).back().hex, WARNED_BEYOND)
+	var done := g.act("march", {"army": a.id, "goal": WARNED_BEYOND, "tag": MovesFixture.SAVOY})
+	assert_eq([done.walk.to, done.walk.points, done.walk.stopped], [leg.end, leg.points_after, &"warned"], "the walk is the leg")
+	var kept := MovePreview.stored(g, MovesFixture.SAVOY, a.id)
+	assert_eq((kept.stops as Array)[0].hex, WARNED_LAST, "the stored route waits at the border this season")
+	assert_eq(int(kept.arrives_turn), g.turn + 1)
+	g.turn += 1
+	g.version += 1
+	var later := MovePreview.to(g, MovesFixture.SAVOY, a.id, WARNED_BEYOND)
+	assert_eq(later.leg.why, &"arrives", "P: warned in the next season")
+	assert_eq(later.way_out, "")

@@ -271,21 +271,14 @@ static func _losses(game: Game, ended: int, from_event: int) -> Dictionary:
 		elif kind == "district_captured":
 			var t := StringName(str(e.get("owner", "")))
 			out[t] = int(out.get(t, 0)) + int(e.get("garrison_lost", 0))
-	var owner_of := {}
-	for a: Army in game.armies:
-		for u: Unit in a.units:
-			owner_of[u.id] = a.tag
 	for r: BattleRecord in game.battle_records:
 		if r.turn != ended:
 			continue
 		var sides: Array[StringName] = [r.attacker, r.defender]
-		var returned: Dictionary = r.end["returned"]
+		var returned := r.returned_by_side()  # by the fight's fighters: a company gone since counts too
 		for side: int in 2:
-			var back := 0
-			for uid: Variant in returned:
-				if owner_of.get(int(uid), &"") == sides[side]:
-					back += int(returned[uid])
-			out[sides[side]] = int(out.get(sides[side], 0)) + int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - back
+			var lost := int(r.end["killed"][side]) + int(r.end["wounded_total"][side]) - returned[side]
+			out[sides[side]] = int(out.get(sides[side], 0)) + lost
 	return out
 
 

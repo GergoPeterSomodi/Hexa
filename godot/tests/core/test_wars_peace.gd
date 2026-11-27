@@ -46,7 +46,7 @@ func test_row_3_not_at_war() -> void:
 
 
 func test_row_5_a_white_peace_needs_the_war_to_be_old() -> void:
-	WarFixture.at_war(g, GEN, nb)
+	WarFixture.declared_now(g, GEN, nb)
 	var need := g.defs.war.peace_min_seasons
 	assert_eq(_peace("white").reason, "a white peace needs %d seasons of war: %d more" % [need, need],
 		"a war of no seasons")

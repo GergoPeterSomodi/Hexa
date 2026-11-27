@@ -1,7 +1,10 @@
 ## The move card (docs/architecture/m6-build-spec.md 6.7; L20, issue #210): a hover card with the words of a march to the hex
 ## under the pointer (or at the order cursor), while an army of yours is selected. MapHover shows it in place of the hex card
 ## and calls show_move with MovePreview.to's preview: the title (the place), its lines in their tones, and the way out of a
-## refusal. It only shows: no buttons, it ignores the mouse and never takes the focus. Ordering is MapArmies' right click and O.
+## refusal. The lines keep the preview's order (the war line, this season's walk and its risks, the arrival, the crossings, the
+## supply; moves-build-spec.md R47); a line the preview says twice (a risk that is also the supply line) shows once, in its
+## first place and in the stronger tone. It only shows: no buttons, it ignores the mouse and never takes the focus. Ordering is
+## MapArmies' right click and O.
 class_name MoveCard
 extends PanelContainer
 
@@ -11,6 +14,8 @@ const CARD_W: float = 300.0
 const WRAP_W: float = 264.0
 ## The meta key of a label's words before it is wrapped.
 const RAW := &"words"
+## The tones from the weakest to the strongest: a line said twice keeps the stronger.
+const TONE_RANK: Array[StringName] = [&"muted", &"plain", &"good", &"warn", &"bad"]
 const TONE_VARIATIONS: Dictionary[StringName, StringName] = {
 	&"good": &"NumberGood",
 	&"bad": &"NumberBad",
@@ -86,15 +91,30 @@ func _fill(preview: Dictionary) -> void:
 	_set_words(_title, str(preview.get("title", "")))
 	_title.visible = not str(_title.get_meta(RAW, "")).is_empty()
 	_clear_rows()
-	for raw: Variant in preview.get("lines", []) as Array:
-		var line := raw as Array
-		if line.size() < 2:
-			continue
+	for line: Array in distinct_lines(preview.get("lines", []) as Array):
 		_rows.add_child(_line_label(str(line[0]), StringName(str(line[1]))))
 	var way := str(preview.get("way_out", ""))
 	_set_words(_way, way)
 	_way.visible = not way.is_empty()
 	_fit()
+
+
+## The [text, tone] lines as the card shows them: in order, each text once, with the stronger of the tones it was given.
+static func distinct_lines(lines: Array) -> Array[Array]:
+	var out: Array[Array] = []
+	var at: Dictionary[String, int] = {}
+	for raw: Variant in lines:
+		var line := raw as Array
+		if line.size() < 2:
+			continue
+		var text := str(line[0])
+		var tone := StringName(str(line[1]))
+		if not at.has(text):
+			at[text] = out.size()
+			out.append([text, tone])
+		elif TONE_RANK.find(tone) > TONE_RANK.find(out[at[text]][1] as StringName):
+			out[at[text]][1] = tone
+	return out
 
 
 ## Sizes the card to its words: each label is wrapped at WRAP_W by its font and set to that height, then the card takes the

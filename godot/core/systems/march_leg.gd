@@ -7,6 +7,12 @@
 ## MV7: the deep-fog step (FogStep, R36: a step onto a hex the country never explored, only fresh, spends fog_step_cost) is a rule
 ## of the leg; stop on sight (R32 to R35, D6 to D8) is a rule of the ticks: the leg keeps the enemy armies its country did not see
 ## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept).
+## MV20: fair warning (FairWarning, R73) is a rule of the ticks too: a step onto the land of a country the walker's country declared
+## war on this season is not taken (&"warned": no halt, the points kept, the march stands and goes on next season).
+## The stack limit (room, and issue #466): room sends a walk back along its path, so a hex keeps a place for every army that
+## started on it and walked off: a step onto a battle there counts them, a battle opening there first sends back the walks its
+## holder has no room for, a walk sent back never stops on a battle hex it left, and one sent back to its start, where its
+## country is now attacked, fights there.
 ## Luck: none. Integer maths. Armies are written only through Armies; the rules are Movement's and Battles'.
 class_name MarchLeg
 extends RefCounted
@@ -194,7 +200,9 @@ static func _no_way(game: Game, w: MarchLeg) -> void:
 ## step is taken, unless another country's army stood there this phase.
 ## Stop on sight (R32, R34): after a step taken that opened no battle, an army not in the seen set within the army's sight ends
 ## the walk there; in the phase the test also runs before the step (an army that walked into its sight in this tick or the last).
-static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary) -> void:
+## Fair warning (R73) comes before the contact: a hex closed this season is not stepped onto, an enemy army on it or not.
+## `walks` are the phase's walks, for the places a battle must leave free (none for a walk alone: no army can come back).
+static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary, walks: Array = []) -> void:
 	if Battles.of_army(game, w.army.id) != null:
 		_stop(game, w, k, Movement.WHY_FOUGHT, "the army is fought in its battle")
 		return
@@ -205,12 +213,18 @@ static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary) -> void:
 			return
 	var h: int = w.walked[k]
 	var hex := game.map.hex_of(h)
+	var closed := FairWarning.enemy_on(game, w.tag, hex)
+	if closed != &"":
+		_stop(game, w, k, FairWarning.WHY, FairWarning.STOP_TEXT % FairWarning.the_name(game, closed))
+		return
+	_clear_for_battle(game, w, hex, walks)
 	if _contact(game, w, hex):
 		var prev := game.map.hex_of(w.start if k == 0 else w.walked[k - 1])
-		if _engage(game, w, k, prev, hex):
+		var full := _places_kept(game, w, hex, walks)
+		if full == "" and _engage(game, w, k, prev, hex):
 			occ[h] = w.cid
 			return
-		_refuse(game, w, k, hex)
+		_refuse(game, w, k, hex, full)
 		return
 	var held := int(occ.get(h, w.cid))
 	if held != w.cid:
@@ -278,10 +292,10 @@ static func _engage(game: Game, w: MarchLeg, k: int, prev: Vector2i, hex: Vector
 	return true
 
 
-## A contact Battles refused: the walk stops before the hex. Why: battle (a battle of the other side is fought there), shaken
-## (too shaken to attack, 4.7 row 3) or enemy (the enemy holds the hex and the attack is refused: room, more than one enemy),
-## with the check's words.
-static func _refuse(game: Game, w: MarchLeg, k: int, hex: Vector2i) -> void:
+## A contact refused (by Battles, or for the places kept: `full`, _places_kept's words): the walk stops before the hex. Why:
+## battle (a battle of the other side is fought there), shaken (too shaken to attack, 4.7 row 3) or enemy (the enemy holds the
+## hex and the attack is refused: room, more than one enemy), with the check's words.
+static func _refuse(game: Game, w: MarchLeg, k: int, hex: Vector2i, full: String = "") -> void:
 	var b := Battles.at(game, hex)
 	var why := Movement.WHY_ENEMY
 	if b != null and b.attacker != w.tag and b.defender != w.tag:
@@ -289,7 +303,7 @@ static func _refuse(game: Game, w: MarchLeg, k: int, hex: Vector2i) -> void:
 	elif Armies.morale_of(w.army) < game.defs.war.attack_morale:
 		why = Movement.WHY_SHAKEN
 	var check := Battles.engage_check(game, {"army": w.army.id, "hex": hex, "tag": w.tag})
-	var text := str(check.reason)
+	var text := full if full != "" else str(check.reason)
 	if text == "":
 		text = "the way there is shut"
 	_stop(game, w, k, why, text)
@@ -323,16 +337,78 @@ static func _stop(game: Game, w: MarchLeg, k: int, why: StringName, text: String
 	w.text = text
 
 
+## The companies of country `cid` that started on hex index `h` in this phase, walked off it and may be sent back there
+## (an army in a battle cannot be); `but` is left out.
+static func _left(game: Game, walks: Array, cid: int, h: int, but: MarchLeg = null) -> int:
+	var n := 0
+	for o: MarchLeg in walks:
+		if o != but and o.cid == cid and o.start == h and game.map.index_of(o.army.hex) != h \
+				and Battles.of_army(game, o.army.id) == null:
+			n += o.army.units.size()
+	return n
+
+
+## "" when the places kept on `hex` for the walk's country leave the army room to fight there, or Battles refuses it anyway;
+## else the words of the refusal: the companies there and those that may come back fill the limit.
+static func _places_kept(game: Game, w: MarchLeg, hex: Vector2i, walks: Array) -> String:
+	var kept := _left(game, walks, w.cid, game.map.index_of(hex), w)
+	if kept == 0 or not bool(Battles.engage_check(game, {"army": w.army.id, "hex": hex, "tag": w.tag}).ok):
+		return ""
+	var limit := Military.stack_limit(game, &"")
+	var taken := Armies.units_at(game, w.tag, hex, PackedInt32Array([w.army.id])) + kept
+	if taken + w.army.units.size() <= limit:
+		return ""
+	return "no room: %d of %d companies of yours stand there or may come back" % [taken, limit]
+
+
+## Before the walk's step opens a battle on `hex`: while the holder's companies there and those that may come back exceed the
+## limit, the last of its walks in id order that walked onto the hex goes back (room's rule, at once), so no battle holds
+## more than a hex does. Nothing where a battle is fought already, or where the attack is refused.
+static func _clear_for_battle(game: Game, w: MarchLeg, hex: Vector2i, walks: Array) -> void:
+	if walks.is_empty() or Battles.at(game, hex) != null or not Movement.enemy_army_at(game, w.tag, hex) \
+			or not bool(Battles.engage_check(game, {"army": w.army.id, "hex": hex, "tag": w.tag}).ok):
+		return
+	var holder: StringName = &""
+	for a: Army in Movement.armies_on(game, hex):
+		if a.tag != w.tag and Wars.at_war(game, w.tag, a.tag):
+			holder = a.tag
+	var cid := _cid(game, holder)
+	var h := game.map.index_of(hex)
+	var limit := Military.stack_limit(game, &"")
+	while Armies.units_at(game, holder, hex) + _left(game, walks, cid, h) > limit:
+		var pick: MarchLeg = null
+		for k: int in range(walks.size() - 1, -1, -1):
+			var o: MarchLeg = walks[k]
+			if o.cid == cid and o.start != h and game.map.index_of(o.army.hex) == h and Battles.of_army(game, o.army.id) == null:
+				pick = o
+				break
+		if pick == null:
+			return
+		_back_in_the_ticks(game, pick)
+
+
+## A walk sent back while the ticks run: the steps it has not taken go back on its route, then the taken ones as room sends
+## them, and the army (and the phase's index) is moved at once.
+static func _back_in_the_ticks(game: Game, w: MarchLeg) -> void:
+	var from := w.army.hex
+	_stop(game, w, w.ticks.size(), &"", "")
+	_send_back(game, w)
+	var came := game.map.hex_of(w.start) if not w.walked.is_empty() else Army.NO_HEX
+	if w.army.hex != game.map.hex_of(w.end):
+		Armies.set_hex(game, w.army, game.map.hex_of(w.end), came)
+	Movement.index_move(game, w.army, from, w.army.hex)
+
+
 ## The stack limit at the phase's end (D12, R6 b): while the companies of one country on a hex exceed the limit, the last
-## walk in id order ending there steps back one hex along its walk (its route keeps the step). Each step back moves one army
-## toward its start, so it ends. An engaged walk stays on its battle hex.
+## walk in id order ending there steps back along its walk (its route keeps the steps; _send_back). Each step back moves one
+## army toward its start, so it ends. An army in a battle stays on its battle hex.
 static func room(game: Game, walks: Array, by_id: Dictionary) -> void:
 	var limit := Military.stack_limit(game, &"")
 	var counts := _counts(game, by_id)
 	while true:
 		var over := -1
 		for w: MarchLeg in walks:
-			if _can_step_back(w) and int(counts.get(_key(w.end, w.cid), 0)) > limit:
+			if _can_step_back(game, w) and int(counts.get(_key(w.end, w.cid), 0)) > limit:
 				over = _key(w.end, w.cid)
 				break
 		if over < 0:
@@ -340,25 +416,37 @@ static func room(game: Game, walks: Array, by_id: Dictionary) -> void:
 		var pick: MarchLeg = null
 		for k: int in range(walks.size() - 1, -1, -1):
 			var w: MarchLeg = walks[k]
-			if _can_step_back(w) and _key(w.end, w.cid) == over:
+			if _can_step_back(game, w) and _key(w.end, w.cid) == over:
 				pick = w
 				break
 		if pick == null:
 			break
-		_step_back(game, pick, counts)
+		var units := pick.army.units.size()
+		counts[over] = int(counts[over]) - units
+		_send_back(game, pick)
+		var now_at := _key(pick.end, pick.cid)
+		counts[now_at] = int(counts.get(now_at, 0)) + units
 
 
-static func _can_step_back(w: MarchLeg) -> bool:
-	return not w.walked.is_empty() and not w.engaged
+static func _can_step_back(game: Game, w: MarchLeg) -> bool:
+	return not w.walked.is_empty() and not w.engaged and Battles.of_army(game, w.army.id) == null
 
 
-static func _step_back(game: Game, w: MarchLeg, counts: Dictionary) -> void:
+## Sends a walk back one hex, and on past every hex where a battle is fought now (it left before the battle began). Back at
+## its start, where its country is attacked, the army takes its place in that battle (Battles.fall_back_in moves it there).
+static func _send_back(game: Game, w: MarchLeg) -> void:
+	_step_back(w)
+	while not w.walked.is_empty() and Battles.at(game, game.map.hex_of(w.end)) != null:
+		_step_back(w)
+	if w.walked.is_empty():
+		Battles.fall_back_in(game, w.army, game.map.hex_of(w.start))
+
+
+static func _step_back(w: MarchLeg) -> void:
 	# A walk stepped back for the stack limit gets no halt and no winter wait (its leg stopped where it no longer stands):
 	# its order stays and it resumes next season on its route (spec 4.4, room).
 	w.status = &""
 	w.text = ""
-	var units := w.army.units.size()
-	counts[_key(w.end, w.cid)] = int(counts[_key(w.end, w.cid)]) - units
 	var last := w.walked.size() - 1
 	var back := w.walked[last]
 	w.walked = w.walked.slice(0, last)
@@ -367,8 +455,6 @@ static func _step_back(game: Game, w: MarchLeg, counts: Dictionary) -> void:
 	rem.append_array(w.rem)
 	w.rem = rem
 	w.end = w.walked[last - 1] if last > 0 else w.start
-	var nk := _key(w.end, w.cid)
-	counts[nk] = int(counts.get(nk, 0)) + units
 
 
 ## The companies of each country per hex at the phase's end: a walk counts at its end, an army that did not walk at its hex.
@@ -428,7 +514,7 @@ static func _apply_orders(game: Game, w: MarchLeg, arrived: bool) -> void:
 		Armies.set_waiting(game, army, Movement.WHY_WINTER)
 	else:
 		Armies.set_route(game, army, w.rem)
-		if not w.walked.is_empty():
+		if not w.walked.is_empty() or w.status == FairWarning.WHY:
 			Armies.set_halt(game, army, &"", "")
 			Armies.set_waiting(game, army, &"")
 

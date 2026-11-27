@@ -1,6 +1,7 @@
 ## Map hex hover card controller using HoverCard + HexCard, with tooltip delay, viewport/MapArea clamping,
 ## drag/UI suppression, and live refresh on Events.hex_changed
-## (docs/architecture/ui-and-controls-spec.md section 7; ui-style-and-feedback-plan.md U14).
+## (docs/architecture/ui-and-controls-spec.md section 7; ui-style-and-feedback-plan.md U14). The points mark of one of your
+## army tokens has its own hover (moves-build-spec.md R51): its words take the card's place while the pointer is on it.
 class_name MapHover
 extends Control
 
@@ -40,6 +41,13 @@ var _army := -1
 var _keyboard := false
 var _cursor_hex: Vector2i = MapInput.NO_HEX
 var _cursor_screen := Vector2.ZERO
+## () -> Vector2: the pointer in viewport pixels (a test's); unset, the viewport's own pointer.
+var pointer_func: Callable = Callable()
+## The words of the points mark under the pointer ("" for none), how long it has been there, and whether the pointer is over
+## the map at all.
+var _tip := ""
+var _tip_elapsed := 0.0
+var _on_map := false
 
 
 func _init() -> void:
@@ -72,6 +80,8 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	if _points_hover(delta):
+		return
 	if _move_wanted():
 		return
 	if _hovered_hex == MapInput.NO_HEX or not hover_cards_enabled or _dragging:
@@ -122,6 +132,7 @@ func on_hover_changed(hex: Vector2i, pointer_pos: Variant = null) -> void:
 	if pointer_pos is Vector2:
 		_pointer_pos = pointer_pos as Vector2
 	_keyboard = false
+	_on_map = hex != MapInput.NO_HEX
 	_track(hex)
 	_refresh_move()
 
@@ -191,7 +202,7 @@ func _ensure_card() -> void:
 
 
 func _show_current() -> void:
-	if _move_wanted():
+	if _tip != "" or _move_wanted():
 		return
 	if war_mark_at(_hovered_hex):  # M7 B25: the war card owns a mark's hex
 		_clear_card()
@@ -237,7 +248,7 @@ func _move_hex() -> Vector2i:
 ## and the hover is live (no drag, no UI under the pointer).
 func _move_wanted() -> bool:
 	var game := Session.game
-	if _army < 0 or not hover_cards_enabled or _dragging or game == null or game.map == null:
+	if _tip != "" or _army < 0 or not hover_cards_enabled or _dragging or game == null or game.map == null:
 		return false
 	var hex := _move_hex()
 	if hex == MapInput.NO_HEX or not game.map.has(hex) or _is_ui_hovered():
@@ -309,6 +320,58 @@ func _place_move_card(card: MoveCard) -> void:
 	elif is_inside_tree() and get_viewport() != null:
 		anchor = to_local * get_viewport().get_mouse_position()  # the pointer is in viewport pixels, this node is not at 0,0
 	card.place(anchor, _available_bounds())
+
+
+## The points mark's hover: while the pointer is on the mark of one of your tokens, its words show after the tooltip delay in
+## place of the hex card and the move card. True while it holds the hover.
+func _points_hover(delta: float) -> bool:
+	var tip := _points_tip_under()
+	if tip.is_empty():
+		if not _tip.is_empty():
+			_end_points_tip()
+		return false
+	_ensure_card()
+	if tip != _tip:
+		_tip = tip
+		_tip_elapsed = 0.0
+		_shown = false
+		_card.clear()
+	_hide_move()
+	_tip_elapsed += maxf(SimClock.delta(delta), 0.0)
+	if _tip_elapsed >= hover_delay_sec:
+		if not _card.visible:
+			_card.show_card({"title": _tip})
+		var at := get_global_transform_with_canvas().affine_inverse() * _pointer_now()
+		_card.position = clamp_card_position(at, _card.get_combined_minimum_size(), _available_bounds())
+	return true
+
+
+## The words of the points mark under the pointer, "" for none, or when the hover is not live (cards off, a drag, the UI or
+## nothing under the pointer, the keyboard's order cursor).
+func _points_tip_under() -> String:
+	if not _on_map or _keyboard or _dragging or not hover_cards_enabled or Session.game == null or _is_ui_hovered():
+		return ""
+	var armies := MapArmies.in_tree(self)
+	if armies == null or armies.tokens() == null:
+		return ""
+	return armies.tokens().points_tip_at(_pointer_now())
+
+
+func _pointer_now() -> Vector2:
+	if pointer_func.is_valid():
+		return pointer_func.call() as Vector2
+	return get_viewport().get_mouse_position() if is_inside_tree() else _pointer_pos
+
+
+## The pointer left the mark: the hover of the hex under it takes over again.
+func _end_points_tip() -> void:
+	_tip = ""
+	_tip_elapsed = 0.0
+	_shown = false
+	_elapsed = 0.0
+	if _card != null:
+		_card.clear()
+	_refresh_move()
 
 
 func _on_army_selected(army_id: int) -> void:

@@ -19,7 +19,8 @@ static func forces(turn: AiTurn, game: Game, brief: AiBrief, _arg: int) -> void:
 
 
 ## An army of the seat at peace (`arg` is its id): Hold when attacked, then its post's march, or a halt on the post. An army
-## takes this step every `peace_order_every` seasons ((turn + id) mod n == 0). No post, no order.
+## takes this step every `peace_order_every` seasons ((turn + id) mod n == 0). No post, no order. The march walks inside the act;
+## one halted on sight refreshes what the seat sees and asks for one more step (moves-build-spec.md R41).
 static func peace_army(turn: AiTurn, game: Game, brief: AiBrief, arg: int) -> void:
 	if posmod(AiKnow.turn(game) + arg, brief.ai.peace_order_every) != 0:
 		return
@@ -35,7 +36,8 @@ static func peace_army(turn: AiTurn, game: Game, brief: AiBrief, arg: int) -> vo
 		if army.order == Army.ORDER_MARCH:
 			AiKnow.act(turn, game, brief.tag, "halt", {"army": arg})
 	elif army.order != Army.ORDER_MARCH or army.goal != post:
-		AiKnow.act(turn, game, brief.tag, "march", {"army": arg, "goal": post})
+		if brief.halted_on_sight(AiKnow.act(turn, game, brief.tag, "march", {"army": arg, "goal": post})):
+			turn.army_retry(game, brief.tag, arg)
 
 
 static func _army(game: Game, tag: StringName, id: int) -> Army:
