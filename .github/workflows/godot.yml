@@ -208,16 +208,34 @@ jobs:
             exit 1
           fi
       - name: GUT tests (headless, JUnit report)
+        # The random-play tests run in groups, each in its own process: in one process with the rest they run the
+        # runner out of memory.
         run: |
+          set +e
           set -uo pipefail
-          "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd \
-            -gdir=res://tests -ginclude_subdirs -gexit \
-            -gjunit_xml_file="$RUNNER_TEMP/gut-junit.xml" 2>&1 | tee gut.log
-          status=${PIPESTATUS[0]}
-          if [ "$status" -ne 0 ] || grep -q 'SCRIPT ERROR' gut.log; then
-            echo "::error::GUT reported a failing test or a script error (see the log)."
-            exit 1
+          fail=0
+          gut() {  # a name for the run, then GUT's options
+            local name=$1; shift
+            "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd "$@" -gexit \
+              -gjunit_xml_file="$RUNNER_TEMP/gut-junit-$name.xml" 2>&1 | tee "gut-$name.log"
+            local status=${PIPESTATUS[0]}
+            if [ "$status" -ne 0 ] || grep -q 'SCRIPT ERROR' "gut-$name.log"; then
+              echo "::error::GUT reported a failing test or a script error in the $name run (see the log)."
+              fail=1
+            fi
+          }
+          rest=$(cd godot && find tests -name 'test_*.gd' ! -name test_ui_monkey.gd | LC_ALL=C sort | sed 's#^#res://#' | paste -sd,)
+          gut main -gtest="$rest"
+          for group in seed_148 seed_149 seed_150 seed_151 mouse_click; do
+            gut "monkey-$group" -gtest=res://tests/shell/test_ui_monkey.gd -gunit_test_name="$group"
+          done
+          want=$(grep -c '^func test_' godot/tests/shell/test_ui_monkey.gd)
+          ran=$(cat gut-monkey-*.log | sed 's/\x1b\[[0-9;]*m//g' | awk '$1=="Tests"{n+=$2} END{print n+0}')
+          if [ "$ran" -ne "$want" ]; then
+            echo "::error::The random-play groups ran $ran of $want tests: add the missing names to the groups."
+            fail=1
           fi
+          exit $fail
       - name: Job summary
         if: always()
         run: |
@@ -225,16 +243,18 @@ jobs:
             echo "## Godot checks"
             echo
             echo "- Import, script load and main scene: see the step logs."
-            if [ -f "$RUNNER_TEMP/gut-junit.xml" ]; then
-              echo "- GUT (JUnit): \`$(grep -o '<testsuites[^>]*>' "$RUNNER_TEMP/gut-junit.xml" | head -1)\`"
-            fi
+            for report in "$RUNNER_TEMP"/gut-junit-*.xml; do
+              if [ -f "$report" ]; then
+                echo "- GUT (JUnit, $(basename "$report" .xml)): \`$(grep -o '<testsuites[^>]*>' "$report" | head -1)\`"
+              fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the JUnit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gut-junit
-          path: ${{ runner.temp }}/gut-junit.xml
+          path: ${{ runner.temp }}/gut-junit-*.xml
           if-no-files-found: ignore
 
   # The speed job: no GPU on the runner, so the window is Mesa's software OpenGL (llvmpipe) under xvfb. Frame times
