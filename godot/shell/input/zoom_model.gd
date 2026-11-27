@@ -4,7 +4,8 @@ extends RefCounted
 
 const ZOOM_MAX := 2.0
 const FIT_MARGIN := 0.96
-const MIN_MARGIN := 0.9
+## The zoom-out limit as a share of the fit zoom: about three wheel notches past the whole-map view (1.15^-3 = 0.66).
+const MIN_MARGIN := 0.65
 const BASE_NOTCH := 1.15
 const SMOOTH_TAU := 0.07
 const SNAP_EPS := 0.001
@@ -25,7 +26,7 @@ static func fit_zoom(free_size: Vector2, map_size: Vector2) -> float:
 	return clampf(fit, 1.0e-5, ZOOM_MAX)
 
 
-## Minimum allowed zoom: `fit_zoom * 0.9`, clamped to `<= ZOOM_MAX`.
+## Minimum allowed zoom: `fit_zoom * MIN_MARGIN`, clamped to `<= ZOOM_MAX`.
 static func min_zoom(free_size: Vector2, map_size: Vector2) -> float:
 	if free_size.x <= 0.0 or free_size.y <= 0.0 or map_size.x <= 0.0 or map_size.y <= 0.0:
 		return 1.0

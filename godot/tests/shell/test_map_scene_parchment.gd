@@ -1,6 +1,7 @@
 ## The parchment map in the map scene (docs/architecture/map-overview-build-spec.md R16 to R18, R22, R24, R25, R29, D2, D4,
 ## D5, D13): what it hides and keeps, the cross-fade, Events.map_parchment, the switch, the modes, the pick, the setting
-## that comes back, keys 7, [ and ], and the loading. Each planted case (P) feeds a check what a fault would leave.
+## that comes back, keys 7, [ and ], and the loading. Terrain and Owner show the parchment only well past the whole-map
+## view (the camera's side of that: test_parchment_zoom.gd). Each planted case (P) feeds a check what a fault would leave.
 extends GutTest
 
 const MAP_SCENE := preload("res://shell/map/map_scene.tscn")
@@ -70,6 +71,11 @@ func _fit_zoom() -> float:
 	return _scene.camera_rig().fit_zoom()
 
 
+## The zoom-out limit, well past the whole-map view: where Terrain and Owner show the parchment (D2).
+func _limit() -> float:
+	return _scene.camera_rig().min_zoom()
+
+
 ## How strongly a node under the view is drawn: 0 when hidden, else its alphas multiplied up to the view.
 func _drawn(node: CanvasItem) -> float:
 	if not node.is_visible_in_tree():
@@ -121,7 +127,8 @@ func _tiles_problems() -> Array[String]:
 		out.append("the parchment is shown")
 	if _scene.parchment_names().visible:
 		out.append("the parchment's names are shown")
-	if not _scene.view().ground_shown() or _scene.view().lines_alpha() != 1.0:
+	# (the view keeps a lines alpha that is equal to 1 but for the rounding of a fade's last steps)
+	if not _scene.view().ground_shown() or not is_equal_approx(_scene.view().lines_alpha(), 1.0):
 		out.append("the tiles are covered")
 	if _scene.country_labels().modulate.a != 1.0:
 		out.append("the tile view's country names are faded")
@@ -146,12 +153,14 @@ func test_the_nodes_stand_where_the_spec_puts_them() -> void:
 	assert_eq(_scene.parchment_names().z_index, ParchmentMap.LAYER_Z)
 
 
-func test_at_the_fit_the_parchment_covers_the_tiles_and_keeps_the_marks() -> void:
+func test_past_the_fit_the_parchment_covers_the_tiles_and_keeps_the_marks() -> void:
 	await _open()
 	_scene.set_mode(MapModes.Mode.OWNER)
 	assert_between(_fit_zoom(), 0.5, 0.8, "north Italy's fit at 1920 x 1080")
 	_scene.fit()
 	await _harness.wait_frames(self, 2)
+	assert_eq(_tiles_problems(), [] as Array[String], "the whole map: the tiles")
+	await _at(_limit())
 	assert_eq(_solid_problems(), [] as Array[String])
 	assert_gt(_scene.parchment_names().placed().size(), 0, "names are laid out")
 	assert_gt(_scene.country_labels().placed().size(), 0, "the covered names are laid out still, at alpha 0")
@@ -179,9 +188,10 @@ func test_a_crossing_fades_the_lines_and_the_names_and_the_tiles_come_back() -> 
 	await _open()
 	_scene.set_mode(MapModes.Mode.OWNER)
 	var fit := _fit_zoom()
-	await _at(fit * 1.15)
-	assert_eq(_solid_problems(), [] as Array[String], "one notch in: still the parchment")
-	_scene.frame_at(_scene.map_size() / 2.0, fit * 1.35)
+	await _at(_limit())
+	await _at(fit * 0.82)
+	assert_eq(_solid_problems(), [] as Array[String], "between the thresholds: still the parchment")
+	_scene.frame_at(_scene.map_size() / 2.0, fit)
 	_scene._process(0.125)
 	var alpha := 1.0 - _scene.view().lines_alpha()
 	assert_between(alpha, 0.3, 0.7, "half way through the cross-fade")
@@ -198,9 +208,11 @@ func test_a_crossing_fades_the_lines_and_the_names_and_the_tiles_come_back() -> 
 	_scene._process(0.125)
 	assert_eq(_tiles_problems(), [] as Array[String], "after a quarter second: the tiles whole")
 	assert_true(_scene.capital_marks().visible)
-	_scene.frame_at(_scene.map_size() / 2.0, fit * 1.15)
+	await _at(fit * 0.82)
+	assert_eq(_tiles_problems(), [] as Array[String], "between the thresholds: still the tiles")
+	_scene.frame_at(_scene.map_size() / 2.0, _limit())
 	_scene._process(0.25)
-	assert_eq(_solid_problems(), [] as Array[String], "one notch back out: the parchment whole")
+	assert_eq(_solid_problems(), [] as Array[String], "back out to the limit: the parchment whole")
 
 
 func test_map_parchment_is_told_once_at_the_start_and_once_a_change() -> void:
@@ -211,10 +223,12 @@ func test_map_parchment_is_told_once_at_the_start_and_once_a_change() -> void:
 	_settings.set_value("map/parchment", true)
 	_scene.fit()
 	await _harness.wait_frames(self, 4)
+	assert_eq(_told, [false] as Array[bool], "the whole map: tiles, nothing new")
+	await _at(_limit())
 	assert_eq(_told, [false, true] as Array[bool])
-	await _at(_fit_zoom() * 1.15)
-	assert_eq(_told, [false, true] as Array[bool], "one notch in: solid still")
-	await _at(_fit_zoom() * 1.35)
+	await _at(_fit_zoom() * 0.82)
+	assert_eq(_told, [false, true] as Array[bool], "between the thresholds: solid still")
+	await _at(_fit_zoom())
 	await _at(_fit_zoom() * 1.5)
 	await _harness.wait_frames(self, 3)
 	assert_eq(_told, [false, true, false] as Array[bool], "told once, and nothing new farther in")
@@ -230,8 +244,7 @@ func test_the_switch_off_keeps_tiles_in_terrain_and_the_parchment_in_goods() -> 
 	await _open()
 	for mode: int in [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER]:
 		_scene.set_mode(mode)
-		_scene.fit()
-		await _harness.wait_frames(self, 2)
+		await _at(_limit())
 		assert_eq(_tiles_problems(), [] as Array[String], "mode %d" % mode)
 	_scene.set_mode(MapModes.Mode.GOODS)
 	await _harness.wait_frames(self, 2)
@@ -242,7 +255,7 @@ func test_the_data_modes_keep_the_tiles_at_every_zoom() -> void:
 	await _open()
 	for mode: int in [MapModes.Mode.RELIEF, MapModes.Mode.YIELDS, MapModes.Mode.FOOD, MapModes.Mode.SUPPLY]:
 		_scene.set_mode(mode)
-		for zoom: float in [_fit_zoom(), 0.3, 1.0]:
+		for zoom: float in [_limit(), _fit_zoom(), 0.3, 1.0]:
 			await _at(zoom)
 			assert_eq(_tiles_problems(), [] as Array[String], "mode %d at %f" % [mode, zoom])
 	await _at(0.1)
@@ -260,7 +273,7 @@ func test_goods_mode_is_solid_at_every_zoom_and_gives_the_tile_parts_terrain() -
 	assert_eq(_scene.overlay().mode(), int(MapModes.Mode.TERRAIN))
 	assert_eq(_scene.parchment().mode(), int(MapModes.Mode.GOODS))
 	assert_eq(_scene.parchment().good(), Session.game.defs.good_id(&"grain"), "grain at first")
-	for zoom: float in [0.1, _fit_zoom(), 1.0, 2.0]:
+	for zoom: float in [0.1, _limit(), _fit_zoom(), 1.0, 2.0]:
 		await _at(zoom)
 		assert_eq(_solid_problems(), [] as Array[String], "zoom %f" % zoom)
 	assert_gt(_scene.parchment_names().placed().filter(
@@ -275,8 +288,7 @@ func test_the_pick_shows_no_parchment_and_choosing_a_country_brings_it() -> void
 	assert_eq(Session.new_scenario("north_italy_1480", 1480), "")
 	await _open()
 	assert_true(_scene.picking())
-	_scene.fit()
-	await _harness.wait_frames(self, 2)
+	await _at(_limit())
 	assert_eq(_tiles_problems(), [] as Array[String], "no parchment during the pick")
 	assert_eq(_told, [false] as Array[bool])
 	assert_true(bool(Session.act("choose_country", {"tag": GEN})["ok"]))
@@ -419,8 +431,12 @@ func test_the_names_are_not_culled_with_the_maps_corner_off_the_screen() -> void
 	var names := _scene.parchment_names()
 	for mode: int in [MapModes.Mode.TERRAIN, MapModes.Mode.GOODS]:
 		_scene.set_mode(mode)
-		await _at(_fit_zoom() * 1.15)
-		_scene.camera_rig().pan_by(Vector2(300.0, 200.0))
+		if mode == MapModes.Mode.GOODS:
+			await _at(_fit_zoom() * 1.15)
+			_scene.camera_rig().pan_by(Vector2(300.0, 200.0))
+		else:  # the parchment only past the fit, where the rig centres the map: framed off its middle instead
+			_scene.frame_at(_scene.map_size() * 0.9, _limit())
+			_scene._process(1.0)
 		await _harness.wait_frames(self, 2)
 		var origin := names.draw_base().affine_inverse() * Vector2.ZERO
 		assert_false(Rect2(Vector2.ZERO, Vector2(SCREEN)).has_point(origin), "(0, 0) at %s" % origin)
@@ -534,8 +550,7 @@ func test_the_far_lock_leaves_the_parchment_to_the_camera() -> void:
 
 func test_a_game_that_ends_drops_the_parchment() -> void:
 	await _open()
-	_scene.fit()
-	await _harness.wait_frames(self, 2)
+	await _at(_limit())
 	assert_true(_scene.parchment().visible)
 	Session.end_game()
 	await _harness.wait_frames(self, 2)
@@ -552,19 +567,23 @@ func test_the_hover_card_is_one_line_over_the_solid_parchment() -> void:
 	scene.configure(_settings)
 	hud.bind_map_scene(scene)
 	_scene = scene
+	scene.frame_at(scene.map_size() / 2.0, _limit())  # solid by the scene's first frame
 	await _harness.wait_frames(self, 3)
 	assert_true(hud.map_hover().shows_line(), "the HUD heard the scene")
 	await _at(_fit_zoom() * 1.5)
 	assert_false(hud.map_hover().shows_line())
 	await _at(_fit_zoom())
+	assert_false(hud.map_hover().shows_line(), "the whole map: the tiles' card")
+	await _at(_limit())
 	assert_true(hud.map_hover().shows_line())
 	_scene.set_mode(MapModes.Mode.RELIEF)
 	assert_false(hud.map_hover().shows_line(), "at once: no parchment in Relief")
 
 
-## The whole App on Genoa: the whole-map view under the HUD's free area is the parchment, two wheel notches bring the
-## tiles, key 7 and ] work through the App, and a quickload brings back the Goods mode with its good.
-func test_in_the_app_the_whole_map_view_is_parchment_and_two_notches_bring_the_tiles() -> void:
+## The whole App on Genoa: the whole-map view under the HUD's free area and one wheel notch past it are the tiles, two
+## notches bring the parchment, one notch back in or Fit the tiles; key 7 and ] work through the App, and a quickload
+## brings back the Goods mode with its good.
+func test_in_the_app_the_whole_map_view_is_tiles_and_two_notches_out_bring_the_parchment() -> void:
 	var old_dir := Session.save_dir
 	var old_lock := RunLock.path
 	var ai := Session.ai_enabled
@@ -589,14 +608,28 @@ func test_in_the_app_the_whole_map_view_is_parchment_and_two_notches_bring_the_t
 	await _harness.wait_frames(self, 4)
 	_scene = app.map_scene()
 	assert_almost_eq(_scene.zoom(), _fit_zoom(), 0.0001, "the game opens on the whole map")
-	assert_eq(_solid_problems(), [] as Array[String])
-	assert_true(app.hud().map_hover().shows_line())
-	assert_gt(_scene.parchment_names()._cover.size(), 0, "the HUD's cover reached the names")
-	assert_eq(_told.back(), true)
-	_scene.camera_rig().zoom_by(2.0)
-	await _harness.wait_frames(self, 3)
-	assert_eq(_tiles_problems(), [] as Array[String], "two notches in: the tiles")
+	assert_eq(_tiles_problems(), [] as Array[String], "a new game on the whole map: the tiles")
 	assert_false(app.hud().map_hover().shows_line())
+	assert_gt(_scene.parchment_names()._cover.size(), 0, "the HUD's cover reached the names")
+	assert_eq(_told.back(), false)
+	_scene.camera_rig().zoom_by(-1.0)
+	await _harness.wait_frames(self, 3)
+	assert_eq(_tiles_problems(), [] as Array[String], "one notch out: the tiles still")
+	_scene.camera_rig().zoom_by(-1.0)
+	await _harness.wait_frames(self, 3)
+	assert_eq(_solid_problems(), [] as Array[String], "two notches out: the parchment")
+	assert_true(app.hud().map_hover().shows_line())
+	assert_eq(_told.back(), true)
+	_scene.camera_rig().zoom_by(1.0)
+	await _harness.wait_frames(self, 3)
+	assert_eq(_tiles_problems(), [] as Array[String], "one notch back in: the tiles")
+	_scene.camera_rig().zoom_by(-2.0)
+	await _harness.wait_frames(self, 3)
+	assert_eq(_solid_problems(), [] as Array[String])
+	app.hud().zoom_control().fit_requested.emit()
+	await _harness.wait_frames(self, 3)
+	assert_eq(_tiles_problems(), [] as Array[String], "the Fit button: the tiles")
+	assert_almost_eq(_scene.zoom(), _fit_zoom(), 0.0001)
 	_press(KEY_7)
 	await _harness.wait_frames(self, 3)
 	_press(KEY_BRACKETRIGHT)

@@ -78,6 +78,40 @@ func test_fit_and_zoom_limits_clamp_min_and_max() -> void:
 	assert_almost_eq(_rig.zoom(), _rig.min_zoom(), 1.0e-5, "zoom clamped to min_zoom")
 
 
+## From the whole map out to the limit and back, eased about a pointer in a corner: while the whole map fits the free
+## area the camera holds the map's centre in every frame, and no pan moves it.
+func test_past_the_fit_the_map_stays_centred_through_zoom_and_pan() -> void:
+	_rig.set_free_rect(Rect2(0.0, 56.0, 1280.0, 664.0))
+	_rig.fit()
+	var middle := Vector2(NORTH_ITALY_SIZE * 0.5)
+	var fit := _rig.fit_zoom()
+	var drifted := 0
+	for button: MouseButton in [MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_UP]:
+		for _notch: int in 3:
+			_rig._unhandled_input(_wheel(button, Vector2(40.0, 690.0)))
+			for _i: int in 30:
+				_rig._process(1.0 / 60.0)
+				if _rig.zoom() <= fit and _camera.position != middle:
+					drifted += 1
+		if button == MOUSE_BUTTON_WHEEL_DOWN:
+			assert_almost_eq(_rig.zoom(), maxf(fit / pow(1.15, 3.0), _rig.min_zoom()), 1.0e-4)
+			_rig.zoom_to(_rig.min_zoom())
+			for _i: int in 30:
+				_rig._process(1.0 / 60.0)
+			_rig.pan_by(Vector2(400.0, -300.0))
+			assert_eq(_camera.position, middle, "a pan at the limit")
+			_rig._unhandled_input(_mouse_btn(MOUSE_BUTTON_LEFT, Vector2(600.0, 400.0), true))
+			_rig._unhandled_input(_mouse_motion(Vector2(700.0, 460.0), Vector2(100.0, 60.0)))
+			_rig._unhandled_input(_mouse_btn(MOUSE_BUTTON_LEFT, Vector2(700.0, 460.0), false))
+			assert_eq(_camera.position, middle, "a drag at the limit")
+			_rig.look_at(Vector2(60.0, 60.0), -1.0, true)
+			assert_eq(_camera.position, middle, "a jump at the limit")
+	assert_eq(drifted, 0, "no frame off the centre")
+	_rig.frame_at(NORTH_ITALY_SIZE * 0.5, 1.0)
+	_rig.pan_by(Vector2(400.0, -300.0))
+	assert_ne(_camera.position, middle, "P: close in the same pan moves")
+
+
 func test_wheel_with_factor_zooms_about_pointer_and_smooths() -> void:
 	_rig.frame_at(NORTH_ITALY_SIZE * 0.5, 1.0)
 	var pointer := Vector2(900.0, 500.0)

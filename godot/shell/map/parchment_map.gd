@@ -7,12 +7,12 @@
 ## given no sight and lays no veil.
 ##
 ## The scene drives it: begin(game), step(ms) a frame while is_building(), sync(game) a frame, owners_changed(hexes),
-## set_mode, set_good, set_options, step_fade(delta) a frame, and apply_zoom(zoom, fit), which returns how solid the
-## parchment is (0 while it is being built or during the country pick). Which zooms show it is ParchmentSwitch's (D2):
-## at rest it is solid or hidden. While it cross-fades the layers are drawn into one picture (the CanvasGroup "Picture")
-## that fades as a whole; solid or hidden, they are drawn straight to the screen. The node also applies the
-## two detail steps of R9 that are geometry: the mountain marks from TOWN_VIEW_PX screen px a hex, the district lines
-## from DISTRICT_VIEW_PX.
+## set_mode, set_good, set_options, settle() while the game loads, step_fade(delta) a frame, and apply_zoom(zoom, fit),
+## which returns how solid the parchment is (0 while it is being built or during the country pick). Which zooms show it
+## is ParchmentSwitch's (D2): at rest it is solid or hidden. While it cross-fades the layers are drawn into one picture
+## (the CanvasGroup "Picture") that fades as a whole; solid or hidden, they are drawn straight to the screen. The node
+## also applies the two detail steps of R9 that are geometry: the mountain marks from TOWN_VIEW_PX screen px a hex, the
+## district lines from DISTRICT_VIEW_PX.
 ##
 ## Colours are ParchmentTokens' and reach the shaders as uniforms; every shader takes only the alpha of a modulate. The
 ## hatch's vertex colour holds a hex index, so nothing above this node may modulate its red, green or blue.
@@ -340,6 +340,11 @@ func apply_zoom(zoom: float, fit: float) -> float:
 func step_fade(delta: float) -> void:
 	if _switch.step(delta):
 		_apply_view()
+
+
+## The camera is still being put in its place (a load): for the next steps what its zoom says shows at once.
+func settle() -> void:
+	_switch.settle()
 
 
 ## Under reduce motion the parchment and the tiles change places at once.

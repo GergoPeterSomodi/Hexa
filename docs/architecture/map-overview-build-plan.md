@@ -119,16 +119,20 @@ A failing frame row is fixed by spec D14's fallbacks in PM6's pull request.
 
 **The owner's playtest** (Windows, fresh user folder, the build from CI):
 
-1. New game, seed 1480, play as Genoa. Zoom out to the whole map: the parchment fades in (sand sea, hatched coast, dashed
-   borders, country names along their shapes, towns and names). The top bar, panels and buttons are the usual walnut and gold.
-2. Zoom in two notches: the tiles are back, with no second set of borders left over.
-3. Press 2 (Owner) at the whole-map view: countries tinted. Turn on colour-blind country colours: the tints change.
+1. New game, seed 1480, play as Genoa. Zoom out to the whole map (Fit): the tiles. One wheel notch farther: still the
+   tiles. A second notch: the parchment fades in (sand sea, hatched coast, dashed borders, country names along their
+   shapes, towns and names); a third is nearly the limit. The top bar, panels and buttons are the usual walnut and gold.
+   (Amended 2026-11-27, owner's playtest: it faded in at the whole map.)
+2. Zoom in two notches, or press Fit: the tiles are back, with no second set of borders left over. Hide and show the HUD
+   (H) on either side: nothing changes over.
+3. Press 2 (Owner) two notches past the whole map: countries tinted. Turn on colour-blind country colours: the tints
+   change.
 4. Press 7 (Goods): the goods card sits bottom left. Pick Wine: wine districts shaded by stage, an icon with pips on each, the
    legend with its count. [ and ] step through the goods. Hover a district: "place · owner · Wine, second stage".
 5. In Goods mode zoom all the way in: still the parchment. Press "Return to default map" (or 1): Terrain tiles.
-6. At the whole-map view select an army: its token, reach and path show over the parchment; give a move order.
+6. Two notches past the whole map select an army: its token, reach and path show over the parchment; give a move order.
 7. Relief, Yields, Food, Supply (3 to 6): no parchment at any zoom.
-8. Options, Map: turn off "Parchment map when zoomed out": the whole-map view shows tiles; Goods mode still shows the parchment.
+8. Options, Map: turn off "Parchment map when zoomed out": the tiles at every zoom; Goods mode still shows the parchment.
 9. Quit and Continue: Goods mode and Wine come back.
 10. Text size 150 % and high contrast: names larger, coast thicker.
 11. Look at the signed `pm_fog_thin` picture (deep fog comes into play with the Europe map).
@@ -168,4 +172,6 @@ A failing frame row is fixed by spec D14's fallbacks in PM6's pull request.
    exists on key 5).
 2. **North Italy's whole-map view.** With the fade band of spec D2 the whole-map view (and the zoom-out limit) is the parchment;
    the tiles return two wheel notches in.
+   Changed 2026-11-27 after the owner's playtest: the whole-map view shows the tiles, the parchment starts two notches
+   past it and the zoom-out limit is three (spec D2).
 

@@ -87,13 +87,14 @@ func test_apply_zoom_gives_the_alpha_of_the_mode_and_shows_it() -> void:
 	assert_false(node.visible, "hidden before the first apply_zoom")
 	for mode: int in [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER]:
 		node.set_mode(mode)
-		for row: Array in [[0.04, 0.65, 1.0], [0.65, 0.65, 1.0], [0.9, 0.65, 0.0], [0.04, 0.04, 1.0], [0.5, 0.04, 0.0]]:
+		for row: Array in [[0.04, 0.65, 1.0], [0.45, 0.65, 1.0], [0.65, 0.65, 0.0], [0.9, 0.65, 0.0], [0.028, 0.04, 1.0],
+				[0.04, 0.04, 0.0], [0.5, 0.04, 0.0]]:
 			var got := node.apply_zoom(row[0], row[1])
 			assert_eq(got, float(row[2]), "mode %d zoom %s fit %s" % [mode, row[0], row[1]])
 			assert_eq(node.visible, got > 0.0, "visible follows")
 			assert_eq(_fade_problems(node, got), 0, "one picture at alpha %s" % got)
 	node.set_mode(MapModes.Mode.GOODS)
-	for zoom: float in [0.04, 0.65, 0.7475, 0.9, 2.0]:
+	for zoom: float in [0.04, 0.45, 0.65, 0.9, 2.0]:
 		assert_eq(node.apply_zoom(zoom, 0.65), 1.0, "Goods is solid at zoom %s" % zoom)
 		assert_true(node.visible)
 	for mode: int in DATA_MODES:
@@ -120,7 +121,7 @@ func _fade_problems(node: ParchmentMap, alpha: float) -> int:
 ## A node half way through a cross-fade: settled on the parchment (two steps of no time), then half the time of a
 ## crossing.
 func _half_faded(node: ParchmentMap) -> float:
-	node.apply_zoom(0.65, 0.65)
+	node.apply_zoom(0.45, 0.65)
 	node.step_fade(0.0)
 	node.step_fade(0.0)
 	node.apply_zoom(1.0, 0.65)

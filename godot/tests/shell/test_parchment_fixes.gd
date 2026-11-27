@@ -61,11 +61,17 @@ func _modulate_of(node: CanvasItem) -> Color:
 	return out
 
 
+## Past the whole-map view, at the zoom-out limit: where Terrain and Owner show the parchment (D2).
+func _limit() -> float:
+	return _scene.camera_rig().min_zoom()
+
+
 # ----- the fallback season fade (the hatch keeps a hex index in its vertex colour) -----------------------------------
 
 
 func test_the_fallback_season_fade_never_modulates_the_parchment() -> void:
 	await _open()
+	await _at(_limit())
 	var fade := _scene.season_fade()
 	fade.method = SeasonFade.Method.FALLBACK
 	fade.run_headless = true
@@ -132,14 +138,14 @@ func test_the_place_plates_fade_with_the_parchment_and_faded_country_names_block
 	_settings.set_value("map/place_names", true)
 	await _open()
 	_scene.set_mode(MapModes.Mode.OWNER)
-	_scene.fit()
+	await _at(_limit())
 	await _harness.wait_frames(self, 3)
 	var plates := _scene.labels()
 	assert_true(plates.visible, "key N is on")
 	assert_gt(_scene.country_labels().obstacles().size(), 0, "P: the covered names are laid out, with boxes")
 	assert_eq(plates.modulate.a, 0.0, "no plate over the solid parchment (nor a name twice)")
 	assert_eq(plates.obstacles, [] as Array[Rect2], "invisible names block nothing")
-	_scene.frame_at(_scene.map_size() / 2.0, _scene.camera_rig().fit_zoom() * 1.4)
+	_scene.frame_at(_scene.map_size() / 2.0, _scene.camera_rig().fit_zoom())
 	_scene._process(0.125)
 	assert_between(plates.modulate.a, 0.3, 0.7, "they come in as the parchment goes")
 	assert_almost_eq(plates.modulate.a, _scene.country_labels().modulate.a, 0.001)
@@ -186,8 +192,7 @@ func test_the_country_pick_never_lays_out_all_seeing_names() -> void:
 		Session.start_game(_fogged_game())
 		_settings.set_value("state/map_mode", remembered)
 		await _open()
-		_scene.fit()
-		await _harness.wait_frames(self, 2)
+		await _at(_limit())
 		assert_true(_scene.picking())
 		var tag := Session.game.countries[2].tag
 		var same_call: Array[String] = []
@@ -249,7 +254,7 @@ func test_hidden_names_read_no_facts_until_they_show() -> void:
 	await _harness.wait_frames(self, 3)
 	assert_true(names._owners.is_empty(), "an owner change and a discovery only mark them stale")
 	_settings.set_value("map/parchment", true)
-	await _at(_scene.camera_rig().fit_zoom())
+	await _at(_limit())
 	assert_false(names._owners.is_empty(), "shown: read")
 	assert_eq(int(names._owners[game.map.index_of(hex)]), game.scenario.id_of(&"MLO"), "as it is now")
 	assert_gt(names.placed().size(), 0)
@@ -279,7 +284,7 @@ func _over_the_armies(names: CanvasItem) -> Array[String]:
 
 func test_army_tokens_paths_and_reach_are_drawn_over_the_names() -> void:
 	await _open()
-	_scene.fit()
+	await _at(_limit())
 	ArmyFixture.army(Session.game, GEN, Countries.by_tag(Session.game, GEN).capital, 0, 2)
 	Session.game.version += 1
 	(_scene.get_node("MapArmies") as MapArmies).sync()
@@ -293,7 +298,7 @@ func test_army_tokens_paths_and_reach_are_drawn_over_the_names() -> void:
 func test_the_names_in_the_world_still_land_on_their_screen_spots() -> void:
 	await _open()
 	var names := _scene.parchment_names()
-	for zoom: float in [0.1, _scene.camera_rig().fit_zoom(), 1.3]:
+	for zoom: float in [0.1, _limit(), 1.3]:
 		await _at(zoom)
 		_scene.set_mode(MapModes.Mode.GOODS)
 		_scene.camera_rig().pan_by(Vector2(37.0, -21.0))

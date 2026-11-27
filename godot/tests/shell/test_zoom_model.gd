@@ -13,13 +13,13 @@ func test_fit_and_min_zoom_for_north_italy_and_europe() -> void:
 	var fit_italy := ZoomModel.fit_zoom(VIEW_720, NORTH_ITALY_SIZE)
 	var min_italy := ZoomModel.min_zoom(VIEW_720, NORTH_ITALY_SIZE)
 	assert_almost_eq(fit_italy, 0.4045, 0.01, "North Italy fit zoom at 1280x720 is ~0.40")
-	assert_almost_eq(min_italy, fit_italy * 0.9, 0.001, "min_zoom is fit * 0.9 (~0.36..0.40)")
+	assert_almost_eq(min_italy, fit_italy * 0.65, 0.001, "min_zoom is fit * 0.65 (~0.26)")
 	assert_gt(min_italy, ZoomModel.ZOOM_FAR_OFF, "North Italy never reaches the far picture at 1280x720")
 
 	var fit_europe := ZoomModel.fit_zoom(VIEW_720, EUROPE_SIZE)
 	var min_europe := ZoomModel.min_zoom(VIEW_720, EUROPE_SIZE)
 	assert_almost_eq(fit_europe, 0.0239, 0.002)
-	assert_almost_eq(min_europe, 0.0215, 0.002, "Fake Europe min zoom is ~0.022")
+	assert_almost_eq(min_europe, 0.0155, 0.001, "Fake Europe min zoom is ~0.016")
 	assert_lt(min_europe, ZoomModel.ZOOM_FAR_ON, "Fake Europe reaches the far picture")
 
 

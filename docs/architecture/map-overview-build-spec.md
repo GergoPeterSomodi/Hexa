@@ -112,6 +112,9 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   `CountryLabels` are hidden. In the fade band the tile borders and lines fade out as the parchment fades in, and
   `CountryLabels` fades by one minus the parchment's alpha. Reach overlays, the selection and build marks, preview, path,
   work, army and war marks and floaters stay above the parchment at every alpha.
+  Amendment (2026-11-27, owner's playtest): the parchment lies solid only past the switch of D2. At the whole-map view
+  and one default notch past it the tiles show whole, with their own borders, names and pennants; on a large map that is
+  the far picture, and the tile view's reach and selection marks are hidden with it, as in the data modes.
   Amendment (2026-11-27): there is no resting fade band (D2); the same fades run during the 0.25 s cross-fade only. The
   place plates (`MapLabels`, key N) fade by one minus the alpha like `CountryLabels`, and names faded out block no plate.
   With `map/parchment` on the tile view itself is never hidden (showing it again builds every tile layer): its ground is
@@ -178,14 +181,26 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   (`shell/mapview/parchment_labels.gd`, a `Control` in the `Names` canvas layer after `Labels`) owns names, dots and
   icons. The facts come from two pure views in `core/views/`: `ParchmentShape` (geometry) and `ParchmentView` (goods
   bytes, counts, legend, names, towns, tip). The shell draws; it holds no rules.
-- **D2 The switch follows the fit zoom.** Amended 2026-11-27: no resting half-and-half view (it replaces the
-  zoom-proportional fade band). With `base = max(fit, 0.28)`, where `fit` is `ZoomModel.fit_zoom` for the window's free
-  map area, zooming in the tiles take over at `base × 1.24` and zooming out the parchment comes back under `base × 1.2`
-  (`ParchmentSwitch`; a zoom between the two keeps what it shows). On north Italy at 1920 x 1080 (fit about 0.65) the
-  whole-map view is parchment, one wheel notch in stays parchment and two notches show the tiles; on a large map the
-  tiles take over at hexes about 36 px wide and the parchment comes back under 35 px, above `FarMap`'s band. A crossing
-  cross-fades over 0.25 s of time; at rest the alpha is exactly 0 or 1. It switches at once on a load, on a change of mode
-  or setting, at the end of the country pick and under `reduce_motion`. Goods mode forces alpha 1 at every zoom.
+- **D2 The switch follows the fit zoom.** Amended 2026-11-27, owner's playtest (the parchment came too early): it shows
+  only well past the whole-map view. With `fit` = `ZoomModel.fit_zoom` for the window's free map area, and no floor under
+  it, zooming out the parchment comes under `fit × 0.80` and zooming in the tiles take over at `fit × 0.84`
+  (`ParchmentSwitch.PARCHMENT_UNDER_FIT` and `TILES_FROM_FIT`, the pair to tune; a zoom between the two keeps what it
+  shows). The zoom-out limit is `fit × 0.65` (`ZoomModel.MIN_MARGIN`; ui-and-controls-spec.md 4.3), so every map,
+  however small its fit, reaches the parchment.
+
+  | Zoom speed | Wheel notches out from the whole map to the parchment | Notches in from the limit to the tiles | Notches from the whole map to the limit |
+  |---|---|---|---|
+  | 50 % | 4 | 4 | 7 |
+  | 100 % | 2 | 2 | 4 (the third stops at 0.66, the fourth adds 1 %) |
+  | 200 % | 1 | 1 | 2 |
+
+  A `+` or `-` key press or button is two notches: at 100 % one press from the whole map shows the parchment. The Fit
+  button always shows the tiles. Only the camera's zooming chooses: a change of the free map area (the HUD hidden or
+  shown, the window resized; no panel changes it), which moves the fit and may push the zoom up to the new limit, keeps
+  what shows until the next zoom. A crossing cross-fades over 0.25 s of time; at rest the alpha is exactly 0 or 1. It
+  switches at once on a load (also while a large map is still loading: the zoom alone says what shows, from the tiles'
+  side), on a change of mode or setting, at the end of the country pick and under `reduce_motion`. Goods mode forces
+  alpha 1 at every zoom. (Earlier the same day: `max(fit, 0.28)` times 1.2 and 1.24, the whole-map view parchment.)
   Amendment to D1 (2026-11-27): `ParchmentLabels` stands in the map scene's world just after `Parchment`, at its z, not
   in the `Names` canvas layer, so army tokens, war marks, paths, previews and reach are drawn over its names; it lays out
   in screen px and draws through the view's inverse transform. Its name spots and icon spots are
@@ -297,8 +312,9 @@ var layout_count := 0
 
 ## 5. Done when
 
-1. On north Italy at the whole-map view the map is the parchment of the approved mockup in Terrain and Owner mode, inside
-   the game's own top bar and HUD; zooming in fades to the tiles; Goods mode shows the goods map at every zoom.
+1. On north Italy two wheel notches past the whole-map view the map is the parchment of the approved mockup in Terrain
+   and Owner mode, inside the game's own top bar and HUD; the whole-map view and closer show the tiles, with a fade
+   between (amended 2026-11-27, owner's playtest); Goods mode shows the goods map at every zoom.
 2. Every case of R12 to R15 holds on the thin fog fixture, each with a planted fault (plan section 3).
 3. The perf rows of plan section 4 hold on north Italy and the made-up Europe; the old map rows do not get worse.
 4. The mode, the good and the parchment switch come back after a restart; the keys of R25 work.

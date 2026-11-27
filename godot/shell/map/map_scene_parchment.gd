@@ -14,6 +14,7 @@ var _names: ParchmentLabels = null
 var _game: Game = null  # the game begun
 var _names_stale := false  # the state changed since the names read it
 var _running := false  # the scene's first frame has come: what is solid may be told
+var _loading := false  # the game begun is still being put on the view
 var _told := -1  # what Events.map_parchment last said (0 or 1), -1 nothing yet
 # The looks: the scene's own switches and the settings it hears (what ParchmentMap is told).
 var _tint := true
@@ -44,6 +45,7 @@ func begin(game: Game) -> void:
 		return
 	_game = game
 	_names_stale = false
+	_loading = game != null
 	_map.begin(game)
 	_names.set_alpha(0.0)
 	# A parchment nothing is to show (switched off, or the country pick) reads the names' facts when it first shows.
@@ -81,6 +83,10 @@ func tick(delta: float) -> void:
 		if _game != null:
 			begin(null)
 		return
+	if _loading:
+		# A large map loads over many frames, and the App places the camera after the last: that still switches at once.
+		_map.settle()
+		_loading = _scene.is_loading()
 	_map.step_fade(delta)
 	_map.sync(Session.game)
 

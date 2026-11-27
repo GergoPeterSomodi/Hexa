@@ -59,7 +59,7 @@ what ships now on the map-only game (**M1.5, the UI foundation**) and what each 
 | Standard 4.4: two autoloads | Unchanged. The settings are an object the App owns and hands down (no third autoload). `Session` gains `end_game()` and `unsaved_actions`; `Events` gains `game_ended` | Keeps the autoload rule |
 | Godot's usual place for InputMap defaults is `project.godot` | The actions are registered at start from one GDScript table, `Bindings.DEFAULTS`, then the overrides of `settings.cfg` are applied | One reviewable table that the help overlay and the tests read; "reset to defaults" is a reinstall. `Bindings.ensure()` makes them exist in tests and tools too |
 | Standard 3.2, layer 9 (names) | `MapLabels` lives in the World under a `CanvasLayer` (layer 5, under the HUD). Its N key moves to `MapInput` | One input path |
-| M1 spec 7: the far picture below zoom 0.20 | Thresholds unchanged. The **minimum zoom becomes "the whole map"** (fit x 0.9). North Italy never reaches the far picture (its minimum is about 0.40 at 1280 x 720); the made-up and the real Europe do (minimum about 0.022) | The far picture is for big maps |
+| M1 spec 7: the far picture below zoom 0.20 | Thresholds unchanged. The **minimum zoom becomes "the whole map"** (fit x 0.9). North Italy never reaches the far picture (its minimum is about 0.40 at 1280 x 720); the made-up and the real Europe do (minimum about 0.022). Amendment (2026-11-27, owner's playtest): the minimum is fit x 0.65, see 4.3 | The far picture is for big maps |
 | M1 spec 8: keys 1-4 season, R new seed; zoom up to 4.0 | 1-4 stay the season preview in M1.5 and become the map modes in M2 (as in Python); the preview stays in the Layers popover and the F3 panel until M3, then F3 only (section 8). R (new seed) moves to Ctrl/Cmd+R in M1.5, freeing R for "continue march" (M6). Zoom stops at 2.0 | Frees keys for their Python meanings; 1x art past 2x is only blur |
 | Python stored options as JSON in `~/.hexa` | `ConfigFile` in `user://settings.cfg`, with a custom user folder named "Hexa" | The Godot way; the Python game is frozen and its options are not carried over |
 
@@ -385,7 +385,7 @@ scroll pan, pinch and Ctrl+scroll zoom; for Windows touchpads).
 |---|---|
 | Zoom | continuous, camera scale; 1 = the art's size in logical px |
 | Fit | `fit = min(free_w / map_w, free_h / map_h) x 0.96`; the free area is the window minus the top bar (the dock is ignored: it comes and goes) |
-| Minimum | `fit x 0.9`: the whole map with a margin. North Italy: about 0.40 at 1280 x 720, 0.82 at 2560 x 1440; the made-up Europe about 0.022 |
+| Minimum | `fit x 0.65` (amended 2026-11-27, owner's playtest; it was fit x 0.9): about three wheel notches past the whole map at the default speed (the third reaches 0.66, a fourth the last 1 %). North Italy: about 0.28 at 1280 x 720, 0.43 at 1920 x 1080, 0.58 at 2560 x 1440, and 0.23 at 1024 x 600, inside the far picture's cross-fade (seen with the parchment off or in a data mode); the made-up Europe about 0.016 at 1280 x 720. The parchment takes over on the way out (map-overview-build-spec.md D2) |
 | Maximum | **2.0** (was 4.0). A UI scale change multiplies the zoom by old/new scale, so the same map stays on screen |
 | A wheel notch | `notch = 1.15 ^ zoom_speed` (zoom speed 50 % to 200 %), times the event's `factor` |
 | A key press or the `+`/`-` buttons | 2 notches about the free area's centre; key repeat repeats it |
@@ -403,6 +403,9 @@ scroll pan, pinch and Ctrl+scroll zoom; for Windows touchpads).
   area, the centre is the map's centre. (Our own clamp in `ZoomModel.clamp_centre`, not `Camera2D.limit_*`, which
   clamp the screen's edges and do not centre a map smaller than the screen.) This replaces Python's "200 px past the
   edge".
+  Amendment (2026-11-27): the camera's centre is the window's middle, so a centred map sits half the top bar's height
+  above the free area's middle (28 px at 1920 x 1080). From the fit zoom out to the minimum the whole map fits on both
+  axes: the camera holds the map's centre, whatever the zoom anchor, and no pan moves it.
 - **Edge pan** (`controls/edge_pan`, off by default): an 8 px band at the window's edge pans at the key speed times
   `edge_pan_speed`, only while the window has focus, the pointer is inside it, no drag is on and no Control is under
   the pointer. Off by default because a windowed Mac puts the Dock and the menu bar at the edges.
@@ -611,7 +614,7 @@ add a third.
 | Water and coast animation | **skip** until the map-look milestone (nothing animates; it would be a shader on the sea layer, with an option then) | | | |
 | Season change, Instant or Fade | **M3** (seasons change by time then). Fade: a picture of the screen (`get_viewport().get_texture().get_image()`) on top, fading out over 0.4 s while the chunks swap below; it also hides the chunk-by-chunk change. Instant with `reduce_motion` | a `TextureRect` in the HUD | `graphics/season_change` | Graphics |
 | Texture filtering | **skip** as an option: painted art is always linear. Mipmaps are an import decision that G1 measures (the look at zoom 0.25 to 0.5 against a third more memory) | `CanvasItem.texture_filter`, import `mipmaps/generate` | | |
-| Far-zoom switch point | **developer only** (F3 panel): on north Italy the far picture never shows (the minimum zoom is about 0.40) | `FarMap.ZOOM_OFF/ZOOM_ON` made settable | `dev/far_zoom` | F3 |
+| Far-zoom switch point | **developer only** (F3 panel): on north Italy the far picture shows only in a window under about 1280 x 720 at the minimum zoom (amended 2026-11-27) | `FarMap.ZOOM_OFF/ZOOM_ON` made settable | `dev/far_zoom` | F3 |
 | Loading slice budget | **developer only** (F3 panel), 2 to 16 ms (5) | `MapScene.SLICE_MS` made settable | `dev/slice_ms` | F3 |
 | Presets Low, Medium, High, plus Advanced | **later**, with texture quality: with today's knobs Low and High would differ in almost nothing. Defined now: **Low** = half textures, no relief shading, no preload, frame cap 60; **Medium** = full textures, relief shading, preload per platform; **High** = Medium plus mipmaps if imported. Changing a knob sets the preset to Custom | | `graphics/preset` | Graphics |
 
