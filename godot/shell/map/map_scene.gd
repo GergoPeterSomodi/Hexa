@@ -58,8 +58,7 @@ var _grid_opacity := 1.0
 var _far_locked := false
 var _panel: HexPanelContract = null
 
-var _mode: MapModes.Mode = MapModes.Mode.TERRAIN
-var _persisted_mode: MapModes.Mode = MapModes.Mode.TERRAIN
+var _modes := MapSceneModes.new(self, _sync_country_labels)
 var _tint_on := true
 var _borders_visible := true
 var _colour_blind := false
@@ -159,9 +158,7 @@ func _apply_settings(settings: Settings) -> void:
 	set_borders(bool(settings.get_value("map/borders")))
 	set_tint(bool(settings.get_value("map/owner_tint")))
 	set_colour_blind(str(settings.get_value("accessibility/country_colours")) == "colour_blind"); _overlay.set_sight_veil(bool(settings.get_value("map/sight_veil")))
-	_persisted_mode = _mode_from_string(str(settings.get_value("state/map_mode")))
-	if not picking() and Session.game != null:
-		_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
+	_modes.hear(str(settings.get_value("state/map_mode")))
 	var shading := bool(settings.get_value("graphics/relief_shading"))
 	_view.set_layer_visible("shade", shading)
 	_view.set_layer_visible("light", shading)
@@ -193,9 +190,7 @@ func _on_setting_changed(key: String, value: Variant) -> void:
 			set_colour_blind(str(value) == "colour_blind")
 			return
 		"state/map_mode":
-			_persisted_mode = _mode_from_string(str(value))
-			if not picking() and Session.game != null:
-				_apply_mode(_clamp_mode_for_game(_persisted_mode), false)
+			_modes.hear(str(value))
 			return
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names", "map/sight_veil",
@@ -253,14 +248,13 @@ func _setup_country_layers(game: Game) -> void:
 		_country_labels.setup(game)
 		_capitals.setup(game, _colour_blind)
 		_view.set_borders_visible(_borders_visible)
-		var start_mode := MapModes.Mode.OWNER if picking() else _saved_mode_from_settings()
-		_apply_mode(_clamp_mode_for_game(start_mode), false)
+		_modes.start(_settings)
 	else:
 		_active_palette = PackedColorArray()
 		_country_labels.setup(null)
 		_capitals.setup(null, _colour_blind)
 		_view.set_borders_visible(false)
-		_apply_mode(_clamp_mode_for_game(_saved_mode_from_settings()), false)
+		_modes.restore(_settings)
 
 
 ## Whether the map is still being put on the view (tiles, lines, borders, the far picture).
@@ -411,8 +405,7 @@ func _on_country_chosen(_tag: StringName) -> void:
 	_overlay.set_hot(0)
 	_capitals.set_picking(false)
 	_country_labels.set_picking(false)
-	var restored := _clamp_mode_for_game(_saved_mode_from_settings())
-	_apply_mode(restored, false)
+	_modes.restore(_settings)
 	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
 
@@ -460,14 +453,14 @@ func picking() -> bool:
 
 ## Returns the active MapModes.Mode integer value.
 func mode() -> int:
-	return int(_mode)
+	return int(_modes.current)
 
 
 ## Switches map mode. A mode not in `MapModes.modes(game)` is ignored. Writes `state/map_mode` unless picking.
 func set_mode(value: int) -> void:
 	if not MapModes.modes(Session.game).has(value):
 		return
-	_apply_mode(value as MapModes.Mode, not picking())
+	_modes.apply(value as MapModes.Mode, not picking(), _settings)
 
 
 ## Shows or hides Terrain-mode owner tinting.
@@ -524,30 +517,6 @@ func _on_find_place_requested() -> void:
 	find_place_requested.emit()
 
 
-func _apply_mode(target: MapModes.Mode, persist: bool) -> void:
-	var changed := _mode != target
-	_mode = target
-	if _overlay != null:
-		_overlay.set_mode(_mode)
-		_overlay.sync_modes(Session.game, true)
-	var is_picking := picking()
-	if _capitals != null:
-		_capitals.set_picking(is_picking)
-		_capitals.set_mode(_mode)
-	if _country_labels != null:
-		_country_labels.set_picking(is_picking)
-		_country_labels.set_mode(_mode)
-	_sync_country_labels()
-	if persist:
-		_persisted_mode = _mode
-		if _settings != null:
-			var mode_str := _mode_to_string(_mode)
-			if str(_settings.get_value("state/map_mode")) != mode_str:
-				_settings.set_value("state/map_mode", mode_str)
-	if changed:
-		mode_changed.emit(int(_mode))
-
-
 func _queue_all_borders(map: MapData) -> void:
 	if map == null:
 		return
@@ -566,24 +535,6 @@ static func _enqueue_all_chunks(queue: Array[Vector2i], map: MapData) -> void:
 	for chunk_y: int in chunks_y:
 		for chunk_x: int in chunks_x:
 			queue.append(Vector2i(chunk_x, chunk_y))
-
-
-func _saved_mode_from_settings() -> MapModes.Mode:
-	if _settings != null:
-		return _mode_from_string(str(_settings.get_value("state/map_mode")))
-	return _persisted_mode
-
-
-func _clamp_mode_for_game(candidate: MapModes.Mode) -> MapModes.Mode:
-	return candidate if MapModes.modes(Session.game).has(int(candidate)) else MapModes.Mode.TERRAIN
-
-
-static func _mode_from_string(name: String) -> MapModes.Mode:
-	return maxi(MapModes.mode_of(StringName(name)), 0) as MapModes.Mode
-
-
-static func _mode_to_string(m: MapModes.Mode) -> String:
-	return String(MapModes.MODE_KEYS[int(m)])
 
 
 # ----- selection & picking ------------------------------------------------------------------------------------------
