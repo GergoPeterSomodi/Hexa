@@ -108,7 +108,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.godot == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 120   # the GUT suite alone takes about an hour
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12 (UI bake checks)

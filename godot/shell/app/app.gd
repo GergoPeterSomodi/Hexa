@@ -54,6 +54,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	ScreenIds.finish_warming()  # no threaded load may run, or wait untaken, when the engine quits
+	TilesetBuilder.finish_requests()
 	_lifecycle_gen += 1
 	_disconnect_all()
 	_disconnect_map_scene()

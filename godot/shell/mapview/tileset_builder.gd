@@ -178,6 +178,16 @@ static func request_season(season_name: String, is_half: bool = false) -> void:
 		ResourceLoader.load_threaded_request(path)
 
 
+## Takes every season request_season asked for and load_season never took, waiting for those still loading (the App
+## calls this when it leaves the tree, for the reasons at ScreenIds.finish_warming). Each request needs its own take.
+static func finish_requests() -> void:
+	for season_name: String in SEASONS:
+		for is_half: bool in [false, true]:
+			var path := tres_path(season_name, is_half)
+			while ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				ResourceLoader.load_threaded_get(path)
+
+
 ## Whether a season's TileSet has been loaded (by request_season) and waits to be taken by load_season.
 static func is_loaded(season_name: String, is_half: bool = false) -> bool:
 	return ResourceLoader.load_threaded_get_status(tres_path(season_name, is_half)) == ResourceLoader.THREAD_LOAD_LOADED

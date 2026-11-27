@@ -24,7 +24,12 @@ const REQUESTS: Array[StringName] = [&"battle", &"declare_war", &"peace"]
 var milestone: String = Bindings.SHELL_MILESTONE
 
 var _app: App = null
-var _req: GameRequests = null
+## The owner, held weakly: GameRequests holds this object (`war`), and a strong reference back would keep the two, and all
+## that GameRequests holds, alive until the engine quits.
+var _req_ref: WeakRef = null
+var _req: GameRequests:
+	get:
+		return _req_ref.get_ref() as GameRequests
 var _scene: MapScene = null
 var _dock: BattleDock = null
 var _links: Array[Array] = []
@@ -34,7 +39,7 @@ var _waiting_battle := -1
 
 func _init(app: Node, requests: RefCounted) -> void:
 	_app = app as App
-	_req = requests as GameRequests
+	_req_ref = weakref(requests)
 
 
 ## Whether the war UI is in this milestone.

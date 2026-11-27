@@ -161,8 +161,7 @@ func _process(_delta: float) -> void:
 
 func _release_menu_art() -> void:
 	for path: String in _art_pending:
-		if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
-			ResourceLoader.load_threaded_get(path)
+		ResourceLoader.load_threaded_get(path)  # waits for one still loading: a load never taken leaks, or breaks the quit
 	_art_pending.clear()
 	set_process(false)
 	_stop_motion()

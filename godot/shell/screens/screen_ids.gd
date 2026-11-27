@@ -65,6 +65,13 @@ static func warm() -> void:
 			_warming[id] = true
 
 
+## Takes every scene warm() asked for and nobody opened, waiting for those still loading. The App calls this when it
+## leaves the tree: an engine that quits under a running load fails to parse the scene, and a load never taken leaks.
+static func finish_warming() -> void:
+	for id: StringName in _warming.keys():
+		scene_of(id)
+
+
 ## The PackedScene of `id` (a finished threaded load, the cache, or a load now); null when it cannot be had.
 static func scene_of(id: StringName) -> PackedScene:
 	if _scenes.has(id):
