@@ -38,11 +38,15 @@ static func at(game: Game, hex: Vector2i) -> Battle:
 	return null
 
 
-## The battle an army is in, or null.
+## The battle an army is in, or null. Asked for every step of every walk: a stored id list is read in place, not copied.
 static func of_army(game: Game, army_id: int) -> Battle:
 	for b: Battle in game.battles:
 		for key: Variant in b.armies:
-			if _ids(b, str(key)).has(army_id):
+			var held: Variant = b.armies.get(str(key))
+			if held is PackedInt32Array:
+				if (held as PackedInt32Array).has(army_id):
+					return b
+			elif _ids(b, str(key)).has(army_id):
 				return b
 	return null
 
@@ -465,11 +469,14 @@ static func input_of(game: Game, b: Battle) -> Dictionary:
 	var garrison := _garrison(game, b)
 	var attacker_armies := _battle_armies(game, b, b.attacker)
 	var defender_armies := _battle_armies(game, b, b.defender)
-	var att_can := not retreat_path(game, b.attacker, attacker_armies, b.hex, false).is_empty()
+	# Only whether a side has a retreat spot (retreat_path's, none ranked); the defender's two questions share one walk.
+	var att_reach := BattleRetreat.reach_of(game, b.attacker, attacker_armies, b.hex)
+	var att_can := BattleRetreat.has_spot(game, b.attacker, attacker_armies, att_reach, false)
 	var stance_def := "hold"
-	var def_can := not retreat_path(game, b.defender, defender_armies, b.hex, false).is_empty()
+	var def_reach := BattleRetreat.reach_of(game, b.defender, defender_armies, b.hex)
+	var def_can := BattleRetreat.has_spot(game, b.defender, defender_armies, def_reach, false)
 	if _standing(defender_armies) == Army.STANDING_WITHDRAW \
-			and not retreat_path(game, b.defender, defender_armies, b.hex, true).is_empty():
+			and BattleRetreat.has_spot(game, b.defender, defender_armies, def_reach, true):
 		stance_def = "withdraw"
 		def_can = true
 	return {

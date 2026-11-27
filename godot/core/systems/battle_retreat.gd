@@ -14,24 +14,24 @@ extends RefCounted
 ## then farthest from the nearest enemy army, then the lowest index.
 static func retreat_path(game: Game, tag: StringName, armies: Array[Army], hex: Vector2i, own_only: bool) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	var war := _war(game)
-	if war == null or armies.is_empty() or game.map.index_of(hex) < 0:
+	var reach := reach_of(game, tag, armies, hex)
+	if reach.is_empty():
 		return out
 	var leaving := _ids_of(armies)
-	var total := 0
-	for a: Army in armies:
-		total += a.units.size()
-	var reach := _reach(game, tag, hex, war.retreat_range)
+	var total := _companies(armies)
 	var steps: Dictionary = reach["steps"]
+	var foes: Dictionary = reach["foes"]
 	var best := -1
 	var best_rank := PackedInt32Array()
 	for key: Variant in steps:
 		var i := int(key)
 		var step := int(steps[key])
 		var spot := game.map.hex_of(i)
-		if step < 1 or not _spot_ok(game, tag, spot, own_only, total, leaving):
+		if step < 1 or not _spot_ok(game, tag, spot, own_only, total, leaving, foes):
 			continue
-		var rank := _rank(game, tag, spot, step, own_only, i)
+		var rank := _rank(game, tag, spot, step, own_only, i, foes, best_rank)
+		if rank.is_empty():
+			continue
 		if best < 0 or _less(rank, best_rank):
 			best = i
 			best_rank = rank
@@ -43,6 +43,30 @@ static func retreat_path(game: Game, tag: StringName, armies: Array[Army], hex: 
 		out.insert(0, game.map.hex_of(cur))
 		cur = int(parent[cur])
 	return out
+
+
+## The walk of a side's armies on hex before a spot is chosen (_reach), or {} when there is none to make (no war numbers, no
+## army, off the map). It holds while no army, war, fortress or land changes: the questions of one moment share it (has_spot).
+static func reach_of(game: Game, tag: StringName, armies: Array[Army], hex: Vector2i) -> Dictionary:
+	var war := _war(game)
+	if war == null or armies.is_empty() or game.map.index_of(hex) < 0:
+		return {}
+	return _reach(game, tag, hex, war.retreat_range)
+
+
+## True when retreat_path would not be empty, from the side's walk `reach` (reach_of): the first spot found answers, none is
+## ranked.
+static func has_spot(game: Game, tag: StringName, armies: Array[Army], reach: Dictionary, own_only: bool) -> bool:
+	if reach.is_empty():
+		return false
+	var leaving := _ids_of(armies)
+	var total := _companies(armies)
+	var steps: Dictionary = reach["steps"]
+	var foes: Dictionary = reach["foes"]
+	for key: Variant in steps:
+		if int(steps[key]) >= 1 and _spot_ok(game, tag, game.map.hex_of(int(key)), own_only, total, leaving, foes):
+			return true
+	return false
 
 
 ## The retreat spot of a side (the last hex of retreat_path), or Army.NO_HEX.
@@ -57,13 +81,37 @@ static func can_retreat(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	for a: Army in Armies.at(game, hex):
 		if a.tag == tag:
 			armies.append(a)
-	return not retreat_path(game, tag, armies, hex, false).is_empty()
+	return has_spot(game, tag, armies, reach_of(game, tag, armies, hex), false)
 
 
-## The hexes a side's armies can walk to within retreat_range: {start, steps: {index: steps}, parent: {index: index}}.
+## The companies of the armies.
+static func _companies(armies: Array[Army]) -> int:
+	var total := 0
+	for a: Army in armies:
+		total += a.units.size()
+	return total
+
+
+## The hexes of the armies at war with tag, as keys (read once for a walk, not once a hex).
+static func _foe_hexes(game: Game, tag: StringName) -> Dictionary:
+	var at_war := {}
+	var out := {}
+	for a: Army in game.armies:
+		if a.tag == tag:
+			continue
+		if not at_war.has(a.tag):
+			at_war[a.tag] = Wars.at_war(game, tag, a.tag)
+		if at_war[a.tag]:
+			out[a.hex] = true
+	return out
+
+
+## The hexes a side's armies can walk to within retreat_range: {start, steps: {index: steps}, parent: {index: index},
+## foes: the hexes of the armies at war with the side (_foe_hexes)}.
 static func _reach(game: Game, tag: StringName, from: Vector2i, reach: int) -> Dictionary:
 	var map := game.map
 	var costs := StepCosts.of(map, game.defs)
+	var foes := _foe_hexes(game, tag)
 	var winter := Calendar.is_winter(game.turn)
 	var start := map.index_of(from)
 	var steps := {start: 0}
@@ -78,28 +126,28 @@ static func _reach(game: Game, tag: StringName, from: Vector2i, reach: int) -> D
 				if j < 0 or steps.has(j) or not map.is_land(n):
 					continue
 				var c := costs.cost(i, d, winter)
-				if c == StepCosts.BLOCKED or c == StepCosts.CLOSED or _enemy_held(game, tag, n):
+				if c == StepCosts.BLOCKED or c == StepCosts.CLOSED or _enemy_held(game, tag, n, foes):
 					continue
 				steps[j] = k
 				parent[j] = i
 				next.append(j)
 		layer = next
-	return {"start": start, "steps": steps, "parent": parent}
+	return {"start": start, "steps": steps, "parent": parent, "foes": foes}
 
 
 ## A hex a side may not enter: an enemy army stands there, or a hostile garrisoned fortress holds it.
-static func _enemy_held(game: Game, tag: StringName, hex: Vector2i) -> bool:
-	for a: Army in Armies.at(game, hex):
-		if a.tag != tag and Wars.at_war(game, tag, a.tag):
-			return true
+static func _enemy_held(game: Game, tag: StringName, hex: Vector2i, foes: Dictionary) -> bool:
+	if foes.has(hex):
+		return true
 	var holder := Occupation.controller_tag(game, hex)
 	return holder != tag and holder != &"" and Wars.at_war(game, tag, holder) \
 		and Occupation.garrison_of(game, hex) > 0 and Occupation.fortress_level(game, hex) > 0
 
 
 ## Whether a side may stop on spot (see retreat_path): not enemy-held, the land rule, and room for the whole side.
-static func _spot_ok(game: Game, tag: StringName, spot: Vector2i, own_only: bool, total: int, leaving: PackedInt32Array) -> bool:
-	if _enemy_held(game, tag, spot) or Armies.held_by_other(game, tag, spot):
+static func _spot_ok(game: Game, tag: StringName, spot: Vector2i, own_only: bool, total: int, leaving: PackedInt32Array,
+		foes: Dictionary) -> bool:
+	if _enemy_held(game, tag, spot, foes) or Armies.held_by_other(game, tag, spot):
 		return false
 	if own_only:
 		if Occupation.controller_tag(game, spot) != tag:
@@ -112,20 +160,23 @@ static func _spot_ok(game: Game, tag: StringName, spot: Vector2i, own_only: bool
 
 
 ## The rank of a retreat spot: its controlled land first (for a broken side), the fewer steps, the farther from the nearest enemy
-## army, then the lowest index (smaller is better).
-static func _rank(game: Game, tag: StringName, spot: Vector2i, step: int, own_only: bool, index: int) -> PackedInt32Array:
+## army, then the lowest index (smaller is better). [] when its first two numbers already lose to `best` (the best rank so far, []
+## for none): the distance to the enemy is then not measured.
+static func _rank(game: Game, tag: StringName, spot: Vector2i, step: int, own_only: bool, index: int, foes: Dictionary,
+		best: PackedInt32Array) -> PackedInt32Array:
 	var first := 0 if own_only or Occupation.controller_tag(game, spot) == tag else 1
-	return PackedInt32Array([first, step, -_enemy_distance(game, tag, spot), index])
+	if not best.is_empty() and (first > best[0] or (first == best[0] and step > best[1])):
+		return PackedInt32Array()
+	return PackedInt32Array([first, step, -_enemy_distance(spot, foes), index])
 
 
-## The distance from spot to the nearest army at war with tag (0 when there is none).
-static func _enemy_distance(game: Game, tag: StringName, spot: Vector2i) -> int:
+## The distance from spot to the nearest of the hexes of the enemy's armies (0 when there is none).
+static func _enemy_distance(spot: Vector2i, foes: Dictionary) -> int:
 	var best := -1
-	for a: Army in game.armies:
-		if a.tag != tag and Wars.at_war(game, tag, a.tag):
-			var d := ImproveRules.hex_distance(spot, a.hex)
-			if best < 0 or d < best:
-				best = d
+	for hex: Vector2i in foes:
+		var d := ImproveRules.hex_distance(spot, hex)
+		if best < 0 or d < best:
+			best = d
 	return maxi(best, 0)
 
 

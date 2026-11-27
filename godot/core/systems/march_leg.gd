@@ -6,7 +6,8 @@
 ## the leg spends the points left, apply writes what is left, R18 to R27); the callers share these rules.
 ## MV7: the deep-fog step (FogStep, R36: a step onto a hex the country never explored, only fresh, spends fog_step_cost) is a rule
 ## of the leg; stop on sight (R32 to R35, D6 to D8) is a rule of the ticks: the leg keeps the enemy armies its country did not see
-## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept).
+## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept). The
+## set depends on the country alone while the legs are made (a leg writes nothing), so the phase makes it once per country.
 ## MV20: fair warning (FairWarning, R73) is a rule of the ticks too: a step onto the land of a country the walker's country declared
 ## war on this season is not taken (&"warned": no halt, the points kept, the march stands and goes on next season).
 ## MV19: multi-leg marches (MarchVia, R65): the stops left (`via`) pass as the steps land on them; a walk arrives only on its goal
@@ -67,8 +68,11 @@ var stops_left := PackedInt32Array()
 ## -1 is the army's full points. A wade step or a step costing more than the points left is taken only as the first step of a
 ## fresh army (points equal to its full, R18), and spends all its points. A fog step (FogStep: a hex the country never explored,
 ## R36) likewise only fresh, spending fog_step_cost; a leg that ends on one, or before one, ends with the status FogStep.WHY.
-## `watch` false leaves out the seen set (the preview's legs: an army the viewer sees cannot be newly sighted).
-static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: int = -1, watch: bool = true) -> MarchLeg:
+## `watch` false leaves out the seen set (the preview's legs: an army the viewer sees cannot be newly sighted). `sets` holds
+## the seen sets by country (_watch): the caller who plans several legs with no army, sight or war changed between them passes
+## one dictionary to all of them (MovementPhase); a leg alone makes its own.
+static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: int = -1, watch: bool = true,
+		sets: Dictionary = {}) -> MarchLeg:
 	var m := game.map
 	var w := MarchLeg.new()
 	w.army = army
@@ -87,7 +91,7 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 	var first := mp >= full and full > 0
 	var mapped := FogStep.mapped(game, w.tag)
 	if watch:
-		_watch(game, w)
+		_watch(game, w, sets)
 	while mp > 0 and w.goal >= 0 and not w.arrived():
 		var nxt := w.rem[0] if not w.rem.is_empty() else -1
 		var d := Movement.direction(m, w.end, nxt) if nxt >= 0 else -1
@@ -141,17 +145,30 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 
 
 ## The seen set of a walk (R32): the armies of the countries at war with the walker's that its country does not see now are kept
-## (`unseen`), with the walking army's sight (the largest sight of its kinds, as Sight's discs).
-static func _watch(game: Game, w: MarchLeg) -> void:
+## (`unseen`), with the walking army's sight (the largest sight of its kinds, as Sight's discs). The set is read from `sets`
+## (country tag -> seen_set), made there on the country's first leg: the walks share the array and none of them writes it.
+static func _watch(game: Game, w: MarchLeg, sets: Dictionary) -> void:
 	if game.wars.is_empty():
 		return
-	var foes := Wars.enemies(game, w.tag)
-	if foes.is_empty():
+	if not sets.has(w.tag):
+		sets[w.tag] = seen_set(game, w.tag)
+	var found: Dictionary = sets[w.tag]
+	if not bool(found.war):
 		return
 	w.sight = army_sight(game, w.army)
-	for a: Army in game.armies:
-		if a.hex != Army.NO_HEX and foes.has(a.tag) and not Sight.sees(game, w.tag, a.hex):
-			w.unseen.append(a)
+	w.unseen = found.unseen
+
+
+## What the walks of `tag` watch for now: {war (a country is at war with it), unseen (the armies of those countries on hexes it
+## does not see, in the order of game.armies)}.
+static func seen_set(game: Game, tag: StringName) -> Dictionary:
+	var unseen: Array[Army] = []
+	var foes := Wars.enemies(game, tag)
+	if not foes.is_empty():
+		for a: Army in game.armies:
+			if a.hex != Army.NO_HEX and foes.has(a.tag) and not Sight.sees(game, tag, a.hex):
+				unseen.append(a)
+	return {"war": not foes.is_empty(), "unseen": unseen}
 
 
 ## The sight of an army: the largest sight of its kinds (1 when the defs do not say), the radius of its disc (SightCache.disc).
@@ -435,7 +452,8 @@ static func room(game: Game, walks: Array, by_id: Dictionary) -> void:
 	while true:
 		var over := -1
 		for w: MarchLeg in walks:
-			if _can_step_back(game, w) and int(counts.get(_key(w.end, w.cid), 0)) > limit:
+			# The count first: _can_step_back looks through every battle, and few hexes are over (both only read).
+			if int(counts.get(_key(w.end, w.cid), 0)) > limit and _can_step_back(game, w):
 				over = _key(w.end, w.cid)
 				break
 		if over < 0:
@@ -443,7 +461,7 @@ static func room(game: Game, walks: Array, by_id: Dictionary) -> void:
 		var pick: MarchLeg = null
 		for k: int in range(walks.size() - 1, -1, -1):
 			var w: MarchLeg = walks[k]
-			if _can_step_back(game, w) and _key(w.end, w.cid) == over:
+			if _key(w.end, w.cid) == over and _can_step_back(game, w):
 				pick = w
 				break
 		if pick == null:

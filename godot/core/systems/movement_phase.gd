@@ -30,10 +30,11 @@ static func season(game: Game) -> void:
 	Movement.begin_index(game)
 	var walks: Array = []
 	var by_id: Dictionary = {}
+	var seen_sets: Dictionary = {}  # R32: each country's, made once; nothing the sets read changes before the ticks
 	for army: Army in game.armies:
 		if not _walks(army) or army.mustering(game.turn) or army.points <= 0:
 			continue
-		var w := MarchLeg.leg(game, steps, army, winter, army.points)
+		var w := MarchLeg.leg(game, steps, army, winter, army.points, true, seen_sets)
 		walks.append(w)
 		by_id[army.id] = w
 	_ticks(game, walks, occ)
