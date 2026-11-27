@@ -171,7 +171,14 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
 - **D6 No parchment in the data modes.** Relief, Yields, Food and Supply keep the tiles at every zoom: their colours are
   read hex by hex and are already tuned for the tile art. The parchment can host them later by adding a byte texture.
 - **D7 Own names, shared rules.** `ParchmentView.country_names` reuses `CountryNames`' regions restricted to discovered
-  hexes and adds the axis angle, the span along it and the hex count. `CountryLabels` stays for the tile view.
+  hexes and adds the axis angle, the room along it and the hex count. `span_px` is that room: the length of an unbroken
+  run, inside the region, of a line at the (clamped) angle (less half a map px at each end), and `at` is the middle of
+  that run, on a hex of the region. So a name no longer than `span_px`, centred on `at` along the angle, never runs over
+  another country, the sea or unexplored paper (R8, R12), whatever the region's bends and gaps; a name moved off that
+  line (R10) is not covered by this. The run is the longest found on lines across the region (38 px apart and 14 at
+  most, the two outermost ones, the hex centres of a region of 24 hexes or fewer, then closer beside the best line);
+  among runs of 0.9 of the longest or more, the one on the line nearest the middle of the hex centres. `CountryLabels`
+  stays for the tile view.
 - **D8 Hatched water and sea in shaders.** The hatch is a strip mesh along the coast edges with UVs (along, across) and a
   small shader of wavy lines; the sea is one quad with a hash speckle. Colours reach shaders only as uniforms.
 - **D9 Colours as tokens.** A new `shell/ui/parchment_tokens.gd` (`ParchmentTokens`, standard and high-contrast sets: sea,

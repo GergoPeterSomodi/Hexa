@@ -15,6 +15,20 @@ const GOODS_STRIDE := 2
 const MAX_STAGE := 3
 ## A country name's angle stays within this many degrees of level.
 const NAME_ANGLE_MAX_DEG := 55.0
+## The room of a name is looked for on lines along its angle, this far apart across the region (map px) and no more than
+## NAME_LINES_MAX of them (a wider region's lines lie further apart); then on lines these shares of that step to each
+## side of the line with the longest run so far, one share after the other. A region of NAME_SMALL_HEXES or fewer is
+## also walked on the line through each of its hex centres.
+const NAME_SMALL_HEXES := 24
+const NAME_LINE_STEP_PX := 38.25
+const NAME_LINES_MAX := 14
+const NAME_LINE_CLOSER: Array[float] = [0.5, 0.25]
+## A run this share of the longest found is as good: of those, the one on the line nearest the region's middle is taken.
+const NAME_RUN_NEAR := 0.9
+## A name's room is its run less this much at each end (map px): the ends themselves lie inside the region, not on its edge.
+const NAME_END_PX := 0.5
+## More than any cell's length along a line (the longest diagonal of a 104 x 102 cell is under it).
+const _CELL_REACH_PX := 117.0
 ## The least level of a town that is listed (a village: a dot), and the least that is named (a town). Capitals are both.
 const TOWN_DOT_LEVEL := 2
 const TOWN_NAME_LEVEL := 3
@@ -100,9 +114,11 @@ static func legend(game: Game, viewer: StringName, good_id: int) -> Array[Dictio
 ## One name a region (CountryNames.MIN_REGION_HEXES or more hexes, joined through discovered hexes only) of the hexes the
 ## viewer has discovered of one owner, in country id order then region order: {tag: StringName, text: String (the short
 ## name), at: Vector2 (map px), angle_deg: float (the long axis of the hex centres, clockwise on screen, within
-## NAME_ANGLE_MAX_DEG), span_px: float (the region's length along that angle, map px), hexes: int}. `at` is the middle
-## of the hex centres, or the centre of the region's innermost hex when that middle lies outside the region (so a name
-## never stands on a hex that is not the region's). [] in a game without countries.
+## NAME_ANGLE_MAX_DEG), span_px: float, hexes: int}. `span_px` is the room for the name: the length (map px) of an
+## unbroken run inside the region of a line at that angle, and `at` is the middle of that run, so every point from
+## at - span_px / 2 to at + span_px / 2 along the angle, both ends too, lies on the region (the run less NAME_END_PX at
+## each end). The run is the longest found on lines across the region; among runs of NAME_RUN_NEAR of the longest or more, the one on the line nearest the middle of the hex
+## centres. [] in a game without countries.
 static func country_names(game: Game, viewer: StringName) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not _has_map(game) or not game.has_countries():
@@ -283,13 +299,20 @@ static func _names_of(game: Game, owners: PackedByteArray, id: int) -> Array:
 	var out: Array = []
 	var tag := Countries.by_id(game, id).tag
 	var text := _short_name(game, tag)
+	var marks := PackedInt32Array()  # on each named region's hexes, its own number: 1 for the first
+	marks.resize(game.map.hex_count())
 	for region: PackedInt32Array in ScenarioGrowth.regions(game.map, owners, id):
-		if region.size() >= CountryNames.MIN_REGION_HEXES:
-			out.append(_name_entry(game.map, tag, text, region))
+		if region.size() < CountryNames.MIN_REGION_HEXES:
+			continue
+		var mark := out.size() + 1
+		for i: int in region:
+			marks[i] = mark
+		out.append(_name_entry(game.map, tag, text, region, marks, mark))
 	return out
 
 
-static func _name_entry(map: MapData, tag: StringName, text: String, region: PackedInt32Array) -> Dictionary:
+static func _name_entry(map: MapData, tag: StringName, text: String, region: PackedInt32Array,
+		marks: PackedInt32Array, mark: int) -> Dictionary:
 	var centres := PackedVector2Array()
 	var sum := Vector2.ZERO
 	for i: int in region:
@@ -306,17 +329,144 @@ static func _name_entry(map: MapData, tag: StringName, text: String, region: Pac
 		yy += d.y * d.y
 		xy += d.x * d.y
 	var angle := clampf(rad_to_deg(0.5 * atan2(2.0 * xy, xx - yy)), -NAME_ANGLE_MAX_DEG, NAME_ANGLE_MAX_DEG)
-	var axis := Vector2.from_angle(deg_to_rad(angle))
-	var low := INF
-	var high := -INF
-	for at: Vector2 in centres:
-		var u := (at - mid).dot(axis)
-		low = minf(low, u)
-		high = maxf(high, u)
-	if not region.has(map.index_of(MapModes.hex_at_px(mid))):
-		mid = MapTiles.cell_centre(CountryNames.region_label_hex(map, region))
-	return {"tag": tag, "text": text, "at": mid, "angle_deg": angle, "span_px": high - low + float(MapTiles.CELL.x),
+	var room := _name_room(map, marks, mark, centres, mid, Vector2.from_angle(deg_to_rad(angle)))
+	return {"tag": tag, "text": text, "at": room["at"], "angle_deg": angle, "span_px": room["span"],
 		"hexes": region.size()}
+
+
+## {at, span} of the run a name takes among the hexes marked `mark`: lines along `axis` are walked from the middle `mid`
+## outwards, then along the region's two sides and through the hex centres of a small region, then closer beside the line
+## of the longest run; of the runs of NAME_RUN_NEAR of the longest or more, the one on the line nearest the middle is
+## taken (then the one nearest along its line).
+static func _name_room(map: MapData, marks: PackedInt32Array, mark: int, centres: PackedVector2Array, mid: Vector2,
+		axis: Vector2) -> Dictionary:
+	# The box of the hex centres along the axis (u) and across it (v), from the middle.
+	var u_low := 0.0
+	var u_high := 0.0
+	var v_low := 0.0
+	var v_high := 0.0
+	var ax := axis.x
+	var ay := axis.y
+	for at: Vector2 in centres:
+		var x := at.x - mid.x
+		var y := at.y - mid.y
+		var u := x * ax + y * ay
+		var v := y * ax - x * ay
+		if u < u_low:
+			u_low = u
+		elif u > u_high:
+			u_high = u
+		if v < v_low:
+			v_low = v
+		elif v > v_high:
+			v_high = v
+	var span_of_u := Vector2(u_low - _CELL_REACH_PX, u_high + _CELL_REACH_PX)
+	var across := Vector2(-ay, ax)
+	var step := maxf(NAME_LINE_STEP_PX, (v_high - v_low) / float(NAME_LINES_MAX - 1))
+	var runs: Array[Vector4] = []  # length, the line's distance from the middle, |middle along it|, the line's offset
+	var middles := PackedFloat64Array()  # where along its line each run's middle is
+	# No run is longer than this, so once a line has such a run no line farther out can be taken before it.
+	var enough := NAME_RUN_NEAR * (u_high - u_low + _CELL_REACH_PX)
+	var longest := 0.0
+	for k: int in ceili(maxf(-v_low, v_high) / step) + 1:
+		for v: float in ([0.0] if k == 0 else [k * step, -k * step]):
+			if v >= v_low and v <= v_high:
+				longest = maxf(longest, _add_runs(map, marks, mark, mid + across * v, axis, span_of_u, v, runs, middles))
+		if longest >= enough:
+			break
+	# The outermost hex centres: a long thin side may lie between the last line above and the region's edge. A line
+	# through a hex centre always crosses that hex, so one run at least is found.
+	var through := PackedFloat64Array([v_low, v_high])
+	if centres.size() <= NAME_SMALL_HEXES:
+		for at: Vector2 in centres:
+			through.append((at - mid).dot(across))
+	for v: float in through:
+		longest = maxf(longest, _add_runs(map, marks, mark, mid + across * v, axis, span_of_u, v, runs, middles))
+	for share: float in NAME_LINE_CLOSER:
+		var top := 0
+		for n: int in runs.size():
+			if runs[n].x > runs[top].x:
+				top = n
+		var from := runs[top].w
+		for v: float in [from + step * share, from - step * share]:
+			if v >= v_low and v <= v_high:
+				longest = maxf(longest, _add_runs(map, marks, mark, mid + across * v, axis, span_of_u, v, runs, middles))
+	var best := -1
+	for n: int in runs.size():
+		var run := runs[n]
+		if run.x >= NAME_RUN_NEAR * longest and (best < 0 or run.y < runs[best].y
+				or (run.y == runs[best].y and run.z < runs[best].z)):
+			best = n
+	return {"at": mid + across * runs[best].w + axis * middles[best], "span": runs[best].x - 2.0 * NAME_END_PX}
+
+
+## Adds to `runs` and `middles` (see _name_room) the runs of the line at offset `v`; returns the longest of them, 0 for
+## none.
+static func _add_runs(map: MapData, marks: PackedInt32Array, mark: int, origin: Vector2, axis: Vector2,
+		span_of_u: Vector2, v: float, runs: Array[Vector4], middles: PackedFloat64Array) -> float:
+	var longest := 0.0
+	for run: Vector2 in _runs(map, marks, mark, origin, axis, span_of_u):
+		var length := run.y - run.x
+		var centre := (run.x + run.y) * 0.5
+		runs.append(Vector4(length, absf(v), absf(centre), v))
+		middles.append(centre)
+		longest = maxf(longest, length)
+	return longest
+
+
+## The unbroken runs over the hexes marked `mark` of the line origin + axis * u for u from span_of_u.x to span_of_u.y,
+## each Vector2(u in, u out). The line is walked cell by cell (the cells are MapModes.hex_at_px's): a cell is left by the
+## nearest of the three sides ahead. `axis` is a unit vector pointing east (its x above 0).
+static func _runs(map: MapData, marks: PackedInt32Array, mark: int, origin: Vector2, axis: Vector2,
+		span_of_u: Vector2) -> PackedVector2Array:
+	var cols := map.cols
+	var rows := map.rows
+	var u := span_of_u.x
+	var start := MapModes.hex_at_px(origin + axis * u)
+	var r := start.y
+	var q := start.x - ((r - (r & 1)) >> 1)  # axial: east is q + 1, south-east is r + 1
+	# A cell's sides are |x| = 52 and |25.5 x -+ 52 y| = 2652 from its centre; these are the rates of the last two.
+	var rise := 25.5 * axis.x - 52.0 * axis.y  # toward the north-east side (against it: south-west)
+	var fall := 25.5 * axis.x + 52.0 * axis.y  # toward the south-east side (against it: north-west)
+	var rise_side := 2652.0 * signf(rise)
+	var fall_side := 2652.0 * signf(fall)
+	var out := PackedVector2Array()
+	var entered := INF
+	var x := origin.x - (104.0 * (q + r * 0.5) + 52.0)  # the line's origin from the cell's centre
+	var y := origin.y - (76.5 * r + 51.0)
+	for _step: int in 4 * (cols + rows):  # more cells than any line crosses: a guard, never the end of a walk
+		if u >= span_of_u.y:
+			break
+		var leave := (52.0 - x) / axis.x
+		var dq := 1
+		var dr := 0
+		if rise != 0.0:
+			var t := (rise_side - 25.5 * x + 52.0 * y) / rise
+			if t < leave:
+				leave = t
+				dq = 1 if rise > 0.0 else -1
+				dr = -dq
+		if fall != 0.0:
+			var t := (fall_side - 25.5 * x - 52.0 * y) / fall
+			if t < leave:
+				leave = t
+				dq = 0
+				dr = 1 if fall > 0.0 else -1
+		var col := q + ((r - (r & 1)) >> 1)
+		if col >= 0 and col < cols and r >= 0 and r < rows and marks[r * cols + col] == mark:
+			if entered == INF:
+				entered = u
+		elif entered != INF:
+			out.append(Vector2(entered, u))
+			entered = INF
+		u = maxf(u, leave)
+		q += dq
+		r += dr
+		x -= 104.0 * dq + 52.0 * dr
+		y -= 76.5 * dr
+	if entered != INF:
+		out.append(Vector2(entered, u))
+	return out
 
 
 static func _make_towns(game: Game, seen: PackedByteArray, capitals: Dictionary[int, StringName]) -> Array:

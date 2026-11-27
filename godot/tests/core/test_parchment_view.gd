@@ -371,6 +371,81 @@ func test_p_a_region_counted_with_an_undiscovered_hex_is_reported() -> void:
 		"P: the names of the whole land given to a thin viewer")
 
 
+## The names whose room leaves their region: some point from at - span / 2 to at + span / 2 along the angle (both ends
+## and every 2 px between) is not on the region of discovered hexes that `at` stands on.
+func _run_problems(g: Game, names: Array[Dictionary], viewer: StringName) -> Array[String]:
+	var out: Array[String] = []
+	var regions := _regions(g, _known(g, viewer))
+	for entry: Dictionary in names:
+		var at: Vector2 = entry["at"]
+		var region: Array = []
+		for r: Dictionary in regions:
+			if r["tag"] == entry["tag"] and (r["region"] as Array).has(g.map.index_of(MapModes.hex_at_px(at))):
+				region = r["region"]
+		var axis := Vector2.from_angle(deg_to_rad(float(entry["angle_deg"])))
+		var reach := float(entry["span_px"]) * 0.5
+		var samples := ceili(reach)
+		var off := 0
+		for k: int in range(-samples, samples + 1):
+			var p := at + axis * (reach * float(k) / float(samples))
+			if not region.has(g.map.index_of(MapModes.hex_at_px(p))):
+				off += 1
+		if off > 0 or reach <= 0.0:
+			out.append("%s at %s: %d of %d samples off its region" % [entry["tag"], at, off, 2 * samples + 1])
+	return out
+
+
+## The longest unbroken stretch inside `region` along `angle` found by sampling: lines 6 px apart, a point every 4 px.
+func _longest_run(g: Game, region: Array, angle: float) -> float:
+	var axis := Vector2.from_angle(deg_to_rad(angle))
+	var across := Vector2(-axis.y, axis.x)
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for i: int in region:
+		var c := MapTiles.cell_centre(g.map.hex_of(i))
+		var uv := Vector2(c.dot(axis), c.dot(across))
+		low = low.min(uv)
+		high = high.max(uv)
+	var best := 0.0
+	for line: int in ceili((high.y - low.y) / 6.0) + 1:
+		var run := 0.0
+		var u := low.x - 70.0
+		while u <= high.x + 70.0:
+			if region.has(g.map.index_of(MapModes.hex_at_px(axis * u + across * (low.y + 6.0 * line)))):
+				run += 4.0
+				best = maxf(best, run)
+			else:
+				run = 0.0
+			u += 4.0
+	return best
+
+
+## The names as the view gave them before: the region's whole length along the angle as the span, at the middle of the
+## hex centres, or at the region's innermost hex when that middle is off the region.
+func _whole_extent(g: Game, names: Array[Dictionary], viewer: StringName) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var regions := _regions(g, _known(g, viewer))
+	for entry: Dictionary in names:
+		for r: Dictionary in regions:
+			var region: Array = r["region"]
+			if r["tag"] != entry["tag"] or not region.has(g.map.index_of(MapModes.hex_at_px(entry["at"]))):
+				continue
+			var axis := Vector2.from_angle(deg_to_rad(float(entry["angle_deg"])))
+			var mid := Vector2.ZERO
+			var low := INF
+			var high := -INF
+			for i: int in region:
+				var c := MapTiles.cell_centre(g.map.hex_of(i))
+				mid += c
+				low = minf(low, c.dot(axis))
+				high = maxf(high, c.dot(axis))
+			mid /= float(region.size())
+			if not region.has(g.map.index_of(MapModes.hex_at_px(mid))):
+				mid = MapTiles.cell_centre(CountryNames.region_label_hex(g.map, PackedInt32Array(region)))
+			out.append(entry.merged({"at": mid, "span_px": high - low + 104.0}, true))
+	return out
+
+
 func test_country_names_angle_span_text_and_place() -> void:
 	for g: Game in [_thin(), _full()]:
 		var viewer := g.player
@@ -388,13 +463,10 @@ func test_country_names_angle_span_text_and_place() -> void:
 			# A region as long upright as level has no long axis to speak of; every other agrees with the search.
 			if absf(found) < 54.9:
 				assert_almost_eq(angle, found, 0.2, "%s: the main axis of its discovered hex centres" % entry["tag"])
-			var low := INF
-			var high := -INF
-			for i: int in region:
-				var u := MapTiles.cell_centre(g.map.hex_of(i)).dot(Vector2.from_angle(deg_to_rad(angle)))
-				low = minf(low, u)
-				high = maxf(high, u)
-			assert_almost_eq(float(entry["span_px"]), high - low + 104.0, 0.01, "%s: the span along the axis" % entry["tag"])
+			var longest := _longest_run(g, region, angle)
+			assert_gte(float(entry["span_px"]), 0.85 * longest, "%s: about the longest stretch there is" % entry["tag"])
+			assert_lte(float(entry["span_px"]), longest + 40.0, "%s: and a stretch that is there" % entry["tag"])
+		assert_eq(_run_problems(g, names, viewer), [] as Array[String], "every name's room lies on its region")
 
 
 ## A full game in which the country `tag` holds exactly `hexes` (the rest of its land is no one's).
@@ -426,8 +498,9 @@ func test_a_level_row_is_level_and_a_column_is_held_at_55_degrees() -> void:
 	var level := _names_for(_holding(GEN, row), GEN)
 	assert_eq(level.size(), 1)
 	assert_almost_eq(float(level[0]["angle_deg"]), 0.0, 0.001)
-	assert_almost_eq(float(level[0]["span_px"]), 6.0 * 104.0, 0.01, "six hexes across")
-	assert_eq(level[0]["at"], (MapTiles.cell_centre(row[0]) + MapTiles.cell_centre(row[5])) * 0.5, "the middle")
+	assert_almost_eq(float(level[0]["span_px"]), 6.0 * 104.0 - 1.0, 0.01, "six hexes across, half a px in at each end")
+	var middle := (MapTiles.cell_centre(row[0]) + MapTiles.cell_centre(row[5])) * 0.5
+	assert_almost_eq((level[0]["at"] as Vector2).distance_to(middle), 0.0, 0.01, "the middle")
 	var upright := _names_for(_holding(GEN, column), GEN)
 	assert_eq(upright.size(), 1)
 	assert_almost_eq(absf(float(upright[0]["angle_deg"])), 55.0, 0.001)
@@ -443,6 +516,75 @@ func test_a_name_never_stands_off_its_region() -> void:
 	var names := _names_for(g, GEN)
 	assert_eq(names.size(), 1)
 	assert_true(ring.has(MapModes.hex_at_px(names[0]["at"])), "the middle of a ring is not its own: the name stands on it")
+
+
+## A U (a level foot of seven hexes with an arm of four up from each end: the middle of the centres lies in the hollow),
+## and two blocks side by side joined by a thin way below them.
+func _bent_shapes() -> Array[Array]:
+	var u: Array[Vector2i] = []
+	var split: Array[Vector2i] = []
+	for col: int in range(4, 11):
+		u.append(Vector2i(col, 8))
+	for row: int in range(4, 8):
+		u.append_array([Vector2i(4, row), Vector2i(10, row)])
+	for col: int in range(4, 12):
+		split.append(Vector2i(col, 6))
+	for row: int in range(3, 6):
+		for col: int in [2, 3, 4, 11, 12, 13]:
+			split.append(Vector2i(col, row))
+	return [u, split]
+
+
+func test_a_bent_or_split_region_is_given_one_unbroken_run() -> void:
+	for shape: Array[Vector2i] in _bent_shapes():
+		var g := _holding(GEN, shape)
+		var names := _names_for(g, GEN, &"")
+		assert_eq(names.size(), 1, "one region")
+		assert_eq(int(names[0]["hexes"]), shape.size())
+		assert_eq(_run_problems(g, names, &""), [] as Array[String], "every point of the room is on the region")
+		var region: Array = shape.map(func(h: Vector2i) -> int: return g.map.index_of(h))
+		var longest := _longest_run(g, region, names[0]["angle_deg"])
+		assert_gte(float(names[0]["span_px"]), 0.9 * longest - 8.0, "the long way is taken, not an arm's width")
+		assert_gte(float(names[0]["span_px"]), 5.0 * 104.0)
+		assert_lt(float(names[0]["span_px"]), longest + 8.0)
+
+
+func test_p_a_room_over_the_whole_extent_of_a_bent_region_is_reported() -> void:
+	for shape: Array[Vector2i] in _bent_shapes():
+		var g := _holding(GEN, shape)
+		var old := _whole_extent(g, _names_for(g, GEN, &""), &"")
+		assert_eq(old.size(), 1)
+		assert_eq(_run_problems(g, old, &"").size(), 1, "P: the region's whole length runs off a bent or split region")
+
+
+func test_a_clamped_angle_gives_a_run_inside_the_region() -> void:
+	# An upright column held at 55 degrees: the room is a short slant across it, not its height.
+	var column: Array[Vector2i] = []
+	for row: int in range(3, 11):
+		column.append(Vector2i(4, row))
+	var g := _holding(GEN, column)
+	var names := _names_for(g, GEN, &"")
+	assert_eq(_run_problems(g, names, &""), [] as Array[String])
+	assert_lt(float(names[0]["span_px"]), 300.0, "far under the column's length")
+	assert_gte(float(names[0]["span_px"]), 104.0, "and a hex's room at least")
+	assert_eq(_run_problems(g, _whole_extent(g, names, &""), &"").size(), 1, "P: its whole extent is not on it")
+
+
+func test_of_near_equal_runs_the_one_nearest_the_middle_is_taken() -> void:
+	# Five rows of ten hexes, the bottom one longer by one: its run is the longest, the middle row's is 10 / 11 of it.
+	var block: Array[Vector2i] = []
+	for row: int in range(4, 9):
+		for col: int in range(3, 13 if row < 8 else 14):
+			block.append(Vector2i(col, row))
+	var g := _holding(GEN, block)
+	var names := _names_for(g, GEN, &"")
+	assert_eq(names.size(), 1)
+	assert_eq(MapModes.hex_at_px(names[0]["at"]).y, 6, "the name stays in the middle, not on the longest row")
+	var region: Array = block.map(func(h: Vector2i) -> int: return g.map.index_of(h))
+	var longest := _longest_run(g, region, names[0]["angle_deg"])
+	assert_between(float(names[0]["span_px"]), ParchmentView.NAME_RUN_NEAR * longest - 8.0, longest - 40.0,
+		"a run near the longest, which is on another line")
+	assert_eq(_run_problems(g, names, &""), [] as Array[String])
 
 
 func test_two_discovered_patches_joined_only_under_fog_are_named_apart() -> void:
