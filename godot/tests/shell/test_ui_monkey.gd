@@ -68,6 +68,8 @@ const EVENTS_PER_SEED := 600
 ## The shell's clock step per frame in the monkey (seconds, SimClock.step_s): 1/60, so every timer takes the same frames on every machine.
 const FIXED_FRAME := 1.0 / 60.0
 
+const LAND_FACTS := preload("res://shell/panels/tile_tabs/land_facts.gd")
+
 ## Documented non-fatal quirks (empty when clean; matches ui-and-controls-spec.md section 9).
 const KNOWN_ISSUES: Array[Dictionary] = []
 
@@ -92,6 +94,7 @@ var _last_season_msec: int = -1
 
 
 func before_each() -> void:
+	_forget_session_choices()
 	Bindings.reset_defaults()
 	SimClock.reset()  # issue 457: the shell's clock is the fixed one, so a seed's counters do not depend on the machine
 	SimClock.step_s = FIXED_FRAME
@@ -110,6 +113,13 @@ func before_each() -> void:
 	_clean_disk()
 
 
+## What the game keeps from one game to the next and a seed's inputs change: the countries the console left to themselves and
+## the folded sections of the tile window. Every seed starts with none, so it plays alone as it plays after other seeds.
+func _forget_session_choices() -> void:
+	Session._passive = []
+	LAND_FACTS.folded.clear()
+
+
 ## Removes every file of the temporary save folder and the temporary lock (never the real ones).
 func _clean_disk() -> void:
 	for slot: String in SaveFile.SLOTS + SaveFile.AUTO_SLOTS:
@@ -123,6 +133,7 @@ func _clean_disk() -> void:
 
 
 func after_each() -> void:
+	_forget_session_choices()
 	SimClock.step_s = -1.0
 	_clean_disk()
 	Session.save_dir = _old_save_dir

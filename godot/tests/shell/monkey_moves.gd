@@ -607,9 +607,9 @@ func _moves_path_act(rng: Rng, vp: SubViewport, app: App, id: int, hex: Vector2i
 	var cancels := int(_n["moves_cancels"])
 	var digest := game.digest()
 	var version := game.version
-	var pos := _m6_screen_pos(app, hex)
-	_m45_move(vp, pos)
+	_m45_move(vp, _m6_screen_pos(app, hex))
 	await _wait_frames(1)
+	var pos := _moves_aim(vp, app, hex)  # again, in the frame of the send: no await from here to _moves_give's send
 	var send := _send_chord.bind(vp, KEY_V) if rng.randi_range(0, 2) == 0 else _moves_shift_right.bind(vp, pos)
 	var given := await _moves_give(vp, app, id, send)
 	await _wait_frames(1)
@@ -637,6 +637,15 @@ func _moves_path_act(rng: Rng, vp: SubViewport, app: App, id: int, hex: Vector2i
 			assert_lte(army.via.size(), ahead.size() + 1, "%s: one point a click" % _tag)
 	assert_lte(army.via.size(), game.defs.max_stops, "%s: the path is no longer than the defs allow" % _tag)
 	return true
+
+
+## The camera framed on `hex` and the pointer moved onto it, in this frame: the screen point of `hex` as it is now. A live
+## walk's follow glides the camera under a resting pointer, so a point taken a frame earlier may lie over another hex.
+func _moves_aim(vp: SubViewport, app: App, hex: Vector2i) -> Vector2:
+	app.map_scene().frame_at(app.map_scene().view().centre_of(hex), 1.0)
+	var pos := _m6_screen_pos(app, hex)
+	_m45_move(vp, pos)
+	return pos
 
 
 ## Whether the rules refuse the march that a path order at `hex` would give (a halt, and a click on the army, are not marches).

@@ -98,6 +98,7 @@ func _ready() -> void:
 	_link(input.cursor_moved, move_cursor)
 	_link(input.command_key_requested, _on_command_key)
 	_link(input.hover_changed, _on_hover)
+	_link(_scene.camera_rig().view_changed, _on_view_moved)
 	_link(input.unit_requested, _on_unit_requested)
 	input.unit_at_func = _own_unit_at
 	_link(input.waypoint_requested, _on_waypoint_clicked)
@@ -241,7 +242,7 @@ func select_army(army_id: int) -> bool:
 	_keyboard = false
 	_scene.select_hex(NO_HEX)
 	_set_cursor(ArmyView.panel(game, Session.player_tag(), army_id)["hex"] as Vector2i)
-	_hover = NO_HEX
+	_hover = _scene.map_input().hover_from_pointer()  # V and the route read the hex under the pointer at once (issue 479)
 	_tokens.set_selected(army_id)
 	_fill_reach()
 	_show_route()
@@ -540,6 +541,7 @@ func move_cursor(direction: int) -> void:
 		_scene.glide_to_hex(target)
 		return
 	var next := _inside(game, MapInput.cursor_step(_cursor, direction), _cursor)
+	_scene.map_input().yield_hover()  # the glide to the cursor must not hand the hover back to a resting pointer
 	_hover = NO_HEX
 	_keyboard = true
 	_set_cursor(next)
@@ -561,6 +563,11 @@ func _on_command_key() -> void:
 		command(_cursor)
 	elif _scene.selected != NO_HEX:
 		_menu.open_for(_scene.selected, _view.get_global_transform_with_canvas() * _view.centre_of(_scene.selected))
+
+
+## The camera moved: the hover is the hex under the resting pointer (issue 480).
+func _on_view_moved(_zoom_now: float, _visible_rect: Rect2) -> void:
+	_scene.map_input().refresh_hover()
 
 
 func _on_hover(hex: Vector2i) -> void:

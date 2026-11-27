@@ -100,6 +100,10 @@ var _press_at := Vector2.ZERO
 var _slop_broken := false
 var _saw_hardware_button := false
 var _last_hover := NO_HEX
+## The pointer set the hover last, not the keyboard's order cursor (yield_hover): a camera move then reads the hex under it.
+var _pointer_leads := true
+## The pointer is in the window: a motion was heard and no mouse exit since.
+var _pointer_in := false
 var _block_reason := ""
 ## Shift held with no other modifier, as the last key or pointer event said it (extend_changed).
 var _extend := false
@@ -119,6 +123,7 @@ func _exit_tree() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_MOUSE_EXIT:
+		_pointer_in = false
 		_set_hover(NO_HEX)
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_set_extend(false)  # a key let go in another window is not heard
@@ -170,6 +175,26 @@ func current_hover() -> Vector2i:
 	return _last_hover
 
 
+## The keyboard's order cursor takes over (Alt+arrows): a camera move leaves the hover until the pointer moves to another hex.
+func yield_hover() -> void:
+	_pointer_leads = false
+
+
+## The pointer leads again (a new selection, issue 479) and the hover is returned: the hex under the pointer as it is now.
+func hover_from_pointer() -> Vector2i:
+	_pointer_leads = true
+	refresh_hover()
+	return _last_hover
+
+
+## Reads the hex under the resting pointer again (issue 480: the camera moved under it, or a drag ended). Nothing while the
+## keyboard leads, a drag runs, the map is off, or the pointer is on a panel or out of the window.
+func refresh_hover() -> void:
+	if not (enabled and _pointer_leads and _pointer_in and is_inside_tree()) or _slop_broken or _is_gui_hovered():
+		return
+	_set_hover(_hex_at(map_px_of(get_viewport().get_mouse_position())))
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not enabled:
 		return
@@ -207,6 +232,8 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 	var within_slop := not _slop_broken and mb.position.distance_to(_press_at) < CLICK_SLOP
 	var released_action := _press_action
 	_reset_press()
+	if not within_slop:
+		refresh_hover()  # a drag ended: the pointer rests on the moved map
 	if not within_slop or _is_gui_hovered():
 		return
 	var map_px := map_px_of(mb.position)
@@ -266,13 +293,16 @@ static func _ctrl_only(mb: InputEventMouseButton) -> bool:
 
 
 func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
+	_pointer_in = true
 	_set_extend(_shift_only(motion))
 	if _press_button != MOUSE_BUTTON_NONE and motion.position.distance_to(_press_at) >= CLICK_SLOP:
 		_slop_broken = true
 	if _slop_broken or _is_gui_hovered():
 		_set_hover(NO_HEX)
 		return
-	_set_hover(_hex_at(map_px_of(motion.position)))
+	var hex := _hex_at(map_px_of(motion.position))
+	_pointer_leads = _pointer_leads or hex != _last_hover
+	_set_hover(hex)
 
 
 func _on_key(key: InputEventKey) -> void:

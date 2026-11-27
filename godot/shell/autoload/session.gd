@@ -217,6 +217,7 @@ func begin_season() -> Dictionary:
 		return verdict
 	last_phase_ms = {"ai_orders": 0.0}
 	ai_worst_step_ms = 0.0
+	_finish_next = 0  # a game that ended in the middle of its season's end leaves its count behind
 	Season.begin(game)
 	Season.orders_begin(game)
 	drain()
