@@ -52,14 +52,14 @@ and fell last season, the countries that went hungry).
 **M6 Armies (the App is wired; the owner's playtest is next).** Armies walk the map. The **Raise** tab of an own settlement's hex
 panel (its Works | Raise segment) raises companies, and the **Army chip** (men under arms) appears with the first one. A token
 on the map is an army: a click selects it (or, on a hex with several, the next one), and its **army panel** opens in the dock:
-Hold, Continue march, Split off, Join and Disband, Raise here, its supply and its upkeep. A right click on a reachable hex (or
-`O` at the cursor) orders a march; with an army selected a right click on its own hex holds it, and with none it opens the hex
-menu. `Tab` selects the next army that needs orders, `R` continues a halted march, Alt+arrows move the cursor (the route follows,
-and the move card says what the way costs). Key `6` is **Supply**: where your armies are fed, your land striped where it starves;
+Hold, Continue march, Split off, Join and Disband, Raise here, its supply and its upkeep. A right click on a hex (or `O` at
+the cursor) orders a march, which walks at once (below); with an army selected a right click on its own hex halts it, and with
+none it opens the hex menu. `Tab` selects the next army that needs orders, `R` continues a halted march, Alt+arrows move the
+cursor (the route follows, and the move card says what the way costs). Key `6` is **Supply**: where your armies are fed, your land striped where it starves;
 the Layers popover's **Sight** switch shades what you cannot see. The Army chip opens the **Military** page (`[` `]` reach it
 too), the report has an **Armies** section, and `Esc` clears a selected army before anything else. The developer console takes
 `raise c r kind [n]`, `march ID c r`, `hold ID`, `armies` and `as TAG action ...`; F3 shows an armies line. The movement replay
-(`game/movement`) plays the walks between seasons; Space skips it.
+(`game/movement`) plays your own walk as you order it and the computer's walks after the season; Space skips it.
 
 **M7 War (the App is wired; the owner's playtest is next).** A neighbour's country panel has **Declare war** (it asks first);
 at war it shows the score and three peace buttons, **Take what you hold**, **White peace** and **Yield**, each asking first. A war
@@ -75,6 +75,18 @@ developer console takes `declare TAG`, `peace TAG take|white|yield`, `storm ID c
 (with `as TAG` before an action: `as MLO declare SAV` gives the player a war); the sandbox has no war. F3 shows a war line (wars,
 battles, sieges, occupied hexes, phase times, area hexes). The war UI answers only from milestone 7
 (`Bindings.SHELL_MILESTONE`).
+
+**Moves in the month (issue 432; built, the owner's playtest next).** An order to march **walks the army in the same click**,
+as far as its move points of the season reach (the slowest company's: knights 16, pikemen and crossbowmen 12, bombards 8), and
+the move is final. An army may be ordered again until its points are spent (the mark on its token and the panel show them). A
+longer route stays as a standing march, one leg at the end of each later season. A walk stops when an unseen enemy army comes
+into sight (points kept, `R` goes on) and beside an enemy (the season is over); unmapped land takes a whole season a step. An
+attack is fought at once (automatically until the battle board) and the dock opens after the walk. A move that opens a battle,
+enters enemy land or ends out of supply asks once (`game/confirm_moves`, "Confirm risky moves"). Stops: **Shift+left click** or
+`V` adds one (again on the last removes it, `Esc` removes all, at most 6), the move card's **March** and **Clear stops** do the
+same as a right click and `Esc`. In the season a country declares a war its armies may not enter that enemy's land (the player's
+too). The computer moves by the same rules at the end of the season. Design `docs/design/moves-in-the-month.md`, rules
+`docs/architecture/moves-build-spec.md`; save format 8 (older saves are refused as an older test build).
 
 ## Engine
 
@@ -272,9 +284,11 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
   - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
-  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"5"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (5).
-  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → army selection, country panel or hex selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
+  - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"8"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (7).
+  - **Armies (M6, M7, moves):** with an army selected, right click or `O` / `Shift+F10` (march at the cursor; on its own hex, halt), `Shift+right click` or `Shift+O` (storm), `Shift+left click` or `V` (add or remove a stop), `Tab` (next army), `R` (continue a halted march), Alt+arrows (move the order cursor), `B` (the last battle you fought). While your own walk is shown, `Space`, `Enter` or `Esc` skip it and do nothing more; a click or an order skips it and then acts.
+  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → staged stops → army selection, country panel or hex selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
+  - With an army of yours selected: right click orders its march, `Shift+right click` storms, `Shift+left click` adds a stop (with no army selected it selects as a plain click does).
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.
 - **Tiles & Map:** tiles are baked by `tools/worldmap/tileset_bake/bake.py` and assembled into `assets/tiles/tiles_<season>.tres` (full) and `assets/tiles/tiles_<season>_half.tres` (0.5× atlases in `assets/tiles/half/`, default on macOS `gl_compatibility` and in the Low preset to avoid `BPTC_RGBA -> RGBA8` 4× VRAM expansion; `import_etc2_astc` is also enabled in `project.godot`) by `tools/build_tileset.gd`; `data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.

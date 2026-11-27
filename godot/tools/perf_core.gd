@@ -2,6 +2,7 @@
 ## (docs/architecture/m3-build-spec.md and m4-build-spec.md section 8): the season phases (production and income
 ## included), the cold DistrictCache fill, a digest, a snapshot, a save and a load, the season summary, the reminders, one
 ## works check, ImprovePreview (of, options_of) and EconomyPreview.expected. Headless, no window, no GUT.
+## The moves rows on north Italy (PerfMoves, moves-build-spec.md 9) run after the Europe rows; --only=moves: they alone.
 ## The M4.5 and M5 rows (m4-5-build-spec.md 8, m5-build-spec.md 8: study_people_ms, food_bytes_ms) run on a second game, PerfFixture.europe_game(SEASONS_45): the study's views and the
 ## Yields bytes of the largest country, each on a new game version (cold; the owner index of the territories, keyed on the owner bytes, stays), the worst of RUNS_45.
 ## A row may carry "known_over": {"issue", "note"} in the budget: over its limit it prints KNOWN OVER and is listed
@@ -88,8 +89,8 @@ func _initialize() -> void:
 	if _only == "tile":
 		quit(PerfTileRows.only(_cpu_scale, _budget_path))
 		return
-	if _only == "war":
-		code = _war_rows()
+	if _only == "war" or _only == "moves":
+		code = _war_rows() if _only == "war" else PerfMoves.measure(_r)
 		quit(_finish_war() if code == 0 else code)
 		return
 	code = _measure()
@@ -98,11 +99,13 @@ func _initialize() -> void:
 	if code == 0:
 		code = _europe_40()
 	if code == 0:
+		code = PerfMoves.measure(_r)
+	if code == 0:
 		code = _ai_rows("", "", true)
 	quit(_finish() if code == 0 else code)
 
 
-## The war rows alone (--only=war): the rows of the budget that this run measured, printed with their verdicts, the results in the
+## The war or moves rows alone (--only=war, --only=moves): the rows of the budget that this run measured, printed with their verdicts, the results in the
 ## --out file; exit 1 past a limit that has no known_over.
 func _finish_war() -> int:
 	var limits: Dictionary = _read_budget().get("limits", {})
@@ -266,15 +269,15 @@ func _war_rows() -> int:
 	var luck := Rng.new()
 	luck.seed_with(SEED + 7)
 	rig_t = Time.get_ticks_usec()
-	var armies := PerfFixture.seed_armies(game, luck)
+	var armies := PerfFixture.seed_armies(game, luck, true)  # MV16: standing marches, walked by the movement phase
 	_r["war_armies"] = armies.size()
 	_r["rig_armies_ms"] = _ms(rig_t)
 	rig_t = Time.get_ticks_usec()
 	var worst := {&"movement": 0.0, &"battles": 0.0}
 	var worst_season := 0.0
 	for _n: int in SEASONS:
-		PerfFixture.rearm(game, luck, armies)
-		PerfFixture.war_march(game, armies, luck)
+		PerfFixture.rearm(game, luck, armies, true)
+		PerfFixture.war_march(game, armies, luck, true)
 		var season_t := Time.get_ticks_usec()
 		Season.begin(game)
 		for phase: StringName in Season.PHASES:
@@ -522,7 +525,7 @@ func _seasons(game: Game) -> bool:
 func _armies(game: Game) -> void:
 	var luck := Rng.new()
 	luck.seed_with(SEED)
-	var armies := PerfFixture.seed_armies(game, luck)
+	var armies := PerfFixture.seed_armies(game, luck, true)
 	_r["armies"] = armies.size()
 	var worst := {&"movement": 0.0, &"supply": 0.0, &"vision": 0.0, &"ready_units": 0.0}
 	var army_phases := 0.0  # the worst season's sum of ARMY_PHASES (m6-build-spec.md 5.0 R10)
@@ -539,7 +542,7 @@ func _armies(game: Game) -> void:
 				season_army += spent
 		army_phases = maxf(army_phases, season_army)
 		Season.finish(game)
-		PerfFixture.rearm(game, luck, armies)
+		PerfFixture.rearm(game, luck, armies, true)
 	_r["movement_peace_ms"] = worst[&"movement"]  # the peace march; the war rig's movement_ms is the row (M7)
 	_r["supply_ms"] = worst[&"supply"]
 	_r["vision_ms"] = worst[&"vision"]

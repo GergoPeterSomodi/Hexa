@@ -16,7 +16,10 @@
 ## (no leak of what the player was not told, the dock and the stack, no stuck Confirm); seeds 1498 to 1500, each playing Savoy.
 ## Fog (monkey_fog.gd; FG18): the M8 monkey with the fog step and the fog invariants; seeds 1504 to 1506 play Savoy with the
 ## computer's turns; 1505 is thin (FogFixture.thin on the player's country, deep fog).
-extends MonkeyTile
+## Moves (monkey_moves.gd; MV15): the tile monkey with the moves steps (orders walked at once, the question of a risky move,
+## the live walk, F5 and F9 mid-season, multi-leg marches); seeds 1510 to 1512, 1511 thin. The random keys and gestures are
+## monkey_input.gd's.
+extends MonkeyInput
 
 const APP_SCENE := preload("res://shell/app/app.tscn")
 const SEEDS: Array[int] = [1480, 1481, 1482]
@@ -38,6 +41,8 @@ const M8_SEEDS: Array[int] = [1501, 1502, 1503]
 ## Fog (FG18): the M8 monkey with the fog step; 1505 is the thin seed.
 const FOG_SEEDS: Array[int] = [1504, 1505, 1506]
 const TILE_SEEDS: Array[int] = [1507, 1508, 1509]
+## Moves in the month (MV15): the tile monkey with the moves steps; 1511 is thin.
+const MOVES_SEEDS: Array[int] = [1510, 1511, 1512]
 ## A forced action runs from this step on when its counter is still 0 (so the invariants cannot pass empty).
 const FORCE_SEASON_STEP := 30
 const FORCE_SAVE_STEP := 120
@@ -65,38 +70,6 @@ const FIXED_FRAME := 1.0 / 60.0
 
 ## Documented non-fatal quirks (empty when clean; matches ui-and-controls-spec.md section 9).
 const KNOWN_ISSUES: Array[Dictionary] = []
-
-const SAFE_KEYS: Array[Key] = [
-	KEY_ESCAPE,
-	KEY_M,
-	KEY_F1,
-	KEY_F3,
-	KEY_1,
-	KEY_2,
-	KEY_3,
-	KEY_4,
-	KEY_5,
-	KEY_G,
-	KEY_N,
-	KEY_H,
-	KEY_U,
-	KEY_I,
-	KEY_L,
-	KEY_BRACKETLEFT,
-	KEY_BRACKETRIGHT,
-	KEY_F,
-	KEY_EQUAL,
-	KEY_MINUS,
-	KEY_W,
-	KEY_A,
-	KEY_S,
-	KEY_D,
-	KEY_TAB,
-	KEY_C,
-	KEY_ENTER,
-	KEY_UP,
-	KEY_DOWN,
-]
 
 var _prev_game: Game = null
 var _prev_unsaved: int = 0
@@ -303,6 +276,15 @@ func test_ui_monkey_tile_seed_1509() -> void:
 	await _run_monkey_seed(TILE_SEEDS[2], true, true, true, true, true, true, true, true, true, false, true)
 
 
+## MV15 (monkey_moves.gd): the tile monkey with the moves steps; 1511 is thin.
+func test_ui_monkey_moves_seed_1510() -> void:
+	await _run_monkey_seed(MOVES_SEEDS[0], true, true, true, true, true, true, true, true, true, false, true, true)
+func test_ui_monkey_moves_seed_1511() -> void:
+	await _run_monkey_seed(MOVES_SEEDS[1], true, true, true, true, true, true, true, true, true, true, true, true)
+func test_ui_monkey_moves_seed_1512() -> void:
+	await _run_monkey_seed(MOVES_SEEDS[2], true, true, true, true, true, true, true, true, true, false, true, true)
+
+
 func test_ui_monkey_fog_seed_1506() -> void:
 	Session.ai_enabled = true
 	await _run_monkey_seed(FOG_SEEDS[2], true, true, true, true, true, true, true, true, true, false)
@@ -366,7 +348,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	_changed_hexes.append(hex)
 
 
-func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false, fog: bool = false, thin: bool = false, tile: bool = false) -> void:
+func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false, m4: bool = false, m45: bool = false, m5: bool = false, m6: bool = false, m7: bool = false, m8: bool = false, fog: bool = false, thin: bool = false, tile: bool = false, moves: bool = false) -> void:
 	await _wait_frames(2)
 	var orphans_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	_player_seen = &""
@@ -393,6 +375,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	_m8_begin(m8)
 	_fog_begin(fog, thin)
 	_tile_begin(tile)
+	_moves_begin(moves, app)
 
 	var rng := Rng.new()
 	rng.seed_with(seed_value)
@@ -439,6 +422,7 @@ func _run_monkey_seed(seed_value: int, new_game: bool = false, m3: bool = false,
 	if m3:
 		_m3_end(seed_value)
 	_m8_end(m8, seed_value)
+	_moves_end(moves, seed_value)
 	_tile_end(tile, seed_value)
 	_fog_end(fog, seed_value)
 	_set_milestones(false, false, false, false, false)
@@ -514,25 +498,6 @@ func _perform_monkey_step(
 		_exercise_screen_or_hud_flow(rng, app, land_hexes, step)
 
 
-func _send_random_key(rng: Rng, vp: SubViewport) -> void:
-	var key := SAFE_KEYS[rng.randi_range(0, SAFE_KEYS.size() - 1)]
-	# Ctrl+F (place search) is F with Ctrl; plain F is Fit whole map.
-	var ctrl := key == KEY_F and rng.randi_range(0, 2) == 0
-	var press := InputEventKey.new()
-	press.keycode = key
-	press.physical_keycode = key
-	press.pressed = true
-	press.ctrl_pressed = ctrl
-	vp.push_input(press)
-
-	var release := InputEventKey.new()
-	release.keycode = key
-	release.physical_keycode = key
-	release.pressed = false
-	release.ctrl_pressed = ctrl
-	vp.push_input(release)
-
-
 func _click_visible_control(rng: Rng, vp: SubViewport, app: App) -> void:
 	var stack := app.stack()
 	var root_ctrl: Node = stack.top() if stack.count() > 0 else app.hud().root()
@@ -550,91 +515,6 @@ func _click_visible_control(rng: Rng, vp: SubViewport, app: App) -> void:
 		_send_click(vp, rect.get_center(), MOUSE_BUTTON_LEFT)
 	else:
 		btn.pressed.emit()
-
-
-func _send_random_viewport_click(rng: Rng, vp: SubViewport) -> void:
-	var pos := Vector2(
-		float(rng.randi_range(12, vp.size.x - 12)),
-		float(rng.randi_range(8, vp.size.y - 12))
-	)
-	var button := MOUSE_BUTTON_LEFT if rng.randi_range(0, 3) != 0 else MOUSE_BUTTON_RIGHT
-	_send_click(vp, pos, button)
-
-
-func _send_random_wheel(rng: Rng, vp: SubViewport) -> void:
-	var pos := Vector2(
-		float(rng.randi_range(60, vp.size.x - 60)),
-		float(rng.randi_range(60, vp.size.y - 60))
-	)
-	var wheel_buttons: Array[MouseButton] = [
-		MOUSE_BUTTON_WHEEL_UP,
-		MOUSE_BUTTON_WHEEL_DOWN,
-		MOUSE_BUTTON_WHEEL_LEFT,
-		MOUSE_BUTTON_WHEEL_RIGHT,
-	]
-	var factors: Array[float] = [0.5, 1.0, 2.0]
-	var ev := InputEventMouseButton.new()
-	ev.button_index = wheel_buttons[rng.randi_range(0, wheel_buttons.size() - 1)]
-	ev.factor = factors[rng.randi_range(0, factors.size() - 1)]
-	ev.position = pos
-	ev.global_position = pos
-	ev.pressed = true
-	ev.ctrl_pressed = rng.randi_range(0, 5) == 0
-	ev.shift_pressed = rng.randi_range(0, 5) == 0
-	vp.push_input(ev)
-	# A wheel tick is a press and a release (as the window sends it): left pressed, it would hold the viewport's mouse grab and
-	# every later click would go to the control under the wheel.
-	var release := ev.duplicate() as InputEventMouseButton
-	release.pressed = false
-	vp.push_input(release)
-
-
-func _send_random_gesture(rng: Rng, vp: SubViewport) -> void:
-	var pos := Vector2(
-		float(rng.randi_range(100, vp.size.x - 100)),
-		float(rng.randi_range(80, vp.size.y - 80))
-	)
-	if rng.randi_range(0, 1) == 0:
-		var pan := InputEventPanGesture.new()
-		pan.position = pos
-		pan.delta = Vector2(float(rng.randi_range(-8, 8)), float(rng.randi_range(-8, 8)))
-		vp.push_input(pan)
-	else:
-		var mag := InputEventMagnifyGesture.new()
-		mag.position = pos
-		mag.factor = 0.85 if rng.randi_range(0, 1) == 0 else 1.15
-		vp.push_input(mag)
-
-
-func _send_random_drag(rng: Rng, vp: SubViewport) -> void:
-	var start := Vector2(
-		float(rng.randi_range(120, vp.size.x - 120)),
-		float(rng.randi_range(100, vp.size.y - 100))
-	)
-	var delta := Vector2(float(rng.randi_range(-90, 90)), float(rng.randi_range(-70, 70)))
-	var mid := start + delta * 0.5
-	var end := start + delta
-
-	var press := InputEventMouseButton.new()
-	press.button_index = MOUSE_BUTTON_LEFT
-	press.position = start
-	press.global_position = start
-	press.pressed = true
-	vp.push_input(press)
-
-	for pt: Vector2 in [mid, end]:
-		var motion := InputEventMouseMotion.new()
-		motion.position = pt
-		motion.global_position = pt
-		motion.relative = pt - start
-		vp.push_input(motion)
-
-	var release := InputEventMouseButton.new()
-	release.button_index = MOUSE_BUTTON_LEFT
-	release.position = end
-	release.global_position = end
-	release.pressed = false
-	vp.push_input(release)
 
 
 func _exercise_screen_or_hud_flow(

@@ -2,8 +2,9 @@
 ## move card. Its words are OddsView's and MovePreview's, laid out as they are (the card text equals card_of of them). Fog: a hex the
 ## player has not discovered gives no odds card (the move card's words, with no numbers); an enemy army out of sight is never
 ## numbered. A shaken army's refusal gives its two sentences in
-## BAD. The card takes no mouse and no focus. Planted faults: an odds card that shows an unseen enemy's numbers; a card that steals
-## the focus; a card that wraps past its width.
+## BAD. This season's walk and its risks stand above the arrival in the preview's tones (moves-build-spec.md R47). The card takes
+## no mouse and no focus. Planted faults: an odds card that shows an unseen enemy's numbers; a card that drops the walk or a risk,
+## or says a line twice; a card that steals the focus; a card that wraps past its width or is taller than a 1280x720 window.
 extends GutTest
 
 var _game: Game = null
@@ -168,6 +169,82 @@ func test_card_of_siege_lines_and_way_out() -> void:
 	var refused := OddsCard.card_of({"verdict": {"ok": false}}, odds)
 	assert_eq((refused.lines as Array).back(), ["Not at war with it.", "bad"], "a refusal is its reason in BAD")
 	assert_eq(refused.way_out, "", "with no way out line")
+
+
+## The theme variation of the odds card's line with this text, &"" when there is none.
+func _variation_of(text: String) -> StringName:
+	for node: Node in _hover.odds_card().find_children("*", "Label", true, false):
+		if str((node as Label).get_meta(MoveCard.RAW, "")) == text:
+			return (node as Label).theme_type_variation
+	return &""
+
+
+func test_the_card_shows_this_seasons_walk_and_its_risks() -> void:
+	var set_up := _fight_set_up()
+	var hex: Vector2i = set_up.c.theirs
+	_hover.on_hover_changed(hex, Vector2(200, 200))
+	var preview := MovePreview.to(_game, ArmyFixture.TAG, set_up.army, hex)
+	var texts: Array[String] = _card_texts()
+	var walk := "Walks 1 hex now: "
+	var battle := "This opens a battle at %s." % Words.place(_game, hex)
+	var at := -1
+	for i: int in texts.size():
+		if texts[i].begins_with(walk):
+			at = i
+	assert_gt(at, 0, "this season's walk, after the odds: %s" % str(texts))
+	assert_gt(texts.find(battle), at, "then the risk of a battle: %s" % str(texts))
+	assert_gt(texts.find(str(preview.arrives_text)), texts.find(battle), "then the arrival: %s" % str(texts))
+	assert_eq(_variation_of(battle), &"NumberWarn", "a risk is in the warning tone")
+	if at >= 0:
+		assert_true(texts[at].ends_with("its season is over."), texts[at])
+		assert_eq(_variation_of(texts[at]), &"Label", "the walk is plain")
+	for risk: Dictionary in preview.risks as Array:
+		assert_eq(texts.count(str(risk.text)), 1, "each risk once: %s" % str(risk.text))
+	assert_false(texts.has(str((preview.war as Dictionary).text)), "the move card's war line stays out: the odds say it")
+
+
+func test_card_of_puts_the_walk_and_risks_before_the_arrival_in_their_tones() -> void:
+	var walk := ["Walks 1 hex now: 4 of 12 move points; its season is over.", MovePreview.TONE_PLAIN]
+	var risk := ["This opens a battle at Pavia (10, 9).", MovePreview.TONE_WARN]
+	var preview := {"verdict": {"ok": true}, "leg_lines": [walk, risk], "arrives_text": "There in Spring 1481 (1 season)",
+		"lines": [["Attacks the Duchy of Milan: odds Even.", &"plain"], walk, risk, ["In supply.", &"good"]]}
+	var odds := {"kind": "attack", "ok": true, "title": "Pavia (10, 9)", "kind_text": "Attack · Even", "tone": "plain",
+		"attack": {"men": 2000, "morale": 1000}, "defence": {"access": "hidden"}, "chips": [], "notes": [], "hint": "",
+		"reason": ""}
+	var card := OddsCard.card_of(preview, odds)
+	assert_eq(_texts(card.lines), ["Attack · Even", "You 2,000 men · morale 100 %", "They: unknown", str(walk[0]),
+		str(risk[0]), "There in Spring 1481 (1 season)"], "the odds, the walk, the risk, the arrival: no war or supply line")
+	assert_eq((card.lines as Array)[3], walk, "the preview's tone")
+	assert_eq((card.lines as Array)[4], risk, "the preview's tone")
+	odds["ok"] = false
+	odds["reason"] = "Too shaken to attack."
+	assert_eq(_texts(OddsCard.card_of(preview, odds).lines), ["Attack · Even", "Too shaken to attack."],
+		"a refusal walks nowhere")
+
+
+## A full attack card: every odds row, the longest walk and all three kinds of risk stay inside a 1280x720 window.
+func test_a_full_card_fits_a_1280_by_720_window() -> void:
+	var preview := {"verdict": {"ok": true}, "arrives_text": "There in Autumn 1481 (3 seasons)", "leg_lines": [
+		["Walks 4 hexes now: 11 of 12 move points, 1 left.", &"plain"],
+		["Stops at near Alessandria (10, 11) this season; walks on at the end of next season, there in Autumn 1481.", &"plain"],
+		["Enters land held by the Duchy of Milan, a country at war with you.", &"warn"],
+		["Enters land held by the Most Serene Republic of Venice, a country at war with you.", &"warn"],
+		["Out of supply: the land feeds 1,000 men a season; 200 men lost a season.", &"warn"]]}
+	var odds := {"kind": "attack", "ok": true, "title": "near Alessandria (10, 11)", "kind_text": "Attack · Unfavourable",
+		"tone": "bad", "attack": {"men": 2000, "morale": 1000},
+		"defence": {"access": "seen", "men": 3000, "morale": 1000, "garrison": {"men": 500, "weight_permille": 1500}},
+		"chips": [{"text": "Hills +25 % for them"}, {"text": "Uphill −10 % for you"},
+			{"text": "Garrison counts ×1.5 behind its walls"}, {"text": "Across a pass −20 % on day 1"},
+			{"text": "Across the river −15 % on day 1"}], "notes": [], "hint": "", "reason": ""}
+	var window := Rect2(0.0, 0.0, 1280.0, 720.0)
+	var card := _hover.odds_card()
+	card.show_odds(preview, odds)
+	card.place(Vector2(1270.0, 710.0), window)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_eq(card.line_texts().size(), 14, "every line is on the card")
+	assert_true(window.encloses(Rect2(card.position, card.size)),
+		"inside the window: at %s, %s big" % [card.position, card.size])
 
 
 func test_the_card_takes_no_focus_and_no_mouse() -> void:

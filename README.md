@@ -34,6 +34,72 @@ python play.py --mode colony --start land --goal independence
 `--nation` takes a country's tag or name in any case (`POR`, `por`, `Portugal`). Random worlds invent their own
 countries (pass `--seed` too); an unknown name opens the country chooser and the terminal lists that map's countries.
 
+## Armies in the Godot version
+
+The game is moving to Godot ([`godot/`](godot/README.md)). This section is how armies move **there**; the rest of this page
+describes the Python game, frozen at v0.2.2.
+
+**Move points.** An army has move points each season, set by its slowest company: knights 16, pikemen and crossbowmen 12,
+bombards 8. Every step costs points by the ground, the road, the river and the season. The mark on the army's token and its
+panel show what is left. The points refill at the start of the next season; they do not add up, and splitting or merging
+armies never gives more.
+
+**Orders walk at once.** A right-click on a hex (or **O** at the order cursor) walks the selected army in the same click, as far
+as its points reach. **Army moves are final: there is no undo.** You may order the same army again until its points are
+spent. Before the click, the hover card shows what the army walks now, the points left, where it stops and when it arrives.
+
+- **Standing marches.** A goal further away than this season's points walks the first leg now; the rest stays as a march that
+  walks one leg at the end of each later season (at most 12 seasons ahead), so a long march is no faster than before. The
+  route stays drawn on the map. **R** continues a halted march, and a right-click on the army's own hex halts it.
+- An order that cannot walk now is kept as a standing march: the army has no points left, it is mustering (a company raised
+  this season; new companies join only an army that has not moved and is not marching), or the first step is a pass closed by
+  snow (it waits for spring).
+- A river too deep for a ford, or a step that costs more than the points left, can only be an army's first step of the season,
+  and it takes all its points.
+- A step beside an enemy army or an enemy garrisoned fortress ends the army's season. The way stops before the army of a
+  country you are at peace with, and a hex holds at most 8 companies of one country.
+- **Stop on sight.** When an enemy army you did not see comes into your army's sight, the walk stops there. The points left
+  are kept and the march is halted: press **R** to go on, or give a new order. Marches walked at the end of the season stop
+  the same way.
+- **Unmapped land.** You may order an army into land your country has never discovered. A step onto it can only be the first
+  step of a season and takes all the points (a first rule that may change). In the north Italy scenario every country starts
+  with the whole map discovered.
+
+**Risky moves ask once.** A move that opens a battle, enters land held by a country at war with you, or ends out of supply
+asks "Move" or "Cancel". Every other move is one click. The option **Confirm risky moves** (on by default) turns the question
+off.
+
+**Battles at once.** An army that walks onto an enemy army, or storms a fortress with points left, fights in the same click.
+The battle is fought automatically (a battle board comes later) and the battle dock opens on the result when the walk has
+been shown. Every army that fought, on both sides, has no points left that season. The winner halts and keeps its goal. A
+storm ordered with no points left is fought at the end of the season.
+
+**The computer** follows the same rules. After you end the season its armies walk and fight at once, then every standing
+march walks. The replay shows what you could see: first the computer's moves one after another, then the marches together.
+The **Movement replay speed** option also sets the speed of your own walks; your walk is only a picture of a move already
+made, and **Space**, **Enter** or **Esc** skips it.
+
+**Stops on the way.** With an army selected, **Shift**+left-click (or **V** at the cursor) adds a stop; up to six. The route is
+drawn through the stops with each part's cost and seasons. Do it again on the last stop to remove it; **Esc** removes them
+all. A right-click (or **O**, or the card's **March** button) on the goal orders the march through them. The army passes a
+stop without halting there, and the stops still ahead stay marked on the map. A storm takes no stops.
+
+**Fair warning.** In the season a country declares war, its armies may not enter that enemy's land. This holds for you too:
+an order into the land is refused with a hint, and a march across it stops at the border, keeps its points and goes on next
+season. The country that was declared on is not held back.
+
+| Control | Does |
+|---|---|
+| Right-click, or **O** / **Shift+F10** at the cursor | march the selected army there; on its own hex, halt it |
+| **Shift**+right-click, or **Shift+O** | storm the fortress there |
+| **Shift**+left-click, or **V** | add a stop for the selected army; on the last stop, remove it |
+| **R** | continue a halted march |
+| **Tab** | select the next army |
+| **Alt**+arrows | move the order cursor |
+| **Space**, **Enter** or **Esc** while your walk is shown | skip it |
+| **Esc** | remove the stops, then clear the selection |
+| **Space** or **Enter** | end the season |
+
 ## Conquest
 
 - **Goal:** move a soldier onto the enemy (red) castle. If nobody wins by turn 40, the higher

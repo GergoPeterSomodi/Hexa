@@ -14,6 +14,21 @@ The game moves to Godot 4.7 (GDScript). Age of Discovery on Europe only; Windows
   turn; 0.3.5 Every screen.
 - Later phases take 0.4.x onwards, starting with the castles map mode (0.4.0) and the paused war features.
 
+### Not yet released: moves in the month (issue 432)
+**Armies:**
+- An order walks the army **at once**, as far as its move points of the season reach, and the move is final. An army may be
+  ordered again until its points are spent
+- A longer route stays as a standing march that walks one leg at the end of each later season
+- A walk stops when an unseen enemy army comes into sight (the points are kept); a step beside an enemy ends the season;
+  unmapped land costs a whole season a step
+- A move onto an enemy army is fought at once (automatically until the battle board) and the battle dock opens on the result
+- Moves that open a battle, enter enemy land or end out of supply ask once ("Confirm risky moves" in Options)
+- **Shift**+left-click (or **V**) adds up to six stops to a march
+- Fair warning for every country: in the season a war is declared, its declarer's armies do not enter the enemy's land
+- The computer moves by the same rules at the end of the season; the replay shows its walks one after another
+
+**Save format 8:** saves of earlier 0.3.x builds no longer open ("Made by an older test build").
+
 **Version numbers (decided 2026-11-13):** one MINOR number per phase of the roadmap; PATCH numbers are the steps
 and fixes inside it. 0.1.x is the foundations. **0.2.x is war:** battles (0.2.0), their patches, battle cards, the
 battle mini-map, and war goals and peace. The Godot port takes 0.3.x ("New engine", above); later phases (the living

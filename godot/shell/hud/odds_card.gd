@@ -1,9 +1,10 @@
 ## The odds card (docs/architecture/m7-build-spec.md 6.4; M7 B26): the hover card of a march that is a war target of the selected
 ## army (an attack, a siege, a storm, a walk in, or a walk in held by a castle), shown by MapHover in place of the move card. Its
-## words are OddsView's (the odds, fogged by the view) and MovePreview.to's (the arrival and the place): this file only lays them
-## out. A refusal is shown only for a shaken army (the two sentences of 6.4); every other refusal stays the move card's, which
-## already names no hex the viewer does not see. It is a MoveCard, so it has the same frame and takes neither the mouse nor the
-## focus. Pure words: `card_of` and `wants` are static and read no node.
+## words are OddsView's (the odds, fogged by the view) and MovePreview.to's (this season's walk and its risks, the arrival and
+## the place; moves-build-spec.md R47): this file only lays them out. A refusal is shown only for a shaken army (the two
+## sentences of 6.4); every other refusal stays the move card's, which already names no hex the viewer does not see. It is a
+## MoveCard, so it has the same frame and takes neither the mouse nor the focus. Pure words: `card_of` and `wants` are static
+## and read no node.
 class_name OddsCard
 extends MoveCard
 
@@ -36,8 +37,8 @@ static func wants(preview: Dictionary, odds: Dictionary) -> bool:
 
 ## The card's words for a war target: {title, lines ([[text, tone]]), way_out} in MoveCard's form. The lines, in order: the kind
 ## and the word in its tone, the army (men and morale), the defence (men and morale, or the garrison's count and weight, or
-## "unknown" when hidden), the ground and walls chips, the notes, and the arrival. The way out is the hint. A refusal is its
-## reason in BAD only (the kind is kept above it).
+## "unknown" when hidden), the ground and walls chips, the notes, this season's walk and its risks (the preview's leg_lines in
+## their tones, R47), and the arrival. The way out is the hint. A refusal is its reason in BAD only (the kind is kept above it).
 static func card_of(preview: Dictionary, odds: Dictionary) -> Dictionary:
 	var title := str(odds.get("title", ""))
 	if title == "":
@@ -62,6 +63,7 @@ static func card_of(preview: Dictionary, odds: Dictionary) -> Dictionary:
 		lines.append([str((chip as Dictionary).get("text", "")), TONE_PLAIN])
 	for note: Variant in odds.get("notes", []) as Array:
 		lines.append([str(note), TONE_PLAIN])
+	lines.append_array(preview.get("leg_lines", []) as Array)
 	var arrives := str(preview.get("arrives_text", ""))
 	if arrives != "":
 		lines.append([arrives, TONE_PLAIN])

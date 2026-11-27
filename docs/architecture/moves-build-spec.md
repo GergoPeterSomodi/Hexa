@@ -597,12 +597,16 @@ it to the signal; `MapArmies._mark_dirty` takes one more optional argument.
 2. The pointer rests on Vercelli. The move card: "Walks 2 hexes now: 4 of 12 move points, 8 left." and the supply line. A
    right click: the army walks now (the token slides two hexes, the camera follows); the toast "The Army of Turin walks to
    Vercelli (6, 9): 8 of 12 move points left."; the panel says "8 of 12 left this season".
-3. Pavia, five hexes on: "Walks 3 hexes now: 7 of 8 move points, 1 left." / "Stops at Cerano (7, 9) this season; walks on at
-   the end of next season, there in Summer 1481." A right click: on the second step an army of Milan comes into sight at
-   Novara. The walk stops at its hex with the points kept; the toast says so; the panel reads "Halted" with Continue.
-4. The pointer on Novara (the Milanese army): "Attacks the Duchy of Milan: odds Even." and the risk "This opens a battle at
-   Novara". A right click asks "Move the Army of Turin?" / "Move". The army walks, the battle is fought, the dock opens on
-   the Battle of Novara, 1481 when the walk has played. The army's points are 0.
+3. The pointer rests on Pavia, a war target: the odds card, with this season's walk ("Walks 4 hexes now: ...; its season is
+   over.") and its risks above the arrival. A right click asks "Move the Army of Turin?" / "Move". On the second step an army
+   of Milan comes into sight at (8, 6), near Como. The walk stops at Novara (7, 8) with the points kept; the toast says so; the
+   panel reads "Halted" with Continue.
+4. The Milanese army is two hexes off. The pointer on it: the odds card ("Attack" and the word of the odds), "Walks 2 hexes
+   now: ...; its season is over." and "Stops beside an enemy at near Novara (7, 7): its season is over.", with no battle yet.
+   A right click (it asks when there is a risk) walks the army beside it: the zone of control ends its season at 0 points, and
+   the march stays standing. The attack is a season later: after End season the pointer on the army shows the risk "This opens
+   a battle at near Como (8, 6)."; a right click asks, "Move" walks and fights the battle at once, and the dock opens on the
+   Battle of Como when the walk has played. The army's points are 0.
 5. End season: the computer's seats play; Milan's other army, which sees the Army of Turin, marches on it and fights at once.
    The pill shows "Countries are moving"; after the phases the replay plays Milan's walks one after another, then the
    standing marches together; then the report, whose "Your armies" line reads "Army of Turin: Turin → Novara".

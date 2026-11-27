@@ -1,16 +1,17 @@
 # Tile window build plan: one uniform window per tile (issue 436)
 
-Technical director, 2026-11-25. **Status: built 2026-11-25 except TW19 (pictures signed, goldens, README and docs). The gate
-(TW0), groups A to E (TW1 to TW18) and three polish rounds added after the owner's playtest (TW20 to TW22: one fixed size,
-the Town tab, the mockup v4 look) are done; a fourth round, **TW23** (design review round 3), is **in progress**; the as-built
-state is section 10 of the spec.** Builds
+Technical director, 2026-11-25. **Status: built except TW19 (pictures signed, goldens, README and docs). The gate (TW0), groups
+A to E (TW1 to TW18), the polish rounds after the owner's playtest (TW20 to TW22), design review round 3 (TW23) and the
+owner's 540 banner design of 2026-11-26 (TW24: full height, 540 wide, short banner, Town / Army / Navy, no scrolling) are
+done; the as-built state is section 10 of the spec.** Builds
 `docs/architecture/tilewin-build-spec.md` ("the spec").
 
 **When it runs.** After the fog build (on master) and before M9.5, which adds its workshops as a strip of the Town tab (was: rows of the Buildings tab)
 and fills the `slots`, `arms` and `gate` fields the models carry (spec D16). It changes no rule, no save and no AI. Issue
 432 (moves in the month) and the battle board are not part of it; the Army rows keep a `points_text` field for 432.
 
-**Task IDs** are `TW0` to `TW23` (`TW20` to `TW22` are the polish rounds, added after TW18; `TW23` is design review round 3, in progress).
+**Task IDs** are `TW0` to `TW24` (`TW20` to `TW22` are the polish rounds, added after TW18; `TW23` is design review round 3;
+`TW24` is the 540 banner design).
 
 ---
 
@@ -23,24 +24,26 @@ S is about half a day of one worker, M a day, L two days.
 | **Gate. The mockup** | **DONE:** three mockups, approved by the owner 2026-11-25 | TW0 | done |
 | **A. Seams** | **DONE:** core seams moved, works rows and job line extracted, the tab registry with its generated index | TW1, TW2, TW3 | done |
 | **B. Read models and the picture** | **DONE (2e1d3be):** `TileView`, `TileBuildings`, `TileArmy`, the two hover cards, the settlement picture (a shell widget with a pure recipe) | TW4 to TW8 | done |
-| **C. Frame and tabs** | **DONE (ef7cbc6):** the window, Land, Buildings, Army, Ships, the fog proofs; built and tested beside the old panel (Land and Buildings became one Town tab in TW21) | TW9 to TW13, TW15 | done |
+| **C. Frame and tabs** | **DONE (ef7cbc6):** the window, Land, Buildings, Army, Ships, the fog proofs; built and tested beside the old panel (Land and Buildings became one Town tab in TW21, Ships became Navy in TW24) | TW9 to TW13, TW15 | done |
 | **D. Swap and recruiting window** | **DONE (0f7827f):** the window replaces the hex panel; `RaiseScreen` built beside it | TW14, TW16 | done |
-| **E. Menu, keys, proofs, finish** | TW17 and TW18 **DONE** (built and tested; in the working tree after 0f7827f, hash to add when committed); **TW19 remains:** pictures, goldens, docs | TW17, TW18, TW19 | TW19: 1 M |
-| **Polish rounds** | **DONE** (same state as TW17 and TW18): one fixed size, the Town tab, the mockup v4 look | TW20, TW21, TW22 | done |
-| **Polish round 3** | **IN PROGRESS:** design review round 3: findings H1 to H5, M1 to M9, L1 to L7 and the owner's decisions of 2026-11-25 (ducats chip as income, the emblem for the stars, the Ships tab's wording, 40 px tiles and a two-line plaque, collapsible facts, the picture at the window's width) | TW23 | 1 M |
+| **E. Menu, keys, proofs, finish** | TW17 and TW18 **DONE**; **TW19 remains:** pictures, goldens, docs | TW17, TW18, TW19 | TW19: 1 M |
+| **Polish rounds** | **DONE:** one size, the Town tab, the mockup v4 look | TW20, TW21, TW22 | done |
+| **Polish round 3** | **DONE:** design review round 3: findings H1 to H5, M1 to M9, L1 to L7 and the owner's decisions of 2026-11-25 (the income chip, the emblem for the stars, the port tab's wording, 40 px tiles and a two-line plaque, collapsible facts, the picture showing the whole town) | TW23 | done |
+| **The banner design** | **DONE:** 540 wide, full height, an 80 px banner, Town / Army / Navy, no scrollbar, "soon" placeholders on own land | TW24 | done |
 
 **Remaining: TW19** (1 M, Haiku with the art director): about 1 worker-day, plus the owner's go for the windowed run and the
-owner's playtest. **In progress: TW23** (1 M, Sonnet): design review round 3, about 1 worker-day; TW19's pictures come after it.
+owner's playtest. Its pictures show the 540 window.
 
 ```
 owner's go
   -> B:  TW4  TW5  TW6  TW7  TW8                 DONE (2e1d3be)
   -> C:  TW9  TW10  TW11  TW12  TW13  TW15       DONE (ef7cbc6)
   -> D:  TW14  TW16                              DONE (0f7827f)
-  -> E:  TW17  TW18                              DONE (not yet committed)
+  -> E:  TW17  TW18                              DONE
          TW19                                    REMAINING  -> the owner plays the checklist of section 5
-  polish: TW20  TW21  TW22                       DONE (not yet committed; after the owner's playtest of group D)
-  round 3: TW23                                  IN PROGRESS (design review round 3; spec D21 to D27)
+  polish: TW20  TW21  TW22                       DONE (after the owner's playtest of group D)
+  round 3: TW23                                  DONE (design review round 3; spec D21 to D27)
+  banner:  TW24                                  DONE (the owner's 540 banner design; spec D28, R33, R41, R42)
 ```
 
 A group starts when every task of the group before it is merged. Inside a group no two tasks touch one file and no task
@@ -95,7 +98,7 @@ without a prefix are under `godot/`; `tools/`, `docs/`, `README.md` at the repos
 | TW14 | M, Sonnet | **Raise companies window** | new `shell/screens/raise_screen.gd`, `tests/shell/test_raise_screen.gd` | Spec R27: tall rows from `TileArmy`, search, filter, the arms banner when present, a raise through `Session.act` (P), Esc, refresh on version; opened in its test by `open_for` (the wiring is TW17's) |
 | TW16 | M, Sonnet | **The swap** | edit `shell/hud/hud.tscn`, `hud.gd` (`tile_window()`), `shell/app/war_requests.gd`, `shell/hud/hex_menu.gd` (its cast and the works path through `TileWindow.begin_option`; items unchanged), `shell/map/map_armies.gd` (if it names the panel); delete `shell/panels/hex_panel.gd`, `.tscn`, `shell/panels/raise_list.gd`, `tests/shell/test_hex_panel.gd`, `test_hex_panel_people.gd`, `test_hex_panel_fog.gd`, `test_raise_list.gd`; edit the callers of spec 7.2 | Spec done-when 2, R30, R35: the fold-in checklist (7.3) in the pull request, checked by the code reviewer; the app runs headless (`--quit`); the monkey's existing seeds green; no `HexPanel`, `hex_panel(` or `RaiseList` left in `shell/`, `tests/`, `tools/` |
 
-### Group E (TW17 and TW18 done, not yet committed; TW19 remains)
+### Group E (TW17 and TW18 done; TW19 remains)
 
 | ID | Size, who | Task | Files | Done when |
 |---|---|---|---|---|
@@ -113,22 +116,22 @@ without a prefix are under `godot/`; `tools/`, `docs/`, `README.md` at the repos
   `raise_screen_open_ms` (`tools/ui/perf_ui_tile.gd`, both budget files).
 - **TW19 REMAINING.** `tools/ui/shot_ui_tile.gd` is written; the rest is not done. **Done when:** the owner has been asked
   and has said go for the windowed run; the pictures are made at both scales and the art director has signed them against the
-  approved mockups and the v4 look (the settlement picture shows the whole town at the window's width, not a cropped middle;
+  approved mockups, the v4 look and the 540 banner design (the banner shows the whole town, not a cropped middle;
   deep fog shows on the thin fixture); the regenerated panel scenes of `shot_ui.gd`, `shot_ui_m6.gd` and `shot_ui_fog.gd` are
-  reviewed side by side; `README.md` (the tile window, its tabs Town, Army and Ships, and the keys), `godot/README.md`,
+  reviewed side by side; `README.md` (the tile window, its tabs Town, Army and Navy, and the keys), `godot/README.md`,
   `CLAUDE.md` (`HexPanel` becomes `TileWindow`), `docs/architecture/ui-and-controls-spec.md` (bindings),
   `docs/design/ui-family-audit.md` and `docs/design/economy-rethink.md` 3.1 (no Industries tab: a Workshops group in the
-  Town tab's strips) say what is built. Plain words, matching spec 3.9.
+  Town tab's strips) say what is built (the README names the tabs Town, Army and Navy). Plain words, matching spec 3.9.
 
 ### Polish rounds (done, after the owner's playtest of group D)
 
 | ID | Task | State |
 |---|---|---|
-| TW20 | **One fixed size** | **DONE.** The window is `Tokens.TILE_WINDOW_W` x `TILE_WINDOW_H` (440 x 640) on every tile and tab; header, tabs and queue pinned, the body scrolls; shrinks only on a viewport shorter than that; tests at 1280 x 720 and at 1920 x 1080 with UI scales 1, 1.25 and 1.5 (spec R33, R38) |
+| TW20 | **One fixed size** | **DONE.** The window was a fixed 440 x 640 on every tile and tab, with the body scrolling (replaced by TW24: 540 wide, full height, no scrollbar; spec R33, R38) |
 | TW21 | **The Town tab** | **DONE.** Land and Buildings merged into one Town tab (`town_tab.gd` with the parts `building_strips.gd` and `land_facts.gd`); the siege block on top when besieged; one wooden strip per building group with 48 px icon tiles (40 px from TW23) that wrap; the land facts ledger under them; foreign land and sea get the facts alone; `land_tab.gd`, `buildings_tab.gd` and their tests replaced by `test_town_tab.gd`, `test_town_tab_strips.gd`, `test_tile_window_strips.gd`; the menu opens the Town tab; registry now Town 10, Army 30, Ships 40 (spec R14, R18 to R20) |
 | TW22 | **The mockup v4 look** | **DONE.** Header: stars at the left (replaced by an emblem on the picture in TW23), name centred, a drawn round close button, a teal sub line, round-icon chips (`StripCells`), a 150 px picture on every tile (`SettlementPicture` gains the LAND and SEA kinds) with round badge icons, "Unexplored" on deep fog; flat tabs with a gold underline; the queue as one row at the foot; Army icon cards with the season's cap said once; `TileStyle` (the flat boxes as data for `KitTheme`); every icon and number has a tooltip or hover card, walked by `test_tile_window_tips.gd` (spec R37, R39, R40) |
-| TW23 | **Design review round 3** | **IN PROGRESS** (the next polish task). Fixes the findings **H1 to H5, M1 to M9 and L1 to L7** of the designer's review (each by its id in the pull request, or answered there) and builds the owner's decisions of 2026-11-25 (spec D21 to D27): the header's ducats chip shows this tile's income a year; the settlement-type emblem on the picture replaces the size stars; the Ships tab keeps its place with in-game wording; 40 px building tiles and a two-line plaque for groups with many buildings; collapsible facts sections; the picture scaled to the window's width so the whole town shows. Expected files: `shell/panels/tile_window.gd`, `shell/ui/strip_cells.gd`, `shell/ui/settlement_picture.gd`, `shell/ui/building_row.gd`, `shell/panels/tile_tabs/` (`town_tab.gd`, `building_strips.gd`, `land_facts.gd`, `ships_tab.gd`), `core/views/tile_view.gd` and their tests (the review's findings name the rest). Done when: every finding fixed or answered; spec R10, R11, R18, R19, R23, R29 as written; `test_tile_window_tips.gd` still walks every control, the emblem included; the size and scale tests of R33 and R38 green; no core rule, save or digest changes; TW19's pictures are made after it |
-
+| TW23 | **Design review round 3** | **DONE.** Fixed the findings **H1 to H5, M1 to M9 and L1 to L7** of the designer's review and built the owner's decisions of 2026-11-25 (spec D21 to D27): the header's fourth chip shows this tile's income a year; the settlement-type emblem replaces the size stars; the port tab keeps its place with in-game wording; 40 px building tiles and a two-line plaque; collapsible facts sections; the picture shows the whole town. No core rule, save or digest changed |
+| TW24 | **The 540 banner design** (owner, 2026-11-26) | **DONE.** `tile_window.gd`, `tile_header.gd`, `tile_tabs/` (new `tile_boxes.gd`), `shell/ui/soon_tag.gd`, `settlement_picture.gd`, tokens and themes: 540 wide and full height under the top bar, an 80 px banner, tabs Town / Army / Navy, the facts in two columns above the strips, no scrollbar (ranked parts hide to fit), "soon" placeholders on your own land only; new test `test_tile_window_fit.gd` (spec D28, R33, R41, R42) |
 
 ---
 
@@ -181,7 +184,7 @@ spec's fallback in TW18's pull request.
 3. Ctrl+] and Ctrl+[ go through the tabs; Esc closes the window.
 4. Army tab at Asti: raise a company with the hammer; hover a row for its card; the army appears under "Armies here"; its
    arrow selects it. "Show all" opens the Raise companies window; Esc closes it.
-5. Click Savona: a third tab, Ships, says no ships yet; the picture shows the harbour.
+5. Click Savona: a third tab, Navy, says no ships are in port, with the coming ships marked "soon"; the banner shows the harbour.
 6. Click a Milanese town far away: exact people, goods, buildings and garrison on the Town tab; Army dimmed, its reason under
    the facts and as the tab's tooltip; "Out of sight: no armies are shown".
 7. As Savoy at war with Milan, march next to a Milanese army: its tile shows "Enemy army here" and a live, read-only Army
@@ -190,14 +193,15 @@ spec's fallback in TW18's pull request.
    army, Cancel work each do what they say. The close button clears the selection.
 9. Look at TW19's signed pictures (deep fog shows on the thin test fixture).
 10. Fold and open a section of the facts on the Town tab; on a town with many buildings the 40 px tiles and the two-line plaques fit,
-    and the picture shows the whole town at the window's width.
+    and the banner shows the whole town.
+11. Make the window small (1280 x 720): no scrollbar; the "soon" boxes hide first, the building strips and raise rows stay.
 
 ---
 
 ## 6. Definition of done
 
 1. The spec's done-when items 1 to 7 hold.
-2. TW4 to TW23 merged (TW4 to TW16 are, TW17, TW18 and TW20 to TW22 are built and wait for their commit, TW19 remains, TW23 is in progress); CI green with the nightly `perf_core` and `perf_ui` jobs within limits; the soak unchanged.
+2. TW4 to TW24 merged (all are but TW19, which remains); CI green with the nightly `perf_core` and `perf_ui` jobs within limits; the soak unchanged.
 3. Issue 436 closed by TW19's pull request, with the approved mockups and the signed pictures linked.
 4. The owner has played section 5.
 
@@ -225,16 +229,17 @@ spec's fallback in TW18's pull request.
 | On land the Town and Army tabs always show; a tab that does not apply is dimmed with its reason (the approved mockup); as built, Land and Buildings are one Town tab, so only Army is ever dimmed | absent tabs, as the earlier draft |
 | The chips are the same on every tab (four cells by case) | per-tab cells as the mockup's sketches varied |
 | Before M9.5 the strip's third cell is Works (crews in use of the limit); M9.5 turns it into Slots on settlements | an empty cell until M9.5 |
-| A settlement-type emblem on the picture shows the size; the size stars are removed (owner, 2026-11-25; spec D22) | size stars from the settlement level, as TW22 built them |
-| As built: a 150 px picture on every tile (a settlement, the bare land or the sea); the first draft gave a title bar to other tiles | a title bar and no picture off settlements |
+| A settlement-type emblem (in the title bar) shows the size; the size stars are removed (owner, 2026-11-25; spec D22) | size stars from the settlement level, as TW22 built them |
+| As built: an 80 px banner on every tile (a settlement, the bare land, the sea or terra incognita); the first draft gave a title bar to other tiles | a title bar and no picture off settlements |
 | The menu loses its inline works rows ("Build here..." opens the Town tab), as the approved menu shows | keep the works rows in the menu too |
 | Gains fill one row a frame after the rows appear | compute every gain before the first draw |
 | Window opens on the last tab picked, else Town | always the first tab |
 | `RaiseScreen` is a non-opaque screen over the map | a second dock panel |
-| The header's ducats chip is this tile's income a year (owner, 2026-11-25; spec D21) | the viewer's treasury, as built |
-| The Ships tab is kept for own ports, with in-game wording (owner, 2026-11-25; spec D23) | hide the tab until ships exist |
-| Building tiles are 40 px and the plaque has two lines (owner, 2026-11-25; spec D24) | 48 px tiles and a one-line plaque, as built |
-| The picture scales to the window's width so the whole town shows (owner, 2026-11-25; spec D25) | scale by the height and crop the sides, as built |
+| The header's fourth chip is this tile's income a year (owner, 2026-11-25; spec D21) | the viewer's treasury |
+| The Navy tab is kept for own ports, with in-game wording (owner, 2026-11-25; spec D23) | hide the tab until ships exist |
+| Building tiles are 40 px and the plaque has two lines (owner, 2026-11-25; spec D24) | 48 px tiles and a one-line plaque |
+| The picture shows the whole town (owner, 2026-11-25; spec D25) | scale by the height and crop the sides |
+| The window is 540 wide, full height, with no scrollbar; "soon" boxes on your own land (owner, 2026-11-26; spec D28) | a fixed 440 x 640 with a scrolling body |
 | The facts sections collapse, open by default, the state kept for the session and not saved (owner, 2026-11-25; spec D26) | always open |
 
 ---
@@ -244,4 +249,4 @@ spec's fallback in TW18's pull request.
 The owner said to ignore the settlement picture for now: TW8's code-drawn picture stays in the window as a placeholder for
 future stylised backgrounds. No more art work on it in this build (no art director pass, no new kinds); its weak points (dark
 water, arrow-like masts, small hamlets and villages) are not to be fixed now. When real backgrounds arrive they replace the
-`SettlementPicture` Control behind the same `TileView` picture facts, so nothing else changes. The scale-to-width fix and the emblem of round 3 (spec D25, D22) are layout, not art work, and are built in TW23.
+`SettlementPicture` Control behind the same `TileView` picture facts, so nothing else changes. The whole-town fix and the emblem of round 3 (spec D25, D22) are layout, not art work, and were built in TW23.

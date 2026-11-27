@@ -313,6 +313,7 @@ func _m7_close_all(vp: SubViewport, app: App) -> bool:
 
 ## Money and iron for Savoy, Milan's army at Alessandria, the war with Milan (the country panel's Confirm) and a Savoyard army on
 ## the march to Alessandria. Each part only when it is not there yet; the developer's gifts excuse the digest check.
+## moves in the month: the console's march walks at once (it may fight); an army whose leg walks this season has moved.
 func _m7_prepare(rng: Rng, vp: SubViewport, app: App) -> void:
 	var game := Session.game
 	var ctx := app.context()
@@ -337,7 +338,11 @@ func _m7_prepare(rng: Rng, vp: SubViewport, app: App) -> void:
 			DevCommands.run("raise 6 9 pikemen 2", ctx)
 			mine = Armies.of_country(game, SAV)
 		if not mine.is_empty():
-			DevCommands.run("march %d 7 9" % mine[0].id, ctx)
+			var id := mine[0].id
+			var from := mine[0].hex
+			var leg := MovePreview.leg_of(game, SAV, id, ALESS)
+			if DevCommands.run("march %d 7 9" % id, ctx).begins_with("Done") and Session.game == game:
+				_m6_assert_walked(game, id, from, ALESS, leg)
 	_changed_hexes.clear()  # `as MLO raise` changes Milan's hex: it is not a works action of the player's (the owner check of the step)
 	await _wait_frames(2)
 

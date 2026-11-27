@@ -290,6 +290,11 @@ never alters a battle. The streams' states are saved. Stored amounts (money, peo
 Lists are walked in a fixed order (by id), never by memory address. **Same seed and same actions give the same
 game**, and a short digest (a fingerprint of the whole state) proves it in tests.
 
+Two rules of the moves in the month (`moves-build-spec.md` section 6):
+- **A battle's days are drawn when it is fought, in the order of the acts.** A battle opened by an order is fought inside
+  that action, from the world's luck, so the action log fixes the order of every draw and a replay gives the same dice.
+- **A check, a view, a preview and a pause draw nothing.** Only an accepted action and the season's phases draw luck.
+
 ### 5.5 Saves
 
 **Decision: our own snapshot, not Godot Resource saves.** A Resource file can carry a script that runs on load, so

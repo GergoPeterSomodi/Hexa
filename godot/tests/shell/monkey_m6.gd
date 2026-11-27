@@ -2,8 +2,9 @@
 ## sections 6 and 9). Key 6 (the Supply mode and its legend); a click on an army's token, or Tab, selects an army; a right click,
 ## O, R and the army panel's Hold, Continue, Split, Join and Disband (with its Confirm); the Raise tab and the console's `raise`;
 ## the hex menu (O on an own hex with no army selected); the Military page; End season with its replay, skipped by Space, Esc or
-## a click; F5 and F9. Invariants: the army panel shows exactly while an own army is selected; no order is accepted while the
-## replay runs (the digest, the version and the stores stay); men and people add up the same before and after a raise, a split,
+## a click; F5 and F9. Invariants: the army panel shows exactly while an own army is selected; a march accepted at idle walks
+## at once (moves in the month); no order is accepted while the season replay runs, and a live walk refuses none (the digest,
+## the version and the stores stay); men and people add up the same before and after a raise, a split,
 ## a merge or a disband (none of them ends a season); no army of yours is selected after a load. The Supply legend and the
 ## treasury and stock checks are MonkeyM4's, which already name Supply. Split out of the monkey like MonkeyM5.
 class_name MonkeyM6
@@ -239,6 +240,7 @@ func _m6_order(rng: Rng, vp: SubViewport, app: App) -> void:
 
 ## A march: the camera frames one of your armies, a click selects it, then a right click orders it to one of the own hexes on
 ## screen that the preview accepts (a march of the rules, the way the player gives it). Nothing is ordered when none is.
+## moves in the month: an accepted march walks at once (a question about a risky one is answered Move).
 func _m6_march(rng: Rng, vp: SubViewport, app: App) -> void:
 	var game := Session.game
 	var tag := Session.player_tag()
@@ -270,13 +272,36 @@ func _m6_march(rng: Rng, vp: SubViewport, app: App) -> void:
 	var start := rng.randi_range(0, goals.size() - 1)
 	for step: int in mini(goals.size(), 4):
 		var goal := goals[(start + step) % goals.size()]
-		var verdict := MovePreview.to(game, tag, army.id, goal)["verdict"] as Dictionary
-		if bool(verdict.get("ok", false)):
+		var preview := MovePreview.to(game, tag, army.id, goal)
+		if bool((preview["verdict"] as Dictionary).get("ok", false)):
+			var from := army.hex
+			var leg := preview["leg"] as Dictionary
+			var unsaved := Session.unsaved_actions
+			var chosen := _m6_map_armies(app).selected_army()  # a stack's click may take another of its armies
 			_send_click(vp, _m6_screen_pos(app, goal), MOUSE_BUTTON_RIGHT)
 			_bump("m6_orders")
 			await _wait_frames(2)
+			var asked := app.stack().top() as Confirm
+			if asked != null and Session.unsaved_actions == unsaved and asked.button_for(&"confirm") != null:
+				_m4_press(vp, asked.button_for(&"confirm"))
+				await _wait_frames(2)
+			if Session.game == game and Session.unsaved_actions > unsaved:
+				_changed_hexes.clear()  # a walk changes land by the rules, never by a works action
+				if chosen == army.id:
+					_m6_assert_walked(game, army.id, from, goal, leg)
 			return
 	await _wait_frames(1)
+
+
+## moves in the month: a march accepted whose leg walks this season has walked (or halted, or spent its season) when the
+## click is done.
+func _m6_assert_walked(game: Game, army_id: int, from: Vector2i, goal: Vector2i, leg: Dictionary) -> void:
+	var army := Armies.by_id(game, army_id)
+	if army == null or (leg["hexes"] as Array).is_empty() or goal == from:
+		return
+	assert_true(army.hex != from or army.halt_why != &"" or army.points == 0,
+		"%s: an accepted march walks at once (army %d still at %s)" % [_tag, army_id, str(from)])
+	_bump("m6_checks")
 
 
 ## Whether one of yours is on a march (a season's walk, and so a replay, needs one).

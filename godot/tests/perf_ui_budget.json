@@ -1,5 +1,5 @@
 {
-  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8; m5-build-spec.md section 8; m6-build-spec.md section 8; m7-build-spec.md section 8). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
+  "comment": "UI performance and memory budgets (docs/architecture/ui-style-and-feedback-spec.md sections 4.10, 11; ui-and-controls-spec.md section 9; m3-build-spec.md section 8; m4-build-spec.md section 8; m4-5-build-spec.md section 8; m5-build-spec.md section 8; m6-build-spec.md section 8; m7-build-spec.md section 8; moves-build-spec.md section 9). Read by tools/ui/perf_ui.gd. Never read by a GUT test.",
   "screens": ["main_menu", "sandbox", "credits", "pause_menu", "options", "about", "help", "confirm", "loading"],
   "limits": {
     "screen_push_cpu_worst_ms": {"limit": 150.0, "class": "cpu", "what": "worst cold instantiate + ScreenStack.push time across M1.5 screens"},
@@ -43,6 +43,8 @@
     "tile_tab_switch_ms": {"limit": 16.0, "class": "gpu", "what": "TW18: every live tab of Savona (a port) shown in turn, cold, the call and one forced draw, worst (tile window spec 8)"},
     "gain_fill_frame_ms": {"limit": 16.0, "class": "gpu", "what": "TW18: the worst frame of the Buildings tab's one-row-a-frame gain fill on Genoa's city (tile window spec 8; under 6 expected)"},
     "raise_screen_open_ms": {"limit": 16.0, "class": "gpu", "what": "TW18: the RaiseScreen pushed and opened for Genoa's city, the call and one forced draw, worst of 3 (tile window spec 8)"},
+    "live_walk_frame_ms": {"limit": 2.0, "class": "cpu", "what": "MV16: one frame of a live walk with a battle mark and a retreat, mean of 30 (moves-build-spec.md 9)"},
+    "move_confirm_push_ms": {"limit": 16.0, "class": "gpu", "what": "MV16: the move question with three risk lines pushed and drawn, worst of 3, the first cold (moves-build-spec.md 9)"},
     "kit_1x_mb": {"limit": 4.0, "class": "mem", "what": "1x Studiolo UI kit RGBA8 memory in play (budget < 4 MB)"},
     "kit_2x_mb": {"limit": 16.0, "class": "mem", "what": "2x Studiolo UI kit RGBA8 memory in play (budget < 16 MB)"},
     "ai_frame_ms": {"limit": 16.0, "class": "gpu", "what": "the worst frame while the countries move (End turn, camera still), north Italy as Genoa, 3 seasons after a warm one, windowed (M8 8.1)", "known_over": {"issue": 0, "note": "33.7 ms worst frame, windowed 2026-11-23 with the season preload on (as in play; was 316 ms with it off: the TileSet loaded in the season-end frame). Left: the season-end frame, about 6 ms base + 14 ms first swap slice (MapSeasons._swap_to) + 10 to 27 ms finish (phases; the works phase drain up to 12 ms) + 4.5 ms season_ended listeners; needs the phases sliced and the swap slice deferred (SeasonFlow, Session.finish_season, owner call on the design); no issue raised yet"}},

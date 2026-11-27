@@ -66,6 +66,13 @@
     "ai_step_worst_ms": {"limit": 8.0, "class": "cpu", "what": "M8: the worst single AI step on the made-up Europe", "known_over": {"issue": 0, "note": "K24a 2026-11-22, a loaded machine (two other sessions Godot runs at about 11,000 CPU s each): 30 s a season mean, 36 s worst, seat 497 ms, worst step 817 ms; the war step is fixed (AiWar.prize_of now reads a near-land field: 356 s to 4 s over the measured seasons); still over: tax 72 s (AiKnow.preview_net, 150 ms mean), brief 46 s (96 ms mean), works_card 47 s, works_scan 23 s, works_act 19 s, army 18 s; the issue is to be raised by the planning session"}},
     "ai_brief_ms": {"limit": 8.0, "class": "cpu", "what": "M8: AiBrief.make for the largest seat on the made-up Europe, warm, mean of 5 (ai_brief_cold_ms is the first make on a new version)", "known_over": {"issue": 0, "note": "9 ms warm and 92 ms cold on a quiet run; 42 ms warm, 550 ms cold on the loaded K23 run; 44 ms warm, 545 ms cold on the loaded K24a run; #440 step 1 (shared two-season walk, 2026-11-24): 41 ms warm before, 11 ms after, 520 ms cold (the cold make is the holder build, #440 step 2); the issue is to be raised by the planning session"}},
     "ai_save_mb": {"limit": 8.0, "class": "mem", "what": "M8: the .sav file after 40 AI seasons on the made-up Europe, the trimmed log (m8-build-spec.md 8.1)"},
-    "ai_load_ms": {"limit": 2000.0, "class": "cpu", "what": "M8: SaveFile.read and Snapshot.restore of that save, the digest check (8.3's load_ms)"}
+    "ai_load_ms": {"limit": 2000.0, "class": "cpu", "what": "M8: SaveFile.read and Snapshot.restore of that save, the digest check (8.3's load_ms)"},
+    "walk_now_ms": {"limit": 2.0, "class": "cpu", "what": "MV16: one at-once march (Game.act, the walk and Sight.refresh) on north Italy, the plan cached, mean of 200 of 1 to 4 seasons of route (moves-build-spec.md 9)"},
+    "walk_now_worst_ms": {"limit": 8.0, "class": "cpu", "what": "MV16: the worst of the same 200 marches (it bounds one AI step)"},
+    "walk_battle_ms": {"limit": 20.0, "class": "cpu", "what": "MV16: an at-once march into an 8 against 8 enemy on north Italy, fought in the act, worst of 20 (moves-build-spec.md 9)"},
+    "preview_leg_ms": {"limit": 2.0, "class": "cpu", "what": "MV16: MovePreview.to with leg and risks, cold, on north Italy at war, worst of 50 (moves-build-spec.md 9)"},
+    "preview_via_ms": {"limit": 4.0, "class": "cpu", "what": "MV16: MovePreview.via with 5 staged stops and a new pointer hex, the staged legs cached, worst of 50 (moves-build-spec.md 9)"},
+    "preview_via_cold_ms": {"limit": 12.0, "class": "cpu", "what": "MV16: the same cold (all 6 legs, the view cache cleared), worst of 50 (moves-build-spec.md 9)"},
+    "march_via_ms": {"limit": 6.0, "class": "cpu", "what": "MV16: march_check then march with 6 stops on north Italy (7 route searches), worst of 50 (moves-build-spec.md 9)"}
   }
 }

@@ -95,8 +95,9 @@ static func leg_of(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> 
 ## title (the place), hexes (Array[Vector2i], the goal last), stops ([{hex, turn, text}] at each season's end), arrives_turn
 ## (-1 when none), arrives_text, seasons, crossings ([{hex, to, kind (&"bridge", &"ford", &"ferry", &"wade", &"pass"),
 ## name, text, closed}]), winter ({pass, closes, waits}), supply_end ({in_supply, feeds, loss}), lines ([[text, tone]]) and
-## way_out, leg ({hexes, cost, points_before, points_after, full, end, why}: this season's walk, R45) and risks ([{kind, text}],
-## R46), both cached with the preview. Kept in the pinned slot &"move_previews" keyed by [version, army, tag], at most PREVIEWS_MAX hexes (R3 c).
+## way_out, leg ({hexes, cost, points_before, points_after, full, end, why}: this season's walk, R45), risks ([{kind, text}],
+## R46) and leg_lines (the walk's and the risks' own lines of `lines`, R47: the odds card shows them), all cached with the
+## preview. Kept in the pinned slot &"move_previews" keyed by [version, army, tag], at most PREVIEWS_MAX hexes (R3 c).
 static func to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dictionary:
 	if game == null or game.map == null or game.defs == null or not game.has_countries() or game.map.index_of(hex) < 0:
 		return _bare({"ok": false, "reason": "that is off the map"})
@@ -177,7 +178,7 @@ static func route_words(game: Game, tag: StringName, a: Army, hex: Vector2i, ver
 		out["way_out"] = FairWarning.HINT_TEXT
 	out["leg"] = leg
 	out["risks"] = risks
-	_leg_lines(game, a, leg, route, risks, lines, 1 if str((out.war as Dictionary).text) != "" else 0)
+	out["leg_lines"] = _leg_lines(game, a, leg, route, risks, lines, 1 if str((out.war as Dictionary).text) != "" else 0)
 	out["lines"] = lines
 	return out
 
@@ -284,6 +285,7 @@ static func _shell(game: Game, hex: Vector2i) -> Dictionary:
 		"way_out": "",
 		"leg": _empty_leg(),
 		"risks": [],
+		"leg_lines": [],
 	}
 
 
@@ -378,6 +380,7 @@ static func _bare(verdict: Dictionary) -> Dictionary:
 		"way_out": "",
 		"leg": _empty_leg(),
 		"risks": [],
+		"leg_lines": [],
 	}
 
 
@@ -713,9 +716,9 @@ static func _risks(game: Game, tag: StringName, a: Army, leg: Dictionary) -> Arr
 
 ## The lines of the leg and its risks (R47), put into `lines` from index `at` (after the war line): the walk now, the stop of a
 ## route longer than the season, the zone of control, a blocked way, the unmapped land of a fog step (MV7, R47: the hex by its
-## coordinates alone, never explored), then a line for each risk.
+## coordinates alone, never explored), then a line for each risk. Returns the lines it put in.
 static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32Array, risks: Array[Dictionary], lines: Array,
-		at: int) -> void:
+		at: int) -> Array:
 	var made: Array = []
 	var why := StringName(leg.why)
 	var hexes: Array[Vector2i] = leg.hexes
@@ -743,6 +746,7 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 		made.append([str(r.text), TONE_WARN])
 	for k: int in made.size():
 		lines.insert(at + k, made[k])
+	return made
 
 
 ## The hex of the fog step that ended the leg: its last hex when the step was taken, else the route's next step after its end.

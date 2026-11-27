@@ -1,8 +1,10 @@
 # Moves in the month (issue 432)
 
-Status: draft for the owner. Written 2026-11-24 by the game designer from the M6, M7 and M8 build specs and the UI family
-audit (no code was read or run). Nothing here is built. Where a number is named it is a data value, not a constant in code. The owner's answers of
-2026-11-24 and 2026-11-25 are in the last section; where a section above says otherwise, the answers win.
+Status: **built** in the Godot game (issue 432; `docs/architecture/moves-build-spec.md`); the owner's playtest and the signed
+pictures remain. Written 2026-11-24 by the game designer from the M6, M7 and M8 build specs and the UI family audit (no code
+was read or run). Where a number is named it is a data value, not a constant in code. The owner's answers of 2026-11-24 and
+2026-11-25 are in the last section; where a section above says otherwise, the answers win, and where the build differs from this
+page the build spec wins (its appendix B).
 
 Words: the game calls one turn a "season". The owner says "month". This page says "season" and means the same thing.
 

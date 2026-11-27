@@ -14,6 +14,8 @@
 ## between tabs, the Yields switch and its update, the table's 100 rows, the timeline's draw and the legend's show (see
 ## _measure_m45). The Europe game takes minutes: it is skipped headless unless --europe-seasons=N is given.
 ##
+## Moves (moves-build-spec.md section 9; the rows are in perf_ui_moves.gd): a frame of a live walk and the move question's push.
+##
 ## Windowed (GPU or xvfb + Mesa in CI):
 ##   godot --path godot -s res://tools/ui/perf_ui.gd -- [--gpu-limits] [--cpu-scale=2.0] [--out=perf_ui.json] [--summary=summary.md] [--europe-seasons=N]
 ## Headless: exercises every M1.5 screen push and checks memory budgets; GPU frame times are reported only.
@@ -25,6 +27,7 @@ const M6 := preload("res://tools/ui/perf_ui_m6.gd")
 const M7 := preload("res://tools/ui/perf_ui_m7.gd")
 const M8 := preload("res://tools/ui/perf_ui_m8.gd")
 const TILE := preload("res://tools/ui/perf_ui_tile.gd")
+const MOVES := preload("res://tools/ui/perf_ui_moves.gd")
 const BUDGET := "res://tests/perf_ui_budget.json"
 const APP_SCENE_PATH := "res://shell/app/app.tscn"
 const SCREEN_IDS_PATH := "res://shell/screens/screen_ids.gd"
@@ -478,6 +481,7 @@ func _measure_m45(packed: PackedScene, headless: bool) -> void:
 	await M6.new(self, _r).measure(app, vp)  # M6 (perf_ui_m6.gd): the armies' panel, tokens, route, replay, Supply, Military page
 	await M7.new(self, _r).measure(app)  # M7 (perf_ui_m7.gd): the battle dock, the war marks, the odds card, the hex menu, the castle areas
 	await TILE.new(self, _r).measure(app, ResourceLoader.load(SCREEN_IDS_PATH) as GDScript)  # TW18 (perf_ui_tile.gd): the tile window rows
+	await MOVES.new(self, _r).measure(app)  # MV16 (perf_ui_moves.gd): the live walk's frame and the move question
 
 	session.call("end_game")
 	root.remove_child(vp)

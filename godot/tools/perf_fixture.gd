@@ -7,6 +7,9 @@
 ##   north_italy_game(seasons): the 1480 scenario on seed 1480 as Genoa, calm weather, the same seeded works for Genoa only.
 ##   largest_tag(game):         the country holding the most land, ties by id.
 ## Headless, no window; the games take minutes to build, so a rig builds one and keeps it.
+## Moves in the month (moves-build-spec.md 9, MV16): an order of march walks at once, which would leave the movement phase
+## nothing to walk. With `standing` the rig's armies get their points and a march that only stands (the order and the route
+## stored, nothing walked), so the phase rows keep measuring the walks; without it every march goes through Game.act.
 class_name PerfFixture
 extends RefCounted
 
@@ -159,7 +162,7 @@ static func europe_ai(seasons: int) -> Game:
 ## random land of its own, through Armies.create and Armies.add_units with raised_turn = turn - 1 (none musters): the rig, not
 ## raise. The movement numbers are copied from the committed definitions first (as probe_movement does), then each army is
 ## ordered out. Returns the armies in id order.
-static func seed_armies(game: Game, luck: Rng) -> Array[Army]:
+static func seed_armies(game: Game, luck: Rng, standing: bool = false) -> Array[Army]:
 	var real := ResourceLoader.load(GAME_DEFS, "", ResourceLoader.CACHE_MODE_IGNORE) as GameDefs
 	var out: Array[Army] = []
 	if real == null:
@@ -175,15 +178,17 @@ static func seed_armies(game: Game, luck: Rng) -> Array[Army]:
 			var hex := game.map.hex_of(land[luck.randi_range(0, land.size() - 1)])
 			var a := Armies.create(game, c.tag, hex, "Army of perf")
 			Armies.add_units(game, a, 0, luck.randi_range(1, MAX_COMPANIES), game.turn - 1, hex, 0, {})
+			if standing:
+				Armies.set_points(game, a, Allowance.full(game, a))
 			out.append(a)
 	for a: Army in out:
-		march_out(game, a, luck)
+		march_out(game, a, luck, standing)
 	return out
 
 
 ## M7 (m7-build-spec.md 8): one army in two of each country at war marches at the nearest enemy army or hostile garrisoned
 ## fortress within WAR_NEAR hexes (the luck stream picks the half; a march refused is kept as it is). Returns the number ordered.
-static func war_march(game: Game, armies: Array[Army], luck: Rng) -> int:
+static func war_march(game: Game, armies: Array[Army], luck: Rng, standing: bool = false) -> int:
 	var ordered := 0
 	var forts := game.war_cache.fortresses(game)
 	for a: Army in armies:
@@ -192,7 +197,7 @@ static func war_march(game: Game, armies: Array[Army], luck: Rng) -> int:
 		var goal := _nearest_enemy(game, a, forts)
 		if goal == Army.NO_HEX:
 			continue
-		if bool(game.act("march", {"army": a.id, "goal": goal, "tag": a.tag})["ok"]):
+		if _march(game, a, goal, standing):
 			ordered += 1
 	return ordered
 
@@ -221,14 +226,14 @@ static func _nearest_enemy(game: Game, a: Army, forts: PackedInt32Array) -> Vect
 
 
 ## Between seasons: an army that arrived (it holds) is given a new march (the rig, outside the timed phases).
-static func rearm(game: Game, luck: Rng, armies: Array[Army]) -> void:
+static func rearm(game: Game, luck: Rng, armies: Array[Army], standing: bool = false) -> void:
 	for a: Army in armies:
 		if a.order == Army.ORDER_HOLD and Armies.by_id(game, a.id) != null:
-			march_out(game, a, luck)
+			march_out(game, a, luck, standing)
 
 
-## A march (Game.act "march") to a hex of the army's own land near it, kept when its plan walks in 1 to SEASONS_MAX seasons.
-static func march_out(game: Game, a: Army, luck: Rng) -> bool:
+## A march (see _march) to a hex of the army's own land near it, kept when its plan walks in 1 to SEASONS_MAX seasons.
+static func march_out(game: Game, a: Army, luck: Rng, standing: bool = false) -> bool:
 	var country := Countries.by_tag(game, a.tag)
 	var land := Territory.districts(game, country.id) if country != null else PackedInt32Array()
 	if land.is_empty():
@@ -243,8 +248,24 @@ static func march_out(game: Game, a: Army, luck: Rng) -> bool:
 		var walk := Movement.walk_plan(game, a, res["hexes"], game.turn)
 		if int(walk["seasons"]) < 1 or int(walk["seasons"]) > SEASONS_MAX:
 			continue
-		return bool(game.act("march", {"army": a.id, "goal": goal, "tag": a.tag})["ok"])
+		return _march(game, a, goal, standing)
 	return false
+
+
+## The army ordered to `goal`: through Game.act (it walks at once), or with `standing` a march that only stands: the check,
+## the planned route stored through the armies' door, the old halt and wait cleared, nothing walked (a rig, not the rules).
+## False when the check refuses.
+static func _march(game: Game, a: Army, goal: Vector2i, standing: bool) -> bool:
+	var args := {"army": a.id, "goal": goal, "tag": a.tag}
+	if not standing:
+		return bool(game.act("march", args)["ok"])
+	if not bool(game.check("march", args)["ok"]):
+		return false
+	Armies.set_order(game, a, Army.ORDER_MARCH, goal, Movement.plan(game, a, goal)["hexes"])
+	Armies.set_halt(game, a, &"", "")
+	Armies.set_waiting(game, a, &"")
+	game.version += 1
+	return true
 
 
 ## M7 (m7-build-spec.md 8): `count` battles of FIGHT_COMPANIES pikemen companies against FIGHT_COMPANIES, each on a land hex and
