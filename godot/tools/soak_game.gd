@@ -2,6 +2,9 @@
 ## (tests/core/invariants.gd) every season, and returns the record tools/soak.gd tables. The first broken invariant ends the game
 ## with its lines. Tools only. `Judge` is the soak's counting judge (the AiTurn.judge Callable: AiJudge's contract rules without
 ## digests); `SoakLogger` counts the engine's and the scripts' errors (OS.add_logger; tools/probes/probe_logger.gd proves it).
+## Moves in the month (moves-build-spec.md 8.4): the season's watch (Invariants.Moves) looks after every act of the computer
+## (the judge's `after`) and after every phase; every RELOAD_EVERY seasons and at the end the game is saved and loaded (I6). The
+## watch's time is left out of the season's and the AI's.
 @warning_ignore_start("integer_division")
 class_name SoakGame
 extends RefCounted
@@ -16,6 +19,8 @@ const ORDER_ACTIONS: Array[String] = ["march", "halt", "continue_march", "storm"
 const LAND_AT: Array[int] = [20, 40, 80]
 ## The playable countries in id order (spec 4.17, `passive`): the seat is [(seed - 1) mod 10].
 const PASSIVE_SEATS := 10
+## A save and a load of the game every this many seasons (the invariant `saved`).
+const RELOAD_EVERY := 10
 
 
 ## Counts the engine's errors; reset per game.
@@ -35,6 +40,9 @@ class Judge extends RefCounted:
 	var problems := PackedStringArray()
 	var works: Dictionary = {}
 	var orders := 0
+	## Called after each act once it is counted (the season's moves watch), and the time those calls have taken.
+	var after := Callable()
+	var after_usec := 0
 
 	func on_act(tag: StringName, action: String, args: Dictionary, verdict: Dictionary, result: Dictionary) -> void:
 		if not bool(verdict.get("ok", false)):
@@ -47,6 +55,10 @@ class Judge extends RefCounted:
 			works[String(tag)] = int(works.get(String(tag), 0)) + 1
 		if ORDER_ACTIONS.has(action):
 			orders += 1
+		if after.is_valid():
+			var started := Time.get_ticks_usec()
+			after.call()
+			after_usec += Time.get_ticks_usec() - started
 
 	func take_problems() -> PackedStringArray:
 		var out := problems
@@ -54,7 +66,8 @@ class Judge extends RefCounted:
 		return out
 
 
-## Plays one game; {} fields as in tools/soak.gd. `plant` is "" or "money" (tests only: a treasury edited mid-game).
+## Plays one game; {} fields as in tools/soak.gd. `plant` is "" or "money" (tests only: a treasury edited mid-game); the fog and
+## moves plants are the invariants' (Invariants.planted, set by the caller).
 static func play(suite: String, seed_value: int, seasons: int, logger: SoakLogger, plant: String = "") -> Dictionary:
 	var rec := {"suite": suite, "seed": seed_value, "seasons": seasons, "played": 0, "failure": [], "seat": ""}
 	logger.count = 0
@@ -73,14 +86,18 @@ static func play(suite: String, seed_value: int, seasons: int, logger: SoakLogge
 		var before := Invariants.before(g)
 		if plant == "money" and n == maxi(seasons / 2, 1):
 			g.countries[0].treasury += 5  # a treasury edited outside its ledger: the `money` invariant must say so
-		_season(g, acc)
+		var moves := Invariants.Moves.start(g)
+		judge.after = moves.look.bind(g, Invariants.Moves.ACT)
+		_season(g, acc, moves, judge)
+		judge.after = Callable()
 		_tally(g, acc, rec)
 		acc["refused"] = int(acc["refused"]) + hook.refusals()
 		acc["seat_seasons"] = int(acc["seat_seasons"]) + hook.seats()
 		acc["army_seasons"] = int(acc["army_seasons"]) + g.armies.size()
 		rec["played"] = n + 1
 		_remember(g, acc, n + 1)
-		var lines := Invariants.check(g, before, {"contract": judge.take_problems(), "errors": logger.count})
+		var lines := Invariants.check(g, before, {"contract": judge.take_problems(), "errors": logger.count, "moves": moves,
+			"reload": (n + 1) % RELOAD_EVERY == 0 or n + 1 == seasons})
 		if not lines.is_empty():
 			rec["failure"] = Array(lines)
 			if not logger.first.is_empty():
@@ -126,19 +143,27 @@ static func _europe(seed_value: int) -> Game:
 	return Game.new_scenario(map, defs, built["scenario"] as ScenarioDef, seed_value)
 
 
-## Season.run, phase by phase, timed: the AI's phase, the stats phase, the whole.
-static func _season(g: Game, acc: Dictionary) -> void:
+## Season.run, phase by phase, timed: the AI's phase, the stats phase, the whole. The moves watch looks after each phase; its
+## time (and that of its looks after the acts) is not counted.
+static func _season(g: Game, acc: Dictionary, moves: Invariants.Moves, judge: Judge) -> void:
 	var whole := Time.get_ticks_usec()
+	var watched := 0
 	Season.begin(g)
 	for phase: StringName in Season.PHASES:
+		var acts_before := judge.after_usec
 		var t := Time.get_ticks_usec()
 		Season.run_phase(g, phase)
+		var in_acts := judge.after_usec - acts_before
+		var took := Time.get_ticks_usec() - t - in_acts
 		if phase == &"ai_orders":
-			(acc["ai"] as Array[float]).append(float(Time.get_ticks_usec() - t) / 1000.0)
+			(acc["ai"] as Array[float]).append(float(took) / 1000.0)
 		elif phase == &"stats":
-			(acc["stats"] as Array[float]).append(float(Time.get_ticks_usec() - t) / 1000.0)
+			(acc["stats"] as Array[float]).append(float(took) / 1000.0)
+		t = Time.get_ticks_usec()
+		moves.look(g, phase)
+		watched += Time.get_ticks_usec() - t + in_acts
 	Season.finish(g)
-	(acc["season"] as Array[float]).append(float(Time.get_ticks_usec() - whole) / 1000.0)
+	(acc["season"] as Array[float]).append(float(Time.get_ticks_usec() - whole - watched) / 1000.0)
 
 
 ## The season's events: wars declared, peaces (who won) and who was attacked while passive.

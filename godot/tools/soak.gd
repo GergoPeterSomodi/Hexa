@@ -10,6 +10,7 @@
 ##   godot --headless --path godot -s res://tools/soak.gd -- --merge=a.json,b.json    # the ranges over the merged games of one suite
 ##   ... --plant=money    (tests only: a treasury is edited mid-game, the `money` invariant must break it)
 ##   ... --plant=fog      (tests only: an explored hex is cleared mid-game, the `explored` invariant must break it)
+##   ... --plant=moves    (tests only: an army gets its move points back mid-season, `grown` and `spent` must break it)
 extends SceneTree
 
 const SUITES := {
@@ -87,7 +88,7 @@ func _run_suite(suite: String, from: int, to: int, seasons: int, append: bool = 
 	var games: Array = []
 	for s: int in range(from, to + 1):
 		print("soak: %s seed %d, %d seasons" % [suite, s, seasons])
-		Invariants.planted = _plant  # the fog plant is read by the invariants (tests only); cleared after the suite
+		Invariants.planted = _plant  # the fog and moves plants are read by the invariants (tests only); cleared after the suite
 		var rec := SoakGame.play(suite, s, seasons, logger, _plant)
 		rec["replay"] = _replay_line(suite, s, seasons)
 		games.append(rec)

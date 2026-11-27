@@ -3,15 +3,23 @@
 ##   before(game) -> Dictionary                 what the season's checks need from before it (take it before Season.run)
 ##   check(game, before, extra) -> PackedStringArray   one line a broken invariant, "name: what", empty when all hold; `extra` may
 ##                                              carry {"contract": PackedStringArray (the judge's problems), "errors": int (the
-##                                              logger's count)}
+##                                              logger's count), "moves": Moves (the season's watch), "reload": bool (I6 now)}
+##   Moves.start(game), watch.look(game, where)   the watch of a season's moves: a look after every act (where Moves.ACT) and
+##                                              after every phase (where the phase's name); its lines are in `lines`
+## Moves in the month (moves-build-spec.md 8.4): I1 `points` (0 to the full), I2 `spent` (a season's walks cost at most what the
+## army had), I3 `grown` (points grow only in ready_units), I4 `battles` (none open at idle or after an act), I5 `armies` (also
+## after every act), I6 `saved` (save, load: the same digest), I7 `walks` (no walk at once of the player in a season's records),
+## I8 `stood` (a standing march with no points does not move in the movement phase). I2, I3 and I8 need the watch.
 ## The names: turn, money, goods, people, men, districts, armies, battles, garrisons, morale, wars, chronicle, stats, explored,
 ## controlled, contract, errors. `explored` (spec R4, the explored set only grows) and `controlled` (every land hex a country
-## controls is explored by it) are the fog invariants of FG14; `Invariants.planted = "fog"` (tests only) breaks `explored`.
+## controls is explored by it) are the fog invariants of FG14; `Invariants.planted = "fog"` (tests only) breaks `explored`,
+## "moves" gives an army its points back in the middle of a season, which breaks `grown` and `spent`.
 class_name Invariants
 extends RefCounted
 
 const NAMES: Array[String] = ["turn", "money", "goods", "people", "men", "districts", "armies", "battles", "garrisons", "morale",
-	"wars", "chronicle", "stats", "explored", "controlled", "contract", "errors"]
+	"wars", "chronicle", "stats", "explored", "controlled", "contract", "errors", "points", "spent", "grown", "saved", "walks",
+	"stood"]
 ## A war lives at most this many seasons (WarDef.war_timer_seasons, 40): the timer ends it in the war phase.
 const WAR_MAX := 40
 const MORALE_MAX := Unit.MAX_MORALE
@@ -19,6 +27,8 @@ const MORALE_MAX := Unit.MAX_MORALE
 const SLOTS := 256
 ## Tests and tools only: the soak's planted fault (`soak --plant=fog` sets it per game). "fog" clears one explored hex that
 ## the country's sight does not reach, once, in the check of the first season that has one; check() then names it.
+## "moves" (`soak --plant=moves`) is read by Moves.look before the movement phase, once, in the first season with an army to
+## give its points back to.
 static var planted := ""
 
 
@@ -54,6 +64,15 @@ static func check(game: Game, before_state: Dictionary, extra: Dictionary = {}) 
 	_wars(game, out)
 	_chronicle(game, out)
 	_stats(game, out)
+	out.append_array(point_lines(game))
+	_season_walks(game, before_state, out)
+	var moves := extra.get("moves", null) as Moves
+	if moves != null:
+		for line: String in moves.lines:
+			if not out.has(line):
+				out.append(line)
+	if bool(extra.get("reload", false)):
+		out.append_array(reload_lines(game))
 	for line: String in extra.get("contract", PackedStringArray()) as PackedStringArray:
 		out.append("contract: " + line)
 	var errors := int(extra.get("errors", 0))
@@ -65,6 +84,201 @@ static func check(game: Game, before_state: Dictionary, extra: Dictionary = {}) 
 ## The report of a broken game: its lines, one after the other.
 static func report(lines: PackedStringArray) -> String:
 	return "\n".join(lines)
+
+
+# --- the moves of the month (moves-build-spec.md 8.4) -----------------------------------------------------------------------
+
+
+## I1: every army's move points are 0 to its full.
+static func point_lines(game: Game) -> PackedStringArray:
+	var out := PackedStringArray()
+	for line: String in Allowance.check(game):
+		out.append("points: " + line)
+	return out
+
+
+## I4 and I5 as they hold after any act: a battle fought at once leaves none open, and every army stands where it may.
+static func act_lines(game: Game) -> PackedStringArray:
+	var out := PackedStringArray()
+	if not game.battles.is_empty():
+		out.append("battles: %d battle(s) alive after an act" % game.battles.size())
+	_armies(game, out)
+	return out
+
+
+## I6: the game saved and loaded again has the same digest.
+static func reload_lines(game: Game) -> PackedStringArray:
+	var back := Snapshot.restore(Snapshot.of(game), game.map, game.defs)
+	var loaded := back["game"] as Game
+	if loaded == null:
+		return PackedStringArray(["saved: the save of turn %d does not load (%s)" % [game.turn, str(back["problem"])]])
+	if loaded.digest() != game.digest():
+		return PackedStringArray(["saved: the game of turn %d loads with another digest" % game.turn])
+	return PackedStringArray()
+
+
+## I7: the records of a season hold no walk at once of the player's country (its walks are made, and played, at idle). The
+## retreat of its army from a battle a computer opened is a record of the season and is not a walk.
+static func _season_walks(game: Game, before_state: Dictionary, out: PackedStringArray) -> void:
+	if game.player == &"":
+		return
+	for k: int in range(int(before_state["events"]), game.events.size()):
+		var e := game.events[k]
+		if str(e.get("kind", "")) == "unit_moved" and bool(e.get("now", false)) and str(e.get("why", "")) == "march" \
+				and StringName(str(e.get("tag", ""))) == game.player:
+			out.append("walks: a walk at once of the player's army %d is in the season's records" % int(e.get("army", 0)))
+
+
+## The watch of the moves (I1 to I5 and I8), told of every act and every phase: it keeps what each army had at the last look,
+## reads the walks (unit_moved, why march) queued since and prices their steps itself (StepCosts, the points the army had).
+## Look before the game's events are drained or cleared.
+class Moves extends RefCounted:
+	## The `where` of a look after one act (a player's or a computer's); any other `where` is a phase of Season.PHASES.
+	const ACT := &"act"
+
+	var lines := PackedStringArray()
+	var _events := 0
+	## Army id -> its points, and its full points, at the last look.
+	var _points := {}
+	var _full := {}
+	## Army id -> the points it had when first seen this season, and the points its walks have cost since.
+	var _allowance := {}
+	var _spent := {}
+	## Tag -> its explored bits at the last look, for the countries with armies (a fog step is read from them).
+	var _explored := {}
+	## Army id -> hex: the standing marches with no points at the last look.
+	var _standing := {}
+
+
+	static func start(game: Game) -> Moves:
+		var out := Moves.new()
+		out._events = game.events.size()
+		out._take(game)
+		return out
+
+
+	## Reads what happened since the last look; `where` is ACT or the phase just run.
+	func look(game: Game, where: StringName) -> void:
+		_walked(game)
+		if Invariants.planted == "moves" and where == &"ai_orders":
+			_plant(game)
+		if where == &"ready_units":
+			_allowance.clear()  # the new season's points: a new count
+			_spent.clear()
+		else:
+			_grown(game, where)
+		if where == &"movement":
+			_stood(game)
+		for line: String in Invariants.point_lines(game):
+			_add(line)
+		if where == ACT:
+			for line: String in Invariants.act_lines(game):
+				_add(line)
+		_take(game)
+
+
+	func _add(line: String) -> void:
+		if not lines.has(line):
+			lines.append(line)
+
+
+	func _take(game: Game) -> void:
+		_points.clear()
+		_full.clear()
+		_explored.clear()
+		_standing.clear()
+		for a: Army in game.armies:
+			_points[a.id] = a.points
+			_full[a.id] = Allowance.full(game, a)
+			if not _allowance.has(a.id):
+				_allowance[a.id] = a.points
+			if not _explored.has(a.tag):
+				_explored[a.tag] = FogStep.mapped(game, a.tag).duplicate()
+			if a.points == 0 and (a.order == Army.ORDER_MARCH or a.order == Army.ORDER_STORM):
+				_standing[a.id] = a.hex
+
+
+	## I2: the walks queued since the last look, added to what each army has spent this season.
+	func _walked(game: Game) -> void:
+		if game.events.size() < _events:
+			_events = 0
+		for k: int in range(_events, game.events.size()):
+			var e := game.events[k]
+			if str(e.get("kind", "")) != "unit_moved" or str(e.get("why", "")) != "march":
+				continue
+			var id := int(e.get("army", 0))
+			var tag := StringName(str(e.get("tag", "")))
+			var had := int(_points.get(id, 0))
+			var fresh := had > 0 and had == int(_full.get(id, 0))
+			var bits: PackedByteArray = _explored.get(tag, PackedByteArray())
+			_spent[id] = int(_spent.get(id, 0)) + _cost(game, e["path"] as Array, had, fresh, bits)
+			var allowed := int(_allowance.get(id, 0))
+			if int(_spent[id]) > allowed:
+				_add("spent: army %d of %s walked %d move points this season, it had %d" % [id, tag, int(_spent[id]), allowed])
+		_events = game.events.size()
+
+
+	## What a walk along `path` (its start first) costs an army that had `had` points: each step's StepCosts in the season's
+	## rules. The first step of a fresh army that wades, costs more than it had or enters unmapped land takes the points it had
+	## (a fog step: GameDefs.fog_step_cost of them).
+	func _cost(game: Game, path: Array, had: int, fresh: bool, bits: PackedByteArray) -> int:
+		var steps := StepCosts.of(game.map, game.defs)
+		var winter := Movement.winter_now(game)
+		var total := 0
+		for k: int in range(1, path.size()):
+			var from := game.map.index_of(path[k - 1] as Vector2i)
+			var to := game.map.index_of(path[k] as Vector2i)
+			var d := Movement.direction(game.map, from, to)
+			var c: int = steps.cost(from, d, winter) if d >= 0 else StepCosts.BLOCKED
+			if k == 1 and fresh and FogStep.is_fog(bits, to):
+				c = had - FogStep.after(game.defs.fog_step_cost, had)
+			elif k == 1 and fresh and c != StepCosts.BLOCKED and (c == StepCosts.WADE or c > had):
+				c = had
+			total += c
+		return total
+
+
+	## I3: no army has more points than at the last look.
+	func _grown(game: Game, where: StringName) -> void:
+		for a: Army in game.armies:
+			if _points.has(a.id) and a.points > int(_points[a.id]):
+				_add("grown: army %d of %s went from %d to %d move points in %s, not in ready_units" % [a.id, a.tag,
+					int(_points[a.id]), a.points, "an act" if where == ACT else str(where)])
+
+
+	## I8: a standing march that had no points before the movement phase stands where it stood.
+	func _stood(game: Game) -> void:
+		for id: int in _standing:
+			var a := Armies.by_id(game, id)
+			if a != null and a.hex != _standing[id]:
+				_add("stood: army %d of %s, a standing march with no points, moved from %s to %s in the movement phase" % [id,
+					a.tag, str(_standing[id]), str(a.hex)])
+
+
+	## Tests only (`soak --plant=moves`): one army that walked this season and has a march left gets its full points back before
+	## the movement phase, where its next leg takes it past what it had; `grown` names the points and `spent` the walk. Clears
+	## Invariants.planted when it fires; a season with no such army leaves it armed.
+	func _plant(game: Game) -> void:
+		var steps := StepCosts.of(game.map, game.defs)
+		for a: Army in game.armies:
+			var full := Allowance.full(game, a)
+			var spent := int(_spent.get(a.id, 0))
+			if spent <= 0 or a.points >= full or a.mustering(game.turn) \
+					or (a.order != Army.ORDER_MARCH and a.order != Army.ORDER_STORM):
+				continue
+			var leg := MarchLeg.leg(game, steps, a, Movement.winter_now(game), full, false)
+			var path: Array = [a.hex]
+			for i: int in leg.walked:
+				var hex := game.map.hex_of(i)
+				if Battles.at(game, hex) != null or not Armies.at(game, hex).is_empty() \
+						or FairWarning.enemy_on(game, a.tag, hex) != &"":
+					break  # a step the phase may not take
+				path.append(hex)
+			if spent + _cost(game, path, full, true, FogStep.mapped(game, a.tag)) <= int(_allowance.get(a.id, 0)):
+				continue
+			Armies.set_points(game, a, full)
+			Invariants.planted = ""
+			return
 
 
 # --- the censuses ----------------------------------------------------------------------------------------------------------

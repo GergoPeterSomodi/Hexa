@@ -4,6 +4,10 @@
 ## garrison over full, a morale past 1,000, a war past 40 seasons (two live wars of a pair, a war in a truce), a chronicle out of
 ## turn order, a stats row missing, the fog invariants (an explored hex lost; a controlled hex not explored by its controller,
 ## fog spec R4 and section 7), the judge's problem and the logger's error. The soak's counting judge is read too.
+## Moves in the month (moves-build-spec.md 8.4): I1 to I8, each with its planted fault (points over the full, a second walk on
+## points given back, points that grow outside ready_units, a battle open after an act, two countries on a hex after an act, a
+## game that does not load, a player's walk at once in a season's records, a standing march without points that moves), the
+## season of clean marches that breaks none, and the soak's `--plant=moves`.
 extends GutTest
 
 
@@ -51,7 +55,7 @@ func test_a_clean_game_breaks_nothing_and_the_checks_change_nothing() -> void:
 		Season.run(g)
 		var lines := Invariants.check(g, before)
 		assert_eq(lines.size(), 0, "no invariant broken: %s" % str(lines))
-	assert_eq(Invariants.NAMES.size(), 17)
+	assert_eq(Invariants.NAMES.size(), 23)
 
 
 func test_p_turn() -> void:
@@ -217,3 +221,175 @@ func test_the_soaks_judge_counts_a_broken_contract() -> void:
 	judge.on_act(&"MLO", "march", {"tag": &"GEN"}, {"ok": true}, {"ok": true})
 	assert_eq(judge.take_problems().size(), 3, "a refused check acted on, a failed act, another seat's tag")
 	assert_eq(judge.problems.size(), 0, "taken")
+
+
+# --- moves in the month (moves-build-spec.md 8.4): I1 to I8 -------------------------------------------------------------------
+
+
+## The moves duel in peace with a march of Savoy's army that takes more than one season: {g, army, goal}.
+func _marching() -> Dictionary:
+	var g := MovesFixture.duel()
+	g.wars.clear()
+	g.version += 1
+	var a := MovesFixture.named(g, MovesFixture.NAME_HOME)
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if Territory.owner_tag(g, hex) != MovesFixture.SAVOY or ImproveRules.hex_distance(hex, a.hex) < 4:
+			continue
+		var plan := Movement.plan(g, a, hex)
+		if bool(plan.ok) and int(plan.cost) > Allowance.full(g, a) \
+				and bool(g.check("march", _order(a, hex))["ok"]):
+			return {"g": g, "army": a, "goal": hex}
+	return {}
+
+
+func _order(a: Army, goal: Vector2i) -> Dictionary:
+	return {"army": a.id, "goal": goal, "tag": a.tag}
+
+
+## A season phase by phase with the watch's look after each.
+func _watched_season(g: Game, watch: Invariants.Moves) -> void:
+	Season.begin(g)
+	for phase: StringName in Season.PHASES:
+		Season.run_phase(g, phase)
+		watch.look(g, phase)
+	Season.finish(g)
+
+
+func test_clean_marches_over_two_seasons_break_no_move_invariant() -> void:
+	var scene := _marching()
+	assert_false(scene.is_empty(), "a long march was found")
+	var g: Game = scene["g"]
+	var a: Army = scene["army"]
+	for season: int in 2:
+		g.events.clear()
+		var watch := Invariants.Moves.start(g)
+		var from := a.hex
+		if season == 0:
+			assert_true(bool(g.act("march", _order(a, scene["goal"]))["ok"]))
+			watch.look(g, Invariants.Moves.ACT)
+			assert_ne(a.hex, from, "it walked at once")
+		var before := Invariants.before(g)  # after the order: the player's walk is no record of the season
+		_watched_season(g, watch)
+		assert_eq(watch.lines, PackedStringArray(), "season %d" % season)
+		var lines := Invariants.check(g, before, {"moves": watch, "reload": true})
+		for name: String in ["points", "spent", "grown", "saved", "walks", "stood", "battles", "armies"]:
+			assert_false(_has(lines, name), "season %d, %s: %s" % [season, name, str(lines)])
+
+
+func test_p_points_over_the_full() -> void:
+	assert_true(_breaks("points", func(g: Game, _b: Dictionary) -> void:
+		var a := WarFixture.army_at(g, AiFixture.MILAN, _milan_hex(g), 1)
+		a.points = Allowance.full(g, a) + 1))
+	var g := MovesFixture.duel()
+	var watch := Invariants.Moves.start(g)
+	MovesFixture.named(g, MovesFixture.NAME_HOME).points = -1
+	watch.look(g, Invariants.Moves.ACT)
+	assert_true(_has(watch.lines, "points"), str(watch.lines))
+
+
+func test_p_spent_a_second_walk_on_points_given_back() -> void:
+	var scene := _marching()
+	var g: Game = scene["g"]
+	var a: Army = scene["army"]
+	var watch := Invariants.Moves.start(g)
+	g.act("march", _order(a, scene["goal"]))
+	watch.look(g, Invariants.Moves.ACT)
+	assert_false(_has(watch.lines, "spent"), "one walk spends what it had at most: %s" % str(watch.lines))
+	var halfway := a.hex
+	a.points = Allowance.full(g, a)  # the fault: the points back in the middle of the season
+	g.act("halt", {"army": a.id, "tag": a.tag})
+	assert_true(bool(g.act("continue_march", {"army": a.id, "tag": a.tag})["ok"]))
+	assert_ne(a.hex, halfway, "it walked again")
+	watch.look(g, Invariants.Moves.ACT)
+	assert_true(_has(watch.lines, "spent"), str(watch.lines))
+
+
+func test_p_grown_points_outside_ready_units() -> void:
+	var g := MovesFixture.duel()
+	var a := MovesFixture.named(g, MovesFixture.NAME_HOME)
+	for where: StringName in [Invariants.Moves.ACT, &"movement", &"supply", &"ready_units"]:
+		ArmyFixture.spent(g, a, 1)
+		var watch := Invariants.Moves.start(g)
+		Armies.set_points(g, a, Allowance.full(g, a))
+		watch.look(g, where)
+		assert_eq(_has(watch.lines, "grown"), where != &"ready_units", "%s: %s" % [where, str(watch.lines)])
+
+
+func test_p_a_battle_open_after_an_act() -> void:
+	var g := MovesFixture.duel()
+	var watch := Invariants.Moves.start(g)
+	g.battles.append(Battle.new())
+	watch.look(g, &"movement")
+	assert_false(_has(watch.lines, "battles"), "the movement phase may leave one for the battles phase")
+	watch.look(g, Invariants.Moves.ACT)
+	assert_true(_has(watch.lines, "battles"), str(watch.lines))
+
+
+func test_p_two_countries_on_a_hex_after_an_act() -> void:
+	var g := MovesFixture.duel()
+	var watch := Invariants.Moves.start(g)
+	watch.look(g, Invariants.Moves.ACT)
+	assert_false(_has(watch.lines, "armies"), str(watch.lines))
+	Armies.set_hex(g, MovesFixture.named(g, MovesFixture.NAME_NEAR), MovesFixture.named(g, MovesFixture.NAME_HOME).hex,
+		Army.NO_HEX)
+	watch.look(g, Invariants.Moves.ACT)
+	assert_true(_has(watch.lines, "armies"), str(watch.lines))
+
+
+func test_p_saved_a_game_that_does_not_load() -> void:
+	var g := AiFixture.watch()
+	var before := Invariants.before(g)
+	Season.run(g)
+	assert_eq(Invariants.reload_lines(g), PackedStringArray(), "the season's game loads with its digest")
+	g.battle_names["nowhere"] = Battles.NAME_COUNT_MAX + 1
+	assert_false(_has(Invariants.check(g, before), "saved"), "only a reload reads it")
+	var lines := Invariants.check(g, before, {"reload": true})
+	assert_true(_has(lines, "saved"), str(lines))
+
+
+func test_p_walks_a_players_walk_at_once_in_the_seasons_records() -> void:
+	var g := MovesFixture.duel()
+	g.events.clear()
+	var before := Invariants.before(g)
+	Season.run(g)
+	g.events.clear()
+	var walk := {"kind": "unit_moved", "tag": MovesFixture.SAVOY, "army": 1, "why": "march", "now": true}
+	var foreign := walk.duplicate()
+	foreign["tag"] = MovesFixture.MILAN
+	var retreat := walk.duplicate()
+	retreat["why"] = &"retreat"
+	var later := walk.duplicate()
+	later["now"] = false
+	g.events.append_array([foreign, retreat, later])
+	assert_false(_has(Invariants.check(g, before), "walks"), "a computer's walk, a retreat and a phase walk are records")
+	g.events.append(walk)
+	assert_true(_has(Invariants.check(g, before), "walks"))
+
+
+func test_p_stood_a_standing_march_without_points_that_moves() -> void:
+	var scene := _marching()
+	var g: Game = scene["g"]
+	var a: Army = scene["army"]
+	assert_true(MovesFixture.standing(g, a, scene["goal"]))
+	ArmyFixture.spent(g, a, 0)
+	var watch := Invariants.Moves.start(g)
+	watch.look(g, &"ai_orders")
+	MovementPhase.season(g)
+	watch.look(g, &"movement")
+	assert_false(_has(watch.lines, "stood"), "the phase leaves it: %s" % str(watch.lines))
+	Armies.set_hex(g, a, g.map.hex_of(a.route[0]), a.hex)  # the fault: a phase that walks it
+	watch.look(g, &"movement")
+	assert_true(_has(watch.lines, "stood"), str(watch.lines))
+
+
+func test_the_soaks_moves_plant_is_caught_by_grown_and_spent() -> void:
+	var clean := SoakGame.play("ai", 1, 6, SoakGame.SoakLogger.new())
+	assert_eq(clean["failure"], [], "the same game without the plant breaks nothing")
+	Invariants.planted = "moves"
+	var rec := SoakGame.play("ai", 1, 6, SoakGame.SoakLogger.new(), "moves")
+	assert_eq(Invariants.planted, "", "the plant found its army and cleared itself")
+	Invariants.planted = ""
+	var lines := PackedStringArray(rec["failure"])
+	assert_true(_has(lines, "grown"), str(lines))
+	assert_true(_has(lines, "spent"), str(lines))

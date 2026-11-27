@@ -5,6 +5,11 @@
 ## garrisons of undiscovered fortresses lowered by 200; the owners of the two undiscovered Venetian hexes nearest Milan's army
 ## (now Genoa's); one more undiscovered Venetian hex made a fortress with a garrison; Venice's stores; the world's luck. It does
 ## not change a discovered garrison, a discovered hex or Venice's treasury: Milan may read those (R19, R33, R34).
+## Moves in the month (moves-build-spec.md 8.2, MV13): the AI's marches walk at once and reveal land during the turn, so every
+## fact the copy changes, the hexes of Venice's moved armies before and after included, lies outside every hex Milan's armies can
+## walk to or see this season (`_reach`): Milan's own walks reveal nothing that differs. A further case hides a Venetian army
+## where Milan's walks can find it: the acts up to the first walk that reveals it are the same on both copies, and the acts after
+## it may differ. P: a step reading a hidden army's hex before that walk gives other acts.
 ## Then each gated read on its own is compared on the two copies, and a planted leak per gated read (the system call a cheat
 ## would make in its place) is shown to differ, so the comparison can fail. P: a test-only step reading the real garrison, the
 ## real owner or the real land of an undiscovered hex gives other acts.
@@ -13,19 +18,31 @@ extends GutTest
 const M := AiFixture.MILAN
 const V := AiFixture.VENICE
 const G := AiFixture.GENOA
-const REACH := 9
+## The radius round Milan's first army the planted reads of owners and land look in (past every changed hex).
+const REACH := 20
+## The hexes beyond a walk's last step and the walking army's sight that a turn may still touch (a battle's retreat).
+const MARGIN := 2
+## The reveal case: the starts of one more Milanese army it walks from, the places a start hides an army on, and the reveals
+## with acts before them it must find.
+const STARTS := 4
+const HIDING_PLACES := 4
+const LATE_REVEALS := 4
 
 
-## Milan (turn 7: Autumn 1481) at war with Venice on the thin duel; Venice's armies on hexes Milan does not discover, and its
-## neighbours' (4 companies each, seen).
-func _scene() -> Game:
+## Milan (turn 7: Autumn 1481) at war with Venice on the thin duel; Venice's armies on hexes Milan does not discover and cannot
+## walk to or see this season, and its neighbours' (4 companies each, seen). With `extra` (a hex index) one more Milanese army
+## of 4 companies starts there.
+func _scene(extra: int = -1) -> Game:
 	var g := FogFixture.duel_thin()
 	g.turn = 7
 	WarFixture.at_war(g, M, V)
 	var own := AiKnow.land_of(g, M)
 	for k: int in 2:
 		WarFixture.army_at(g, M, g.map.hex_of(own[k * 3]), 4)
-	for i: int in _unseen_land(g, V).slice(0, 3):
+	if extra >= 0:
+		WarFixture.army_at(g, M, g.map.hex_of(extra), 4)
+	Sight.refresh(g)
+	for i: int in _far_land(g, _reach(g)).slice(0, 3):
 		WarFixture.army_at(g, V, g.map.hex_of(i), 3)
 	WarFixture.army_at(g, V, g.map.hex_of(own[own.size() - 1]), 3)
 	Sight.refresh(g)
@@ -38,6 +55,52 @@ func _unseen_land(g: Game, tag: StringName) -> Array[int]:
 	var out: Array[int] = []
 	for i: int in AiKnow.land_of(g, tag):
 		if g.map.is_land(g.map.hex_of(i)) and not Knowledge.discovered(g, M, g.map.hex_of(i)):
+			out.append(i)
+	return out
+
+
+## Every hex index Milan's armies can walk to or see this season: from each army the land steps its points pay (its first step
+## whatever it costs), its sight and MARGIN hexes round each of those; and the hexes Milan sees now.
+func _reach(g: Game) -> Dictionary:
+	var out := {}
+	var steps := StepCosts.of(g.map, g.defs)
+	var winter := Movement.winter_now(g)
+	for army: Army in AiKnow.own_armies(g, M):
+		var from := g.map.index_of(army.hex)
+		var spent := {from: 0}
+		var queue: Array[int] = [from]
+		while not queue.is_empty():
+			var cur: int = queue.pop_front()
+			for d: int in 6:
+				var n := StepCosts.neighbour_index(g.map.cols, g.map.rows, cur, d)
+				if n < 0 or g.map.land[n] != 1:
+					continue
+				var c := steps.cost(cur, d, winter)
+				if c == StepCosts.BLOCKED or c == StepCosts.CLOSED:
+					continue
+				var total: int = int(spent[cur]) + c
+				if cur == from and (c == StepCosts.WADE or c > army.points):
+					total = army.points
+				elif c == StepCosts.WADE or total > army.points:
+					continue
+				if not spent.has(n) or total < int(spent[n]):
+					spent[n] = total
+					queue.append(n)
+		var radius := MarchLeg.army_sight(g, army) + MARGIN
+		for i: int in spent:
+			for j: int in SightCache.disc(g.map, i, radius):
+				out[j] = true
+	for i: int in g.map.hex_count():
+		if Sight.sees(g, M, g.map.hex_of(i)):
+			out[i] = true
+	return out
+
+
+## Venice's undiscovered land outside `reach`, ascending.
+func _far_land(g: Game, reach: Dictionary) -> Array[int]:
+	var out: Array[int] = []
+	for i: int in _unseen_land(g, V):
+		if not reach.has(i):
 			out.append(i)
 	return out
 
@@ -74,7 +137,8 @@ func _nearest(g: Game, from: Vector2i, indices: Array[int], n: int) -> Array[int
 ## The facts Milan may not know, changed on copy B. Returns what was changed, for the sensitivity checks.
 func _perturb(g: Game) -> Dictionary:
 	var changed := {"armies": 0, "garrisons": 0, "owners": 0, "fortresses": 0, "stores": 0}
-	var unseen := _unseen_land(g, V)
+	var reach := _reach(g)
+	var unseen := _far_land(g, reach)
 	var flips := _nearest(g, _first_army(g).hex, unseen, 2)
 	var genoa := Countries.by_tag(g, G).id
 	for i: int in flips:
@@ -96,7 +160,7 @@ func _perturb(g: Game) -> Dictionary:
 			spare.append(i)
 	var k := 0
 	for army: Army in AiKnow.own_armies(g, V):
-		if Sight.sees(g, M, army.hex) or spare.is_empty():
+		if reach.has(g.map.index_of(army.hex)) or spare.is_empty():
 			continue
 		var to := g.map.hex_of(spare[spare.size() - 1 - (k % spare.size())])
 		k += 1
@@ -107,7 +171,7 @@ func _perturb(g: Game) -> Dictionary:
 		changed["armies"] = int(changed["armies"]) + 1
 	for i: int in g.map.hex_count():
 		var hex := g.map.hex_of(i)
-		if Occupation.fortress_level(g, hex) > 0 and not Knowledge.discovered(g, M, hex):
+		if Occupation.fortress_level(g, hex) > 0 and not Knowledge.discovered(g, M, hex) and not reach.has(i):
 			g.state.garrison[i] = maxi(0, int(g.state.garrison[i]) - 200)
 			changed["garrisons"] = int(changed["garrisons"]) + 1
 	for good: int in g.defs.goods.size():
@@ -139,6 +203,23 @@ func test_the_scene_has_what_the_spec_asks_for() -> void:
 	assert_gte(int(changed["garrisons"]), 1, "undiscovered fortresses lowered")
 	assert_gte(int(changed["owners"]), 1, "undiscovered owners changed")
 	assert_gte(int(changed["armies"]), 1, "unseen Venetian armies moved")
+	var reach := _reach(g)
+	var moved := 0
+	for army: Army in AiKnow.own_armies(g, V):
+		var other := Armies.by_id(b, army.id)
+		if other.hex == army.hex:
+			continue
+		moved += 1
+		assert_false(reach.has(g.map.index_of(army.hex)), "army %d stood out of reach" % army.id)
+		assert_false(reach.has(g.map.index_of(other.hex)), "army %d moved to a hex out of reach" % army.id)
+	assert_gte(moved, 1, "armies stand elsewhere on the copy")
+	for i: int in g.map.hex_count():
+		if g.state.owner[i] != b.state.owner[i] or g.state.garrison[i] != b.state.garrison[i]:
+			assert_false(reach.has(i), "the land changed at %s is out of reach" % g.map.hex_of(i))
+	g.events.clear()
+	_turn(g)
+	var walks := g.events.filter(func(e: Dictionary) -> bool: return e["kind"] == "unit_moved" and e["tag"] == M)
+	assert_gt(walks.size(), 0, "Milan's armies walk during the turn")
 
 
 func test_the_same_turn_when_what_it_may_not_know_changes() -> void:
@@ -165,6 +246,155 @@ func test_the_same_turn_over_the_other_seasons() -> void:
 		var tb := _turn(b)
 		assert_eq(tb["acts"], ta["acts"], "turn %d" % turn)
 		assert_eq(tb["luck"], ta["luck"], "turn %d luck" % turn)
+
+
+# ----- a walk that reveals an army (moves-build-spec.md 8.2) ------------------------------------------------------------------
+
+
+## Milan's turn with, after each act, the enemy armies it sees: {acts, seen, trace, luck}.
+func _watched_turn(g: Game) -> Dictionary:
+	var hook := AiFixture.solo(g, M)
+	var acts := PackedStringArray()
+	var seen := PackedStringArray()
+	hook.judge = func(_t: StringName, action: String, args: Dictionary, _verdict: Dictionary, _result: Dictionary) -> void:
+		acts.append("%s %s" % [action, str(args)])
+		var rows := PackedStringArray()
+		for row: Dictionary in AiKnow.seen_enemies(g, M):
+			rows.append("%d@%s %d" % [row["army"], row["hex"], row["men"]])
+		seen.append(";".join(rows))
+	hook.begin(g)
+	while not hook.step(g):
+		pass
+	return {"acts": acts, "seen": seen, "trace": hook.trace_of(M), "luck": g.luck.ai.get_state()}
+
+
+## The first act after which the two turns see other enemy armies; -1 when they never do.
+func _first_reveal(a: Dictionary, b: Dictionary) -> int:
+	var sa := a["seen"] as PackedStringArray
+	var sb := b["seen"] as PackedStringArray
+	for i: int in mini(sa.size(), sb.size()):
+		if sa[i] != sb[i]:
+			return i
+	return -1
+
+
+## True when both turns did the same acts up to and with act `k`.
+func _same_up_to(a: PackedStringArray, b: PackedStringArray, k: int) -> bool:
+	return a.size() > k and b.size() > k and a.slice(0, k + 1) == b.slice(0, k + 1)
+
+
+## The scene (with Milan's extra army on `from`) and one more Venetian army on hex index `at`.
+func _with_army(from: int, at: int) -> Game:
+	var g := _scene(from)
+	WarFixture.army_at(g, V, g.map.hex_of(at), 3)
+	Sight.refresh(g)
+	g.version += 1
+	return g
+
+
+## The places an army can hide on that the walks of the turn find: the land hexes with no army, out of sight at the start, that
+## Milan sees after an act of its turn on this scene; ascending.
+func _found_by_walking(g: Game) -> Array[int]:
+	var hidden: Array[int] = []
+	for i: int in g.map.hex_count():
+		var hex := g.map.hex_of(i)
+		if g.map.land[i] == 1 and not Sight.sees(g, M, hex) and Armies.at(g, hex).is_empty():
+			hidden.append(i)
+	var out: Array[int] = []
+	var hook := AiFixture.solo(g, M)
+	hook.judge = func(_t: StringName, _action: String, _args: Dictionary, _verdict: Dictionary, _result: Dictionary) -> void:
+		for i: int in hidden:
+			if not out.has(i) and Sight.sees(g, M, g.map.hex_of(i)):
+				out.append(i)
+	hook.begin(g)
+	while not hook.step(g):
+		pass
+	out.sort()
+	return out
+
+
+## The first STARTS hexes (index order) from which one more Milanese army finds hidden places by walking: [{from, places}].
+func _walking_starts() -> Array[Dictionary]:
+	var base := _scene()
+	var out: Array[Dictionary] = []
+	for i: int in base.map.hex_count():
+		var hex := base.map.hex_of(i)
+		if base.map.land[i] != 1 or Sight.sees(base, M, hex) or not Armies.at(base, hex).is_empty() 				or not Movement.open_to(base, M, hex):
+			continue
+		var places := _found_by_walking(_scene(i))
+		if not places.is_empty():
+			out.append({"from": i, "places": places})
+		if out.size() == STARTS:
+			break
+	return out
+
+
+## A land hex (any country's) far from every walk of Milan, with no army, for the same army on the other copy: the last one.
+func _far_place(g: Game) -> int:
+	var reach := _reach(g)
+	for i: int in range(g.map.hex_count() - 1, -1, -1):
+		if g.map.land[i] == 1 and not reach.has(i) and Armies.at(g, g.map.hex_of(i)).is_empty():
+			return i
+	return -1
+
+
+func test_the_acts_up_to_the_first_revealing_walk_are_the_same() -> void:
+	var starts := _walking_starts()
+	assert_eq(starts.size(), STARTS, "walks that find hidden places")
+	var reveals := 0
+	var late := 0
+	var by_walk := 0
+	for start: Dictionary in starts:
+		var from: int = start["from"]
+		var far := _far_place(_scene(from))
+		assert_ne(far, -1)
+		var other := _watched_turn(_with_army(from, far))
+		for place: int in (start["places"] as Array[int]).slice(0, HIDING_PLACES):
+			var g := _with_army(from, place)
+			var hex := g.map.hex_of(place)
+			assert_false(Sight.sees(g, M, hex), "the army at %s starts out of sight" % hex)
+			var turn := _watched_turn(g)
+			var k := _first_reveal(turn, other)
+			if k < 0:
+				assert_eq(turn["acts"], other["acts"], "an army at %s never seen: the same turn" % hex)
+				assert_eq(turn["luck"], other["luck"], "an army at %s never seen: the same luck" % hex)
+				continue
+			reveals += 1
+			var act: String = (turn["acts"] as PackedStringArray)[k]
+			by_walk += 1 if (act.begins_with("march ") or act.begins_with("continue_march ") or act.begins_with("storm ")) else 0
+			late += 1 if k >= 1 else 0
+			assert_true(_same_up_to(turn["acts"], other["acts"], k), "an army at %s, revealed by act %d: %s against %s" % [hex, k,
+				str((turn["acts"] as PackedStringArray).slice(0, k + 1)), str((other["acts"] as PackedStringArray).slice(0, k + 1))])
+	gut.p("reveals %d (%d by a walk, %d after the first act)" % [reveals, by_walk, late])
+	assert_eq(by_walk, reveals, "every reveal is a walk's")
+	assert_gte(late, LATE_REVEALS, "and acts come before it")
+
+
+## A test-only step before the turn: the Venetian armies on the hexes Milan's walks may reach, read honestly (those it sees) or
+## from the real armies.
+func _look_round(g: Game, reach: Dictionary, leak: bool) -> String:
+	var found := PackedStringArray()
+	if leak:
+		for army: Army in Armies.of_country(g, V):
+			if reach.has(g.map.index_of(army.hex)):
+				found.append(str(army.hex))
+	else:
+		for row: Dictionary in AiKnow.seen_enemies(g, M):
+			if row["tag"] == V and reach.has(g.map.index_of(row["hex"] as Vector2i)):
+				found.append(str(row["hex"]))
+	return "look %s" % ", ".join(found)
+
+
+func test_p_a_step_reading_a_hidden_armys_hex_before_the_walk_gives_other_acts() -> void:
+	var start := _walking_starts()[0]
+	var from: int = start["from"]
+	var reach := _reach(_scene(from))
+	var a := _with_army(from, (start["places"] as Array[int])[0])
+	var b := _with_army(from, _far_place(_scene(from)))
+	for leak: bool in [false, true]:
+		var acts_a := PackedStringArray([_look_round(a, reach, leak)])
+		var acts_b := PackedStringArray([_look_round(b, reach, leak)])
+		assert_eq(_same_up_to(acts_a, acts_b, 0), not leak, "leak %s: %s against %s" % [leak, acts_a, acts_b])
 
 
 # ----- each gated read of the door, on the two copies -------------------------------------------------------------------------
@@ -220,7 +450,7 @@ func test_p_each_planted_leak_differs_on_the_two_copies() -> void:
 	var b := _scene()
 	_perturb(b)
 	var fort := _unseen_fortress(a)
-	var flip := _nearest(a, _first_army(a).hex, _unseen_land(a, V), 1)[0]
+	var flip := _nearest(a, _first_army(a).hex, _far_land(a, _reach(a)), 1)[0]
 	var leaks: Dictionary = {
 		"the real garrison of an undiscovered fortress": func(g: Game) -> Variant: return Occupation.garrison_of(g, g.map.hex_of(fort)),
 		"the real owner of an undiscovered hex": func(g: Game) -> Variant: return Territory.owner_tag(g, g.map.hex_of(flip)),

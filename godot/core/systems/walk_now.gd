@@ -51,7 +51,7 @@ static func walk(game: Game, army: Army) -> Dictionary:
 	while k < w.walked.size():
 		MarchLeg.step(game, w, k, occ)
 		k += 1
-	MarchLeg.room(game, [w], {army.id: w})
+	MarchLeg.room_one(game, w)
 	MarchLeg.apply(game, [w], {})
 	var battle := Battles.of_army(game, army.id) if w.engaged else null
 	if battle != null:

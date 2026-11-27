@@ -207,6 +207,14 @@ rule holds for the player's armies and the computer's alike.
 - **R23** Room: the goal's check (`Military.can_stand` with `_adding`) at order time, as today. The at-once walk runs the
   same room cut as the phase with its one walk, so a leg that would end on a hex already full of the walker's companies ends
   on the last hex with room. The phase's step-back rule stays. P: nine companies of one country on a hex after a walk.
+  - **R23a Room when the phase opens battles (added for issue #466).** The room cut sends a walk back along its own path, so
+    in the movement phase a hex keeps a place for every army of a country that started on it and walked off. An army stepping
+    into a battle there counts those companies and is refused when they fill the limit ("no room: N of L companies of yours
+    stand there or may come back"). A battle opening there first sends back the walks its holder has no room for. A walk sent
+    back never stops on a hex where a battle is fought. An army sent back to its start, where its country is now attacked,
+    takes its place in that battle among the defenders. After the phase every country's companies fit every hex, every army of
+    a battle stands on its hex, and every army of a side on a battle hex is in the battle. P: a ninth company on a battle hex;
+    an army of a side on a battle hex that is not in the battle.
 - **R24** A step onto a hex where an army of another country at peace stands (or a test-hostile pair) is not taken: the walk
   stops before it, halt `blocked`. The words name the country only when the walker's country sees the hex ("an army of the
   Duchy of Milan is at Novara (8, 9)"; else "another country's army stands at Novara (8, 9)", the words of
@@ -742,6 +750,9 @@ with Savoy thin at radius 2 (`FogFixture.thin`). `ArmyFixture.spent(g, army, poi
 **Unchanged, must stay green:** `test_season.gd` (PHASES pinned), `test_replay.gd`, `test_war_property.gd`, `test_ai_turn.gd`,
 `test_ai_determinism.gd`, `test_combat_*` and the bands test (the fight does not change), `test_sight.gd`, `test_knowledge.gd`,
 the tile window's tests other than `test_army_tab.gd`.
+
+Correction (MV20): fair warning (R73) does change `test_war_property.gd`'s setup: a season passes between its declaration and
+its staged siege march, so its 40 seasons start at turn 2. Its assertions are unchanged.
 
 ### 8.3 Pictures
 

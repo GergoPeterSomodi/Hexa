@@ -90,6 +90,13 @@ static func can_stand(game: Game, tag: StringName, hex: Vector2i, adding: int,
 	for a: Army in Armies.at(game, hex):
 		if a.tag != tag and not Wars.at_war(game, tag, a.tag):
 			return "another country's army stands at %s" % hex_text(game, hex)
+	return room_text(game, tag, hex, adding, leaving)
+
+
+## "" when `adding` more companies of `tag` fit on `hex` by the stack limit alone (leaving as in can_stand), else its words. The
+## country's own companies only: the fog-safe verdict reads this on a hex the country does not see (FogVerdict.stand, R57).
+static func room_text(game: Game, tag: StringName, hex: Vector2i, adding: int,
+		leaving: PackedInt32Array = PackedInt32Array()) -> String:
 	var present := Armies.units_at(game, tag, hex, leaving)
 	var limit := stack_limit(game, tag)
 	if present + adding > limit:

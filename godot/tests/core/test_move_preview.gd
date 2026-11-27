@@ -219,8 +219,9 @@ func _text_holds(value: Variant, needle: String) -> bool:
 	return false
 
 
-## M7 (4.15) fog: a refusal that names an unseen goal says the generic no-way words and names no enemy. The same words for an
-## unseen empty sea goal; a seen refusal keeps its exact reason.
+## M7 (4.15) fog: an order to an unseen goal names nothing. A shaken army's march onto an unseen hex where an enemy army stands
+## is answered as onto the same hex empty (R57, issue #468: the hidden army is not read, so it is not "too shaken to attack"); an
+## unseen sea goal's refusal is the generic no-way words. A seen refusal keeps its exact reason.
 func test_planted_refusal_on_an_unseen_goal_names_nothing() -> void:
 	var enemy := WarFixture.neighbour_of(_g, ArmyFixture.TAG)
 	WarFixture.at_war(_g, enemy, ArmyFixture.TAG)
@@ -234,10 +235,11 @@ func test_planted_refusal_on_an_unseen_goal_names_nothing() -> void:
 	var a := ArmyFixture.army(_g, ArmyFixture.TAG, _gen_hex(), 0, 2)
 	for u: Unit in a.units:
 		Armies.set_morale(_g, a, u.id, 300)
+	var empty_hex := str(MovePreview.to(_g, ArmyFixture.TAG, a.id, hex))
 	ArmyFixture.army(_g, enemy, hex, 0, 3)
+	_g.version += 1
 	var v := MovePreview.to(_g, ArmyFixture.TAG, a.id, hex)
-	assert_eq(v.kind, &"refusal")
-	assert_eq(str(v.verdict.reason), "no way there by land", "P: an unseen goal's refusal names nothing")
+	assert_eq(str(v), empty_hex, "P: the preview is the same as onto the empty hex")
 	assert_false(_text_holds(v, String(enemy)), "P: no enemy tag in the card")
 	assert_false(_text_holds(v, "shaken"), "P: the enemy's presence is not named")
 	var sea := ArmyFixture.NO_HEX
@@ -248,7 +250,8 @@ func test_planted_refusal_on_an_unseen_goal_names_nothing() -> void:
 			break
 	assert_ne(sea, ArmyFixture.NO_HEX, "an unseen sea hex exists")
 	var empty := MovePreview.to(_g, ArmyFixture.TAG, a.id, sea)
-	assert_eq(str(empty.verdict.reason), str(v.verdict.reason), "P: the same words as an empty unseen hex")
+	assert_eq(empty.kind, &"refusal")
+	assert_eq(str(empty.verdict.reason), "no way there by land", "P: an unseen sea goal's refusal names nothing")
 
 
 func test_a_seen_refusal_keeps_its_reason() -> void:

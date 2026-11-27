@@ -21,6 +21,8 @@ const FOG_NO_WAY_TEXT := "no way there by land"
 ## and `warned` with fair warning (R73: the leg ends before land the viewer knows is closed this season, and the leg names its
 ## country in `border`); `sighted` never comes from a preview (an army the viewer sees now cannot be newly sighted). `blocked`
 ## and `no_way` are the engine's other ends: an army of another country the viewer sees in the way, and a route with no way on.
+## `room` is the walk's room cut (R23: the leg ends on the last hex with room for the army), and the halt words of a contact the
+## walk is refused (Movement.WHY_SHAKEN, WHY_ENEMY, WHY_BATTLE with the leg's `text`, R28) on an enemy army the viewer sees.
 const WHY_ARRIVES := &"arrives"
 const WHY_POINTS := &"points"
 const WHY_WINTER := &"winter"
@@ -34,6 +36,7 @@ const WHY_NO_WAY := &"no_way"
 const WHY_FOG := FogStep.WHY
 const WHY_SIGHTED := Movement.WHY_SIGHTED
 const WHY_WARNED := FairWarning.WHY
+const WHY_ROOM := WalkNow.ROOM
 const BORDER_TEXT := "Stops at the border of %s: you declared war this season."
 const RISK_BATTLE := &"battle"
 const RISK_ENEMY_LAND := &"enemy_land"
@@ -494,7 +497,7 @@ static func _leg(game: Game, tag: StringName, a: Army, goal: Vector2i, route: Pa
 	var walk := _walk(game, tag, a, goal, route, before, winter, steps)
 	var hexes: Array[Vector2i] = walk.hexes
 	var why: StringName = WHY_POINTS
-	var met := _met(game, tag, hexes)
+	var met := _met(game, tag, a, hexes)
 	var bar := FairWarning.first_barred(game, tag, hexes)
 	if bar >= 0 and (int(met.cut) < 0 or bar <= int(met.at)):
 		why = WHY_WARNED
@@ -503,6 +506,8 @@ static func _leg(game: Game, tag: StringName, a: Army, goal: Vector2i, route: Pa
 	elif int(met.cut) >= 0:
 		hexes = _head(hexes, int(met.cut))
 		why = StringName(met.kind)
+		if met.has("text"):
+			out["text"] = met.text
 	elif bool(walk.zoc):
 		why = WHY_ZOC
 	elif StringName(walk.status) == Movement.WHY_WINTER:
@@ -513,12 +518,21 @@ static func _leg(game: Game, tag: StringName, a: Army, goal: Vector2i, route: Pa
 		why = WHY_BATTLE if (war_kind == OddsView.KIND_ATTACK or war_kind == OddsView.KIND_STORM) else WHY_ARRIVES
 	elif StringName(walk.status) == FogStep.WHY:
 		why = WHY_FOG
+	# R23: the walk's room cut (MarchLeg.room_kept, the country's own companies only); none after a battle opened.
+	if why != WHY_BATTLE or out.has("text"):
+		var keep := MarchLeg.room_kept(game, a, _indices_of(game, hexes))
+		if keep < hexes.size():
+			hexes = _head(hexes, keep)
+			why = WHY_ROOM
+			out.erase("text")
+			out.erase("border")
+	var fought := why == WHY_ZOC or (why == WHY_BATTLE and not out.has("text"))
 	var cost := _spent(game, steps, a.hex, hexes, winter, before, FogStep.mapped(game, a.tag))
 	out["hexes"] = hexes
 	out["cost"] = cost
 	out["end"] = hexes.back() if not hexes.is_empty() else a.hex
 	# R25 and D11: a zone of control and a battle end the army's season.
-	out["points_after"] = 0 if (why == WHY_ZOC or why == WHY_BATTLE) else before - cost
+	out["points_after"] = 0 if fought else before - cost
 	out["why"] = why
 	return out
 
@@ -620,19 +634,31 @@ static func _sees_zoc(game: Game, tag: StringName, hex: Vector2i) -> bool:
 	return false
 
 
-## The first army of another country on the leg that the viewer sees: {cut (hexes kept; -1 none), at (its place on the leg),
-## kind (battle: the walk ends on its hex; blocked: before it), hex, tag}.
-static func _met(game: Game, tag: StringName, hexes: Array[Vector2i]) -> Dictionary:
+## The first army of another country on the leg that the viewer sees, met as the walk meets it: {cut (hexes kept; -1 none), at
+## (its place on the leg), kind, hex, and text for a refused contact}. An army at war is a contact (FogVerdict.contact, the walk's
+## engage rule): battle when it opens (the walk ends on its hex), else the walk's halt word before it with the check's words;
+## any other country's army: blocked, before it.
+static func _met(game: Game, tag: StringName, a: Army, hexes: Array[Vector2i]) -> Dictionary:
 	for k: int in hexes.size():
-		if not Knowledge.sees(game, tag, hexes[k]):
+		var h := hexes[k]
+		if not Knowledge.sees(game, tag, h):
 			continue
-		for o: Army in Movement.armies_on(game, hexes[k]):
-			if o.tag == tag:
-				continue
-			if Wars.at_war(game, tag, o.tag):
-				return {"cut": k + 1, "at": k, "kind": WHY_BATTLE, "hex": hexes[k], "tag": o.tag}
-			return {"cut": k, "at": k, "kind": WHY_BLOCKED, "hex": hexes[k], "tag": o.tag}
+		if Movement.enemy_army_at(game, tag, h):
+			var c := FogVerdict.contact(game, a, h)
+			if bool(c.ok):
+				return {"cut": k + 1, "at": k, "kind": WHY_BATTLE, "hex": h}
+			return {"cut": k, "at": k, "kind": c.why, "hex": h, "text": c.text}
+		for o: Army in Movement.armies_on(game, h):
+			if o.tag != tag:
+				return {"cut": k, "at": k, "kind": WHY_BLOCKED, "hex": h}
 	return {"cut": -1}
+
+
+static func _indices_of(game: Game, hexes: Array[Vector2i]) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for h: Vector2i in hexes:
+		out.append(game.map.index_of(h))
+	return out
 
 
 static func _head(hexes: Array[Vector2i], n: int) -> Array[Vector2i]:
@@ -650,7 +676,7 @@ static func _risks(game: Game, tag: StringName, a: Army, leg: Dictionary) -> Arr
 	var hexes: Array[Vector2i] = leg.hexes
 	if hexes.is_empty():
 		return out
-	if StringName(leg.why) == WHY_BATTLE:
+	if StringName(leg.why) == WHY_BATTLE and not leg.has("text"):
 		out.append({"kind": RISK_BATTLE, "text": "This opens a battle at %s." % Words.place(game, leg.end)})
 	var here := Occupation.controller_tag(game, a.hex)
 	var named: Array[StringName] = []
@@ -680,6 +706,8 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 		made.append(["No move points left this season: it sets out at the end of next season.", TONE_WARN])
 	if not hexes.is_empty():
 		made.append([_walks_text(leg, why), TONE_PLAIN])
+	if leg.has("text"):
+		made.append(["Stops at %s: %s." % [Words.place(game, leg.end), str(leg.text)], TONE_WARN])
 	match why:
 		WHY_WARNED:
 			made.append([BORDER_TEXT % Words.country_the(game, StringName(leg.border)), TONE_WARN])
@@ -689,6 +717,8 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 			made.append(["Stops beside an enemy at %s: its season is over." % Words.place(game, leg.end), TONE_WARN])
 		WHY_BLOCKED:
 			made.append(["Stops at %s: another country's army stands in the way." % Words.place(game, leg.end), TONE_WARN])
+		WHY_ROOM:
+			made.append(["Stops at %s: no room for more of your companies further on." % Words.place(game, leg.end), TONE_WARN])
 		WHY_FOG:
 			var fog := _fog_hex(game, a, leg, route)
 			made.append(["Unmapped land at (%d, %d): the army spends its season finding the way." % [fog.x, fog.y], TONE_WARN])
@@ -711,7 +741,7 @@ static func _fog_hex(game: Game, a: Army, leg: Dictionary, route: PackedInt32Arr
 static func _walks_text(leg: Dictionary, why: StringName) -> String:
 	var n := (leg.hexes as Array).size()
 	var head := "Walks %d hex%s now: %d of %d move points" % [n, "" if n == 1 else "es", int(leg.cost), int(leg.points_before)]
-	if why == WHY_ZOC or why == WHY_BATTLE:
+	if why == WHY_ZOC or (why == WHY_BATTLE and not leg.has("text")):
 		return head + "; its season is over."
 	return head + ", %d left." % int(leg.points_after)
 

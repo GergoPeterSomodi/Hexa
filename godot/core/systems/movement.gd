@@ -616,14 +616,10 @@ static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i
 		if _discovered(game, tag, goal):
 			return _verdict("not your land: the %s holds it, and your armies cross no border in peace" % country_name(game, Territory.owner_tag(game, goal)))
 		return _verdict("not your land: another country holds it, and your armies cross no border in peace")  # R32: not named
-	if enemy_army_at(game, tag, goal):
-		var attack := Battles.engage_check(game, {"army": army.id, "hex": goal, "tag": tag})
-		if not bool(attack.ok):
-			return _verdict(str(attack.reason))
-	else:
-		var stand := Military.can_stand(game, tag, goal, _adding(game, army, goal), _leaving(game, army, goal))
-		if stand != "":
-			return _verdict(stand)
+	# R57: the goal's armies are read only where the country sees them (FogVerdict); the walk meets the others (R24, R28).
+	var stand := FogVerdict.stand(game, army, tag, goal, _adding(game, army, goal), _leaving(game, army, goal))
+	if stand != "":
+		return _verdict(stand)
 	var res := plan(game, army, goal)
 	if not bool(res.ok):
 		if str(res.reason) == "too_far":

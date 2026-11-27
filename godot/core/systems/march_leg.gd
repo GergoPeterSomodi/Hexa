@@ -20,6 +20,8 @@ extends RefCounted
 const OWNS: Array[String] = []
 ## Hexes per country key: index * KEY_STRIDE + country id (country ids are bytes).
 const KEY_STRIDE := 256
+## The words of a contact refused with no reason given.
+const SHUT_TEXT := "the way there is shut"
 
 ## One army's walk: its legs, ticks and the room cut, then its end.
 var army: Army
@@ -296,17 +298,22 @@ static func _engage(game: Game, w: MarchLeg, k: int, prev: Vector2i, hex: Vector
 ## battle (a battle of the other side is fought there), shaken (too shaken to attack, 4.7 row 3) or enemy (the enemy holds the
 ## hex and the attack is refused: room, more than one enemy), with the check's words.
 static func _refuse(game: Game, w: MarchLeg, k: int, hex: Vector2i, full: String = "") -> void:
-	var b := Battles.at(game, hex)
-	var why := Movement.WHY_ENEMY
-	if b != null and b.attacker != w.tag and b.defender != w.tag:
-		why = Movement.WHY_BATTLE
-	elif Armies.morale_of(w.army) < game.defs.war.attack_morale:
-		why = Movement.WHY_SHAKEN
 	var check := Battles.engage_check(game, {"army": w.army.id, "hex": hex, "tag": w.tag})
 	var text := full if full != "" else str(check.reason)
 	if text == "":
-		text = "the way there is shut"
-	_stop(game, w, k, why, text)
+		text = SHUT_TEXT
+	_stop(game, w, k, refusal_why(game, w.army, hex), text)
+
+
+## The halt word of a contact refused for `army` on `hex` (R28): battle (a battle of the other side is fought there), shaken (too
+## shaken to attack) or enemy (any other refusal). The walk and the preview's leg (FogVerdict.contact) share it.
+static func refusal_why(game: Game, army: Army, hex: Vector2i) -> StringName:
+	var b := Battles.at(game, hex)
+	if b != null and b.attacker != army.tag and b.defender != army.tag:
+		return Movement.WHY_BATTLE
+	if Armies.morale_of(army) < game.defs.war.attack_morale:
+		return Movement.WHY_SHAKEN
+	return Movement.WHY_ENEMY
 
 
 ## The walk stops before its step k (into hex h, held by country `held`): blocked, with the words of blocked_text.
@@ -426,6 +433,35 @@ static func room(game: Game, walks: Array, by_id: Dictionary) -> void:
 		_send_back(game, pick)
 		var now_at := _key(pick.end, pick.cid)
 		counts[now_at] = int(counts.get(now_at, 0)) + units
+
+
+## The room cut of a walk alone (WalkNow, R23): the walk's steps kept by room's rule, then the army fallen back into a battle at
+## its start when it is sent all the way back (as _send_back). The same as room() with one walk; the preview reads room_kept.
+static func room_one(game: Game, w: MarchLeg) -> void:
+	if not _can_step_back(game, w):
+		return
+	var keep := room_kept(game, w.army, w.walked)
+	if keep == w.walked.size():
+		return
+	while w.walked.size() > keep:
+		_step_back(w)
+	if w.walked.is_empty():
+		Battles.fall_back_in(game, w.army, game.map.hex_of(w.start))
+
+
+## The steps (hex indices, in order) of `army`'s lone walk that the stack limit keeps (room, R23): back from the end while the
+## country's companies on the end hex (the army's own counted there, not where it stands) exceed the limit, and on past every hex
+## where a battle is fought. Reads the country's own armies (and the battles); the walk (room_one) and MovePreview's leg share it.
+static func room_kept(game: Game, army: Army, walked: PackedInt32Array) -> int:
+	var limit := Military.stack_limit(game, &"")
+	var units := army.units.size()
+	var but := PackedInt32Array([army.id])
+	var n := walked.size()
+	while n > 0 and Armies.units_at(game, army.tag, game.map.hex_of(walked[n - 1]), but) + units > limit:
+		n -= 1
+		while n > 0 and Battles.at(game, game.map.hex_of(walked[n - 1])) != null:
+			n -= 1
+	return n
 
 
 static func _can_step_back(game: Game, w: MarchLeg) -> bool:
