@@ -1,6 +1,7 @@
 ## The map scene (docs/architecture/m1-build-spec.md sections 5, 7 and 8; m2-build-spec.md sections 6.1 to 6.5;
 ## ui-and-controls-spec.md sections 3.1, 3.3, 4.2 to 4.4): the camera, CameraRig, TileMapView, FarMap, ModeOverlay,
-## CapitalMarks, MapInput, CountryLabels and MapLabels around Session.game.
+## CapitalMarks, MapInput, CountryLabels and MapLabels around Session.game; the parchment map and its names over them
+## are MapSceneParchment's.
 ## Any HexPanelContract is injected externally by App/Hud (or tests) and is null-safe when running standalone.
 class_name MapScene
 extends Node2D
@@ -18,6 +19,8 @@ signal find_place_requested
 ## U with a selection: the App opens the works card for the hex's upgrade (or its first build), or begins the work at once
 ## by game/confirm_works (docs/architecture/m4-build-spec.md 6.1, 6.12). With no listener the scene begins the upgrade itself.
 signal upgrade_requested
+## Key 7 in the Goods mode: the HUD gives the keyboard to the goods card.
+signal good_focus_requested
 
 const MAP_ID := "north_italy"
 const START_SEED := 1480
@@ -58,7 +61,8 @@ var _grid_opacity := 1.0
 var _far_locked := false
 var _panel: HexPanelContract = null
 
-var _modes := MapSceneModes.new(self, _sync_country_labels)
+var _parchment := MapSceneParchment.new(self)
+var _modes := MapSceneModes.new(self, _sync_view, _parchment)
 var _tint_on := true
 var _borders_visible := true
 var _colour_blind := false
@@ -84,6 +88,7 @@ func _ready() -> void:
 	if not InputMap.has_action(&"map_select"):
 		Bindings.ensure()
 	_rig.setup(_camera, Vector2.ZERO)
+	_parchment.attach($Parchment as ParchmentMap, $ParchmentLabels as ParchmentLabels)
 	_rig.view_changed.connect(_on_view_changed)
 	_input.camera = _camera
 	_input.map_node = _view
@@ -98,7 +103,6 @@ func _ready() -> void:
 	_input.names_toggled.connect(toggle_names)
 	_input.hud_toggled.connect(func() -> void: hud_toggle_requested.emit())
 	_input.upgrade_requested.connect(_on_upgrade_key)
-	_fade.world = self
 	_view.setup(_seasons.open())
 	_preview.setup(_view)
 	_set_grid_visible(_grid_visible)
@@ -158,6 +162,8 @@ func _apply_settings(settings: Settings) -> void:
 	set_borders(bool(settings.get_value("map/borders")))
 	set_tint(bool(settings.get_value("map/owner_tint")))
 	set_colour_blind(str(settings.get_value("accessibility/country_colours")) == "colour_blind"); _overlay.set_sight_veil(bool(settings.get_value("map/sight_veil")))
+	_parchment.read_settings(settings)
+	_modes.hear_good(str(settings.get_value("state/map_good")))
 	_modes.hear(str(settings.get_value("state/map_mode")))
 	var shading := bool(settings.get_value("graphics/relief_shading"))
 	_view.set_layer_visible("shade", shading)
@@ -191,6 +197,13 @@ func _on_setting_changed(key: String, value: Variant) -> void:
 			return
 		"state/map_mode":
 			_modes.hear(str(value))
+			return
+		"state/map_good":
+			_modes.hear_good(str(value))
+			return
+		"map/parchment", "accessibility/high_contrast", "accessibility/text_size", "accessibility/reduce_motion":
+			_parchment.read_settings(_settings)
+			_apply_zoom()
 			return
 	if key in [
 		"map/grid", "map/grid_opacity", "map/place_names", "map/sight_veil",
@@ -231,6 +244,7 @@ func _on_game_started() -> void:
 	_enqueue_all_chunks(_line_queue, map)
 	if game.has_countries():
 		_enqueue_all_chunks(_border_queue, map)
+	_parchment.begin(game)
 	_setup_country_layers(game)
 	_far.begin(map, state)
 	_rig.set_map_size(map_size())
@@ -259,7 +273,7 @@ func _setup_country_layers(game: Game) -> void:
 
 ## Whether the map is still being put on the view (tiles, lines, borders, the far picture).
 func is_loading() -> bool:
-	return _view.is_filling() or not _line_queue.is_empty() or not _border_queue.is_empty() or _far.is_building()
+	return _view.is_filling() or not _line_queue.is_empty() or not _border_queue.is_empty() or _far.is_building() or _parchment.is_building()
 
 
 func fill_progress() -> float:
@@ -269,23 +283,28 @@ func fill_progress() -> float:
 ## Does all the loading now (a small map, a test, a tool).
 func finish_loading() -> void:
 	_far.step(1.0e9)
+	_parchment.step(1.0e9)
 	while _view.fill_step(100000):
 		pass
 	_line_step(1.0e9)
 	_border_step(1.0e9)
+	_apply_zoom()
 
 
-## Up to `budget_ms` of loading: the far picture first, then tiles nearest camera, then lines, then borders.
+## Up to `budget_ms` of loading: the far picture first, then the parchment where it is to be seen (it covers the tiles
+## that come after it), then tiles nearest camera, then lines, then borders, then a parchment nothing shows yet.
 func _load_step(budget_ms: float) -> void:
 	var until := SimClock.usec() + int(budget_ms * 1000.0)
 	if _far.is_building():
 		_far.step(budget_ms)
-	if _view.is_filling():
+	_parchment.load_step(until, true)
+	if SimClock.usec() < until and _view.is_filling():
 		_view.fill_for(float(until - SimClock.usec()) / 1000.0)
 	if SimClock.usec() < until and not _line_queue.is_empty():
 		_line_step(float(until - SimClock.usec()) / 1000.0)
 	if SimClock.usec() < until and not _border_queue.is_empty():
 		_border_step(float(until - SimClock.usec()) / 1000.0)
+	_parchment.load_step(until, false)
 
 
 ## Builds the lines of the queued chunks, one at least, until the time is up.
@@ -362,6 +381,7 @@ func _on_hex_changed(hex: Vector2i) -> void:
 	for touched: Vector2i in MapCells.touched_by(map, hex):
 		_view.set_hex(touched, MapCells.of_hex(map, state, touched))
 	_far.update_hex(hex)
+	_parchment.state_changed()
 	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
 
@@ -384,19 +404,22 @@ func _on_owners_changed(hexes: Array[Vector2i]) -> void:
 		var budget := 1.0e9 if map.hex_count() <= SYNC_LOAD_HEXES else slice_ms
 		_border_step(budget)
 		_country_labels.on_owners_changed(hexes)
-		_labels.set_obstacles(_country_labels.obstacles())
+		MapLabelSync.block(_labels, _country_labels)
 		_capitals.refresh()
+	_parchment.owners_changed(hexes)
 	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
 
 
 func _on_season_ended(_turn: int) -> void:
 	_seasons.season_ended()
+	_parchment.state_changed()
 
 
 ## Works and taxes change a hex's worth: the Yields and Food textures follow (only in their modes).
 func _on_yields_event(_a: Variant = null, _b: Variant = null, _c: Variant = null, _d: Variant = null) -> void:
 	_overlay.sync_modes(Session.game)
+	_parchment.state_changed()
 
 
 ## The player picked a country: ends picking highlight/pennants and restores the remembered map mode.
@@ -405,6 +428,7 @@ func _on_country_chosen(_tag: StringName) -> void:
 	_overlay.set_hot(0)
 	_capitals.set_picking(false)
 	_country_labels.set_picking(false)
+	_parchment.state_changed()  # before the mode returns: the names read the player's facts, not the pick's all-seeing ones
 	_modes.restore(_settings)
 	if _panel != null and _panel.shown_hex() != NO_HEX:
 		_panel.refresh()
@@ -468,6 +492,7 @@ func set_tint(on: bool) -> void:
 	_tint_on = on
 	if _overlay != null:
 		_overlay.set_tint(_tint_on)
+	_parchment.set_looks(_tint_on, _borders_visible, _colour_blind)
 
 
 ## Shows or hides country border meshes.
@@ -476,6 +501,7 @@ func set_borders(on: bool) -> void:
 	if _view != null:
 		var has_c := Session.game != null and Session.game.has_countries()
 		_view.set_borders_visible(_borders_visible and has_c)
+	_parchment.set_looks(_tint_on, _borders_visible, _colour_blind)
 
 
 ## Switches overlay, pennants, and borders between standard and colour-blind safe palettes.
@@ -483,6 +509,7 @@ func set_colour_blind(on: bool) -> void:
 	if on == _colour_blind:
 		return
 	_colour_blind = on
+	_parchment.set_looks(_tint_on, _borders_visible, _colour_blind)
 	if Session.game == null or not Session.game.has_countries():
 		return
 	_active_palette = MapModes.palette(Session.game, _colour_blind)
@@ -502,6 +529,9 @@ func _on_mode_requested(requested_mode: int) -> void:
 		map_mode_refused.emit(requested_mode)
 		if Session.game == null or not Session.game.has_countries():
 			refused.emit("No countries on this map")
+		return
+	if requested_mode == int(MapModes.Mode.GOODS) and mode() == requested_mode:
+		good_focus_requested.emit()
 		return
 	set_mode(requested_mode)
 
@@ -670,16 +700,14 @@ func map_size() -> Vector2:
 func fit() -> void:
 	_rig.set_map_size(map_size())
 	_rig.fit()
-	_apply_zoom()
-	_sync_country_labels()
+	_sync_view()
 
 
 ## A view centred on a map pixel at a zoom (1 = the art's size).
 func frame_at(centre: Vector2, zoom_val: float) -> void:
 	_rig.set_map_size(map_size())
 	_rig.frame_at(centre, zoom_val)
-	_apply_zoom()
-	_sync_country_labels()
+	_sync_view()
 
 
 func zoom() -> float: return _camera.zoom.x
@@ -693,6 +721,8 @@ func labels() -> MapLabels: return _labels
 func work_marks() -> WorkMarks: return _work_marks
 func preview_marks() -> PreviewMarks: return _preview
 func season_fade() -> SeasonFade: return _fade
+func parchment() -> ParchmentMap: return _parchment.map_node()
+func parchment_names() -> ParchmentLabels: return _parchment.names()
 func camera() -> Camera2D: return _camera
 func camera_rig() -> CameraRig: return _rig
 func map_input() -> MapInput: return _input
@@ -717,6 +747,11 @@ func _hex_under_camera() -> Vector2i:
 
 
 func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
+	_sync_view()
+
+
+## What follows the camera and the mode: the picture the zoom calls for, then the names.
+func _sync_view() -> void:
 	_apply_zoom()
 	_sync_country_labels()
 
@@ -725,24 +760,24 @@ func _on_view_changed(_zoom_val: float, _visible_rect: Rect2) -> void:
 func set_screen_cover(rects: Array[Rect2]) -> void:
 	if _country_labels != null and _labels != null:
 		_country_labels.set_cover(rects)
-		_labels.set_obstacles(_country_labels.obstacles())
+		MapLabelSync.block(_labels, _country_labels)
+	_parchment.set_cover(rects)
 
 
 func _sync_country_labels() -> void:
 	MapLabelSync.sync(_country_labels, _labels, _camera, get_viewport_rect().size if is_inside_tree() else Vector2.ZERO)
+	_parchment.relayout()
 
 
 func _apply_zoom() -> void:
-	var z := 0.0 if _far_locked else _camera.zoom.x
-	_view.visible = _far.apply_zoom(z)
 	_work_marks.set_zoom(_camera.zoom.x)
 	_preview.set_zoom(_camera.zoom.x)
-	var grid_layer := _view.layer("grid")
-	if grid_layer != null:
-		grid_layer.modulate.a = ZoomModel.grid_alpha(_camera.zoom.x, _grid_opacity)
+	_view.set_grid_alpha(ZoomModel.grid_alpha(_camera.zoom.x, _grid_opacity))
+	_parchment.apply(0.0 if _far_locked else _camera.zoom.x)  # the far picture, the tile view and what covers them
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_parchment.tick(SimClock.delta(delta))
 	_apply_zoom()
 	_overlay.sync_discovered(Session.game)  # R36: the deep fog follows the explored set (one compare while it holds)
 	if _seasons.tick():

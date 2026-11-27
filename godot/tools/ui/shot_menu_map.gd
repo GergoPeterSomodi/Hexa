@@ -36,6 +36,10 @@ func _setup_scene() -> void:
 		return
 	_scene = packed.instantiate() as Node2D
 	_scene.set("preload_next_season", false)
+	var settings := Settings.new("macOS", false)
+	settings.set_value("map/parchment", false)  # the menu's backdrop is the tile map, framed whole (map-overview PM5)
+	settings.set_value("graphics/preload_next_season", false)
+	_scene.call("configure", settings)
 	root.add_child(_scene)
 	_scene.call("finish_loading")
 	_scene.call("set_hud_visible", false)

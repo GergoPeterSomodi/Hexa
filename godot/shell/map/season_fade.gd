@@ -1,8 +1,10 @@
 ## The fade between two seasons of the map (docs/architecture/m3-build-spec.md 6.9 and 10): a CanvasLayer at layer 9, under
 ## the HUD's 10. The PRIMARY method captures the viewport before the swap, shows it over the new season at alpha 1 and
-## tweens it away in 0.4 s. The FALLBACK (spec 10, for a driver that cannot read the screen) takes the world's modulate to
-## Tokens.BG and back, 0.2 s each way. METHOD picks one; the planner flips it if the capture probe fails on a real window.
-## Headless, or under reduce motion, nothing happens at all.
+## tweens it away in 0.4 s. The FALLBACK (spec 10, for a driver that cannot read the screen) fades a rect of the
+## background colour (Tokens.BG) over the map and away again, 0.2 s each way. Neither touches the map's own modulate:
+## the parchment's hatch shader keeps a hex index in its vertex colour, which a modulate would turn into another hex's.
+## METHOD picks one; the planner flips it if the capture probe fails on a real window. Headless, or under reduce motion,
+## nothing happens at all.
 class_name SeasonFade
 extends CanvasLayer
 
@@ -24,13 +26,12 @@ var method: Method = METHOD
 var reduce_motion := false
 ## A test may switch the headless skip off (the fallback then runs; the capture finds no image and does nothing).
 var run_headless := false
-## The node the fallback modulates (the map scene).
-var world: CanvasItem = null
 
 ## The cost of the last capture in ms (0 before the first, or when none was taken).
 var last_capture_ms := 0.0
 
 var _rect: TextureRect = null
+var _curtain: ColorRect = null  # the fallback's rect of the background colour
 var _tween: Tween = null
 
 
@@ -44,6 +45,13 @@ func _init() -> void:
 	_rect.stretch_mode = TextureRect.STRETCH_SCALE
 	_rect.visible = false
 	add_child(_rect)
+	_curtain = ColorRect.new()
+	_curtain.name = "Curtain"
+	_curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_curtain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_curtain.color = Tokens.BG
+	_curtain.visible = false
+	add_child(_curtain)
 
 
 ## True when no fade is done: headless, or reduce motion.
@@ -51,16 +59,17 @@ func skipped() -> bool:
 	return reduce_motion or (DisplayServer.get_name() == "headless" and not run_headless)
 
 
-## Call before the swap. PRIMARY: the viewport's picture covers the screen. FALLBACK: the world fades to the background.
+## Call before the swap. PRIMARY: the viewport's picture covers the screen. FALLBACK: the background colour fades in.
 func capture() -> void:
 	_stop()
 	if skipped():
 		return
 	if method == Method.FALLBACK:
-		if world != null:
-			_tween = create_tween()
-			_tween.tween_property(world, "modulate", Tokens.BG, DURATION / 2.0)
-			await _tween.finished
+		_curtain.modulate.a = 0.0
+		_curtain.visible = true
+		_tween = create_tween()
+		_tween.tween_property(_curtain, "modulate:a", 1.0, DURATION / 2.0)
+		await _tween.finished
 		return
 	var started := SimClock.usec()
 	RenderingServer.force_draw(false)  # not `await frame_post_draw`: low-processor mode draws no idle frames
@@ -80,29 +89,28 @@ func note_capture_cost(ms: float) -> void:
 		method = Method.FALLBACK
 
 
-## Call after the swap has begun: the picture fades away (or the world comes back) and `finished` is emitted.
+## Call after the swap has begun: the picture (or the background colour) fades away and `finished` is emitted.
 func fade_out() -> void:
 	if skipped():
 		finished.emit()
 		return
 	_tween = create_tween()
-	if method == Method.FALLBACK:
-		if world != null:
-			_tween.tween_property(world, "modulate", Color.WHITE, DURATION / 2.0)
+	if _curtain.visible:
+		_tween.tween_property(_curtain, "modulate:a", 0.0, DURATION / 2.0)
+		_tween.tween_callback(_curtain.hide)
 	elif _rect.visible:
 		_tween.tween_property(_rect, "modulate:a", 0.0, DURATION)
 		_tween.tween_callback(_rect.hide)
 	_tween.tween_callback(finished.emit)
 
 
-## True while a picture covers the screen or a tween runs.
+## True while a picture or the background colour covers the screen, or a tween runs.
 func is_fading() -> bool:
-	return _rect.visible or (_tween != null and _tween.is_running())
+	return _rect.visible or _curtain.visible or (_tween != null and _tween.is_running())
 
 
 func _stop() -> void:
 	if _tween != null:
 		_tween.kill()
 	_rect.visible = false
-	if world != null:
-		world.modulate = Color.WHITE
+	_curtain.visible = false

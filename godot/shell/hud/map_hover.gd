@@ -2,7 +2,9 @@
 ## drag/UI suppression, and live refresh on Events.hex_changed
 ## (docs/architecture/ui-and-controls-spec.md section 7; ui-style-and-feedback-plan.md U14). The points mark of one of your
 ## army tokens has its own hover (moves-build-spec.md R51): its words take the card's place while the pointer is on it. The move
-## card's preview is MapArmies' (order_preview: with Shift held, the selected army's extended path, R59).
+## card's preview is MapArmies' (order_preview: with Shift held, the selected army's extended path, R59). While the
+## parchment map is solid (Events.map_parchment) or the map is in Goods mode, the hex card gives way to one line,
+## ParchmentView.tip (map-overview-build-spec.md R23, D11).
 class_name MapHover
 extends Control
 
@@ -49,6 +51,10 @@ var pointer_func: Callable = Callable()
 var _tip := ""
 var _tip_elapsed := 0.0
 var _on_map := false
+## What picks the card of a hex: the map's mode and chosen good (the Hud's), and whether the parchment is solid.
+var _mode: int = MapModes.Mode.TERRAIN
+var _good := -1
+var _parchment_solid := false
 
 
 func _init() -> void:
@@ -67,6 +73,7 @@ func _ready() -> void:
 	_bind(Events.army_changed, _on_army_event)
 	_bind(Events.season_ended, _on_army_event)
 	_bind(Events.game_ended, _on_army_cleared)
+	_bind(Events.map_parchment, _on_map_parchment)
 
 
 func _exit_tree() -> void:
@@ -77,6 +84,7 @@ func _exit_tree() -> void:
 	_unbind(Events.army_changed, _on_army_event)
 	_unbind(Events.season_ended, _on_army_event)
 	_unbind(Events.game_ended, _on_army_cleared)
+	_unbind(Events.map_parchment, _on_map_parchment)
 	_disconnect_settings()
 
 
@@ -166,6 +174,30 @@ func preview_changed() -> void:
 	_refresh_move()
 
 
+## The map's mode (the Hud's call).
+func set_map_mode(mode: int) -> void:
+	if mode != _mode:
+		_mode = mode
+		_show_again()
+
+
+## The good the Goods mode shows (the Hud's call).
+func set_map_good(good_id: int) -> void:
+	if good_id != _good:
+		_good = good_id
+		_show_again()
+
+
+## The map scene that may have said "parchment solid" is gone (the Hud's call): the hex card until a scene says so.
+func reset_parchment() -> void:
+	_on_map_parchment(false)
+
+
+## Whether a hex shows the parchment's one line in place of the hex card.
+func shows_line() -> bool:
+	return _parchment_solid or _mode == MapModes.Mode.GOODS
+
+
 ## The move card (6.7) of the hover, for the tests and the pictures; created on first use.
 func move_card() -> MoveCard:
 	_ensure_move()
@@ -216,14 +248,35 @@ func _show_current() -> void:
 	if _hovered_hex == MapInput.NO_HEX or Session.game == null:
 		_clear_card()
 		return
-	var model := HexCard.of(Session.game, _hovered_hex)
+	var one_line := shows_line()
+	var line := ParchmentView.tip(Session.game, Session.player_tag(), _hovered_hex, _mode, _good) if one_line else ""
+	var model: Dictionary = {}
+	if not one_line:
+		model = HexCard.of(Session.game, _hovered_hex)
+	elif not line.is_empty():
+		model = {"lines": [[line, &"plain"]]}
 	if model.is_empty():
 		_clear_card()
 		return
 	_ensure_card()
 	_card.show_card(model)
+	if one_line:
+		_card.accessibility_name = line
+		_card.reset_size()  # the card does not shrink by itself after a hex card
 	_shown = true
 	_position_card()
+
+
+## The card on show is made again: what picks it changed.
+func _show_again() -> void:
+	if _shown:
+		_show_current()
+
+
+func _on_map_parchment(solid: bool) -> void:
+	if solid != _parchment_solid:
+		_parchment_solid = solid
+		_show_again()
 
 
 ## The hover's own tracking: the hex under the pointer, its delay and the hex card (the body the hover always had).
@@ -423,7 +476,8 @@ func _position_card() -> void:
 	var csize := _card.get_combined_minimum_size()
 	if _card.size.x > csize.x or _card.size.y > csize.y:
 		csize = Vector2(maxf(_card.size.x, csize.x), maxf(_card.size.y, csize.y))
-	_card.position = clamp_card_position(_pointer_pos, csize, bounds)
+	var at := get_global_transform_with_canvas().affine_inverse() * _pointer_pos  # viewport pixels; this node is not at 0,0
+	_card.position = clamp_card_position(at, csize, bounds)
 
 
 func _available_bounds() -> Rect2:

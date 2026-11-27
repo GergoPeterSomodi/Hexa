@@ -1,6 +1,7 @@
 ## Studiolo HUD frame coordinating TopBar, right Dock (TileWindow), bottom-right ZoomControl + ScaleBar
 ## (shifting left automatically when Dock opens), KeyHints, MapHover, LayersPopover, ToastHost, and DebugOverlay
-## (docs/architecture/ui-and-controls-spec.md sections 3.1, 3.3, 7; ui-style-and-feedback-plan.md U14).
+## (docs/architecture/ui-and-controls-spec.md sections 3.1, 3.3, 7; ui-style-and-feedback-plan.md U14). By the map's
+## mode it shows the legend, the goods card and the Return button (map-overview-build-spec.md R20 to R23).
 class_name Hud
 extends CanvasLayer
 
@@ -52,6 +53,9 @@ const KEY_HINTS_LEFT := 12.0
 ## The Yields legend's top edge in the map area: 12 px under the bar, and this far under the F3 panel when that is open.
 const LEGEND_TOP := 12.0
 const LEGEND_GAP := 8.0
+## The toasts' place in hud.tscn; they move up while the Return button is under them.
+const TOASTS_TOP := -140.0
+const TOASTS_BOTTOM := -44.0
 
 @onready var _root: Control = $Root
 @onready var _top_bar: TopBar = $Root/Column/TopBar
@@ -74,6 +78,8 @@ const LEGEND_GAP := 8.0
 @onready var _tile_window: TileWindow = $Root/Column/Main/Dock/TileWindow
 @onready var _country_panel: CountryPanel = $Root/Column/Main/Dock/CountryPanel
 @onready var _army_panel: ArmyPanel = $Root/Column/Main/Dock/ArmyPanel
+@onready var _goods_card: GoodsCard = $Root/Column/Main/MapArea/GoodsCard
+@onready var _return_btn: KitButton = $Root/Column/Main/MapArea/ReturnButton
 
 var _ctx: ShellContext = null
 var _row_card: TileHoverCard = null
@@ -85,16 +91,27 @@ var _reduce_motion: bool = false
 var _screen_cover: Array[Rect2] = []
 var _cover_queued: bool = false
 var _mode_scene: MapScene = null
+## The instance id of the last bound map scene (0: none): the hover forgets the parchment when it goes.
+var _scene_id := 0
+var _shown_mode := -1
 
 
 func _ready() -> void:
-	for watched: Control in [_top_bar, _bottom_right, _dock]:
+	for watched: Control in [_top_bar, _bottom_right, _dock, _minimap, _goods_card, _return_btn, _map_area, _mode_legend,
+			_task_flag]:
 		watched.resized.connect(_queue_cover)
 		watched.visibility_changed.connect(_queue_cover)
+	(_minimap.get_parent() as Control).item_rect_changed.connect(_queue_cover)  # the minimap's column moves as it sorts
+	_toasts.minimum_size_changed.connect(_queue_cover)  # the toasts find their place by their size
+	_return_btn.pressed.connect(func() -> void: mode_requested.emit(int(MapModes.Mode.TERRAIN)))
+	_goods_card.good_changed.connect(_on_goods_changed.unbind(1))
+	_goods_card.refreshed.connect(_on_goods_changed)
+	Events.country_chosen.connect(_on_country_chosen)
 	get_viewport().size_changed.connect(_queue_cover)
 	_layers_popover.anchor_button = _top_bar.layers_button()
-	_debug_overlay.visibility_changed.connect(_place_legend)
-	_debug_overlay.resized.connect(_place_legend)
+	_debug_overlay.visibility_changed.connect(_arrange)
+	_debug_overlay.resized.connect(_arrange)
+	_action_log.open_changed.connect(_arrange.unbind(1))
 
 	_top_bar.layers_toggled.connect(_on_top_bar_layers_toggled)
 	_top_bar.help_requested.connect(func() -> void: help_requested.emit())
@@ -156,10 +173,12 @@ func _ready() -> void:
 	if _settings != null:
 		_minimap.configure(_settings)
 		_tile_window.set_settings(_settings)
+		_goods_card.configure(_settings)
 
 
 func _exit_tree() -> void:
-	for pair: Array in [[Events.game_started, _on_game_started], [Events.season_ended, _on_season_ended]]:
+	for pair: Array in [[Events.game_started, _on_game_started], [Events.season_ended, _on_season_ended],
+			[Events.country_chosen, _on_country_chosen]]:
 		if (pair[0] as Signal).is_connected(pair[1] as Callable):
 			(pair[0] as Signal).disconnect(pair[1] as Callable)
 	_disconnect_ctx()
@@ -194,6 +213,7 @@ func configure(settings: Settings) -> void:
 		_minimap.configure(_settings)
 		_action_log.bind_settings(_settings)
 		_task_flag.settings = _settings
+		_goods_card.configure(_settings)
 	if _settings == null:
 		return
 	_settings.changed.connect(_on_setting_changed)
@@ -213,8 +233,12 @@ func bind_camera_rig(rig: CameraRig) -> void:
 func bind_map_scene(scene: Node) -> void:
 	_debug_overlay.bind_map_scene(scene)
 	var map_scene := scene as MapScene
+	var scene_id := 0 if map_scene == null else map_scene.get_instance_id()
+	if _scene_id != 0 and scene_id != _scene_id:  # not on the same scene again: it sends map_parchment only on a change
+		_map_hover.reset_parchment()
+	_scene_id = scene_id
 	_mode_scene = map_scene
-	_sync_legend()
+	_sync_mode_parts()
 	if map_scene == null:
 		_minimap.unbind()
 		_top_bar.refresh_game()
@@ -228,6 +252,9 @@ func bind_map_scene(scene: Node) -> void:
 	_bound_map_input = map_scene.map_input()
 	if _bound_map_input != null:
 		_bound_map_input.hover_changed.connect(_on_map_hover_changed)
+		_bound_map_input.good_step_requested.connect(_on_good_step_requested)
+	if not map_scene.good_focus_requested.is_connected(_on_good_focus_requested):
+		map_scene.good_focus_requested.connect(_on_good_focus_requested)
 	_minimap.bind_map_scene(map_scene)
 	_top_bar.refresh_game()
 	_top_bar.set_mode(map_scene.mode())
@@ -285,13 +312,14 @@ static func screen_rect(c: Control) -> Rect2:
 	return Rect2(xf.origin, c.size * xf.get_scale())
 
 
-## The screen rects (viewport px) covering the map: the top bar, the open dock, the minimap corner and what a screen
-## over the map covers (set_screen_cover). Empty while the HUD is hidden.
+## The screen rects (viewport px) covering the map: the top bar, the open dock, the minimap corner, the goods card and the
+## Return button while shown, and what a screen over the map covers (set_screen_cover). Empty while the HUD is hidden.
 func cover_rects() -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	if not _root.visible:
 		return out
-	for c: Control in [_top_bar, _minimap, _zoom_control, _scale_bar, _dock]:  # not BottomRight: mostly empty
+	var covering: Array[Control] = [_top_bar, _minimap, _zoom_control, _scale_bar, _dock, _goods_card, _return_btn]
+	for c: Control in covering:  # not BottomRight: mostly empty
 		if c.is_visible_in_tree():
 			out.append(screen_rect(c))
 	out.append_array(_screen_cover)
@@ -365,6 +393,7 @@ func set_covered(hides_world: bool, any_screen: bool) -> void:
 	_any_screen = any_screen
 	_notifications.set_covered(hides_world)
 	_mode_legend.set_covered(hides_world)
+	_goods_card.set_covered(hides_world)
 	_task_flag.set_covered(any_screen)
 
 
@@ -419,6 +448,32 @@ func refresh_bindings(platform: String = OS.get_name()) -> void:
 	_top_bar.refresh_hotkeys()
 	_layers_popover.refresh_hotkeys()
 	_zoom_control.refresh_hotkeys()
+	_return_btn.refresh_hotkey()
+
+
+## The legend, the goods card, the Return button and the hover for the map mode `mode` (-1: no map); `picking` while the
+## country is being chosen. The bound map scene's mode changes come here.
+func show_mode_parts(mode: int, picking: bool = false) -> void:
+	_shown_mode = mode
+	_map_hover.set_map_mode(mode if mode >= 0 else int(MapModes.Mode.TERRAIN))
+	_map_hover.set_map_good(_goods_card.good_id())
+	_goods_card.set_active(mode == MapModes.Mode.GOODS and not picking)
+	if mode < 0:
+		_mode_legend.hide_legend()
+	elif mode == MapModes.Mode.GOODS:
+		_show_goods_legend()
+	else:
+		_mode_legend.show_mode(mode)
+	_return_btn.visible = mode > MapModes.Mode.TERRAIN and not picking
+	_arrange()
+
+
+func goods_card() -> GoodsCard:
+	return _goods_card
+
+
+func return_button() -> KitButton:
+	return _return_btn
 
 
 func top_bar() -> TopBar:
@@ -565,15 +620,48 @@ func _on_season_preview_selected(index: int) -> void:
 ## A new game or a season that ended: F3's Look is back on the calendar (the preview ends with the season).
 func _on_game_started() -> void:
 	set_look(-1)
-	_sync_legend()
+	_sync_mode_parts()
 
 
-## The legend follows the map's mode: its rows for Yields, hidden for every other mode and with no map.
-func _sync_legend() -> void:
+## The parts that follow the map's mode, read from the bound map scene (hidden with no map).
+func _sync_mode_parts() -> void:
 	if _mode_scene != null and is_instance_valid(_mode_scene):
-		_mode_legend.show_mode(_mode_scene.mode())
+		show_mode_parts(_mode_scene.mode(), _mode_scene.picking())
 	else:
-		_mode_legend.hide_legend()
+		show_mode_parts(-1)
+
+
+## The pick ended. Read after the map scene has heard it too: its mode may stay, and then it sends no mode_changed.
+func _on_country_chosen(_tag: StringName) -> void:
+	_sync_mode_parts.call_deferred()
+
+
+## [ and ] on the map: the next good, in the Goods mode only (R25).
+func _on_good_step_requested(by: int) -> void:
+	if _shown_mode == MapModes.Mode.GOODS:
+		_goods_card.step(by)
+
+
+## Key 7 again in the Goods mode (nothing while the card is hidden).
+func _on_good_focus_requested() -> void:
+	_goods_card.focus_selected()
+
+
+## Another good, or its counts read again: the hover line and the goods legend follow.
+func _on_goods_changed() -> void:
+	_map_hover.set_map_good(_goods_card.good_id())
+	if _shown_mode == MapModes.Mode.GOODS:
+		_show_goods_legend()
+
+
+func _show_goods_legend() -> void:
+	var high_contrast := _settings != null and bool(_settings.get_value("accessibility/high_contrast"))
+	_mode_legend.show_goods(Session.game, Session.player_tag(), _goods_card.good_id(), high_contrast)
+
+
+## The movable parts take their places (HudLayout): after anything that covers the map has changed.
+func _arrange() -> void:
+	HudLayout.arrange(self)
 
 
 ## An older header of the action log: the study's History page at that turn.
@@ -583,16 +671,7 @@ func _on_history_requested(turn: int) -> void:
 
 
 func _on_mode_changed(_mode: int) -> void:
-	_sync_legend()
-
-
-## The legend sits 12 px under the bar, or under the F3 panel while that is open.
-func _place_legend() -> void:
-	var top := LEGEND_TOP
-	if _debug_overlay.visible:
-		top = _debug_overlay.offset_top + _debug_overlay.size.y + LEGEND_GAP
-	_mode_legend.offset_top = top
-	_mode_legend.offset_bottom = top
+	_sync_mode_parts()
 
 
 func _on_season_ended(_turn: int) -> void:
@@ -656,6 +735,7 @@ func _emit_cover() -> void:
 	_cover_queued = false
 	var room := screen_rect(_scale_bar).position.x - screen_rect(_key_hints).position.x - float(Tokens.S2)
 	_key_hints.fit_width(room)
+	_arrange()
 	cover_changed.emit()
 
 
@@ -668,6 +748,8 @@ func _apply_settings(settings: Settings) -> void:
 func _on_setting_changed(key: String, _value: Variant) -> void:
 	if _settings != null and (key == "accessibility/reduce_motion" or key == "dev/developer_tools"):
 		_apply_settings(_settings)
+	if key == "accessibility/high_contrast":
+		_on_goods_changed()
 
 
 func _disconnect_ctx() -> void:
@@ -691,4 +773,5 @@ func _unbind_rig() -> void:
 func _unbind_map_input() -> void:
 	if _bound_map_input != null and is_instance_valid(_bound_map_input) and _bound_map_input.hover_changed.is_connected(_on_map_hover_changed):
 		_bound_map_input.hover_changed.disconnect(_on_map_hover_changed)
+		_bound_map_input.good_step_requested.disconnect(_on_good_step_requested)
 	_bound_map_input = null

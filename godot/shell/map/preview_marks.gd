@@ -3,6 +3,7 @@
 ## (MapModes.delta_colour: good green, bad red) and LABELS ("+16 timber") on those hexes. They come and go with
 ## show_preview and clear_marks; they write no cell of TileMapView's layers (the ghost has layers of its own, made on show and
 ## freed on clear), draw in map space (so they follow zoom and pan) and take no input. Shown nothing: no nodes, no redraws.
+## While the parchment map shows, the ghost is drawn at the marks' own depth, over it (map-overview-build-spec.md R17).
 class_name PreviewMarks
 extends Node2D
 
@@ -24,6 +25,7 @@ var _view: TileMapView = null
 var _enabled := true
 var _zoom := 1.0
 var _ghost: CanvasGroup = null
+var _ghost_raised := false
 var _layers: Array[TileMapLayer] = []
 var _tint: Array[Dictionary] = []  # {hex, colour}
 var _labels: Array[Dictionary] = []  # {hex, text, delta}
@@ -56,6 +58,14 @@ func set_zoom(value: float) -> void:
 	_zoom = value
 	if not _labels.is_empty():
 		queue_redraw()
+
+
+## true while the parchment map shows: the ghost goes over it, behind the tints and labels.
+func set_ghost_raised(on: bool) -> void:
+	if on == _ghost_raised:
+		return
+	_ghost_raised = on
+	_place_ghost()
 
 
 ## Draws a card's preview: `preview` is ImprovePreview's dictionary (ghost {hex, tiles}, map_marks {hex: {delta, label}}).
@@ -110,8 +120,7 @@ func _make_ghost(ghost: Dictionary) -> void:
 	var hex: Vector2i = ghost["hex"]
 	_ghost = CanvasGroup.new()
 	_ghost.name = "Ghost"
-	_ghost.z_as_relative = false
-	_ghost.z_index = GHOST_Z
+	_place_ghost()
 	_ghost.self_modulate = Color(1.0, 1.0, 1.0, GHOST_ALPHA)
 	add_child(_ghost)
 	for layer_name: String in MapCells.LAYERS:  # (the order of the view's layers)
@@ -131,6 +140,14 @@ func _make_ghost(ghost: Dictionary) -> void:
 		remove_child(_ghost)
 		_ghost.free()
 		_ghost = null
+
+
+func _place_ghost() -> void:
+	if _ghost == null:
+		return
+	_ghost.z_as_relative = false
+	_ghost.z_index = LAYER_Z if _ghost_raised else GHOST_Z
+	_ghost.show_behind_parent = _ghost_raised
 
 
 func _make_marks(marks: Dictionary) -> void:

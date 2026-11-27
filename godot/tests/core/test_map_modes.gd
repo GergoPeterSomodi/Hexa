@@ -326,7 +326,7 @@ func test_colour_at_yields_reads_the_players_bytes() -> void:
 
 func test_modes_with_yields() -> void:
 	var all: Array[int] = [MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF, MapModes.Mode.YIELDS,
-		MapModes.Mode.FOOD, MapModes.Mode.SUPPLY]
+		MapModes.Mode.FOOD, MapModes.Mode.SUPPLY, MapModes.Mode.GOODS]
 	assert_eq(MapModes.modes(EconomyFixture.game(&"GEN")), all)
 	assert_eq(MapModes.modes(EconomyFixture.game()),
 		[MapModes.Mode.TERRAIN, MapModes.Mode.OWNER, MapModes.Mode.RELIEF] as Array[int],
@@ -402,7 +402,8 @@ func test_food_legend_and_titles() -> void:
 	assert_eq(MapModes.legend_title(MapModes.Mode.TERRAIN), "")
 	assert_eq(MapModes.legend_title(MapModes.Mode.GOODS), "Goods produced")
 	assert_eq(MapModes.legend(MapModes.Mode.GOODS), [] as Array[Dictionary], "the rows of Goods are ParchmentView's")
-	assert_false(MapModes.modes(EconomyFixture.game(&"GEN")).has(MapModes.Mode.GOODS), "Goods is not offered yet")
+	assert_true(MapModes.modes(EconomyFixture.game(&"GEN")).has(MapModes.Mode.GOODS), "offered with a player")
+	assert_false(MapModes.modes(EconomyFixture.game()).has(MapModes.Mode.GOODS), "not during the pick")
 
 
 func test_food_year_of_genoa_and_savona() -> void:

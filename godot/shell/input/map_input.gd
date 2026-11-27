@@ -11,6 +11,8 @@ signal unit_requested(screen: Vector2)
 signal command_requested(map_px: Vector2)
 signal hover_changed(hex: Vector2i)
 signal mode_requested(mode: int)
+## [ (-1) and ] (+1): the Goods mode's good before or after the chosen one (map-overview-build-spec.md R25).
+signal good_step_requested(by: int)
 signal country_requested
 signal find_place_requested
 signal grid_toggled
@@ -323,12 +325,15 @@ func _on_key(key: InputEventKey) -> void:
 		new_seed_requested.emit()
 		_mark_handled()
 		return
-	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4", &"view_mode_5", &"view_mode_6"]
+	var mode_actions: Array[StringName] = [&"view_mode_1", &"view_mode_2", &"view_mode_3", &"view_mode_4", &"view_mode_5",
+		&"view_mode_6", &"view_mode_7"]
 	for i: int in mode_actions.size():
 		if _is_action_pressed_exact(key, mode_actions[i]):
 			mode_requested.emit(i)
 			_mark_handled()
 			return
+	if _on_good_key(key):
+		return
 	if _is_action_pressed_exact(key, &"ui_find_place"):
 		find_place_requested.emit()
 		_mark_handled()
@@ -348,6 +353,20 @@ func _on_key(key: InputEventKey) -> void:
 		if not _refuses():
 			upgrade_requested.emit()
 		_mark_handled()
+
+
+## The Goods mode's keys: true when one fired.
+func _on_good_key(key: InputEventKey) -> bool:
+	var by := 0
+	if _is_action_pressed_exact(key, &"map_good_prev"):
+		by = -1
+	elif _is_action_pressed_exact(key, &"map_good_next"):
+		by = 1
+	if by == 0:
+		return false
+	good_step_requested.emit(by)
+	_mark_handled()
+	return true
 
 
 ## The M3 to M7 keys: report, bookmarks, cancel work, the study, the army keys. Returns true when one fired. While orders

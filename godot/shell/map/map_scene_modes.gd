@@ -1,7 +1,9 @@
 ## The map modes of the map scene (docs/architecture/map-overview-build-spec.md D12), moved out of map_scene.gd to keep it
 ## under its size limit: the mode on show, the remembered mode (the setting state/map_mode, or the one kept here when the
-## scene has no settings) and putting a mode on the overlay, the pennants and the country names. Which modes a game offers
-## stays MapModes' answer; the public calls (mode, set_mode) and the signals stay on the scene.
+## scene has no settings) and putting a mode on the overlay, the pennants, the country names and the parchment. It keeps the
+## Goods mode's chosen good too (the setting state/map_good). Under the Goods mode the tile layers' own parts show Terrain:
+## the parchment covers them (map-overview-build-spec.md D5). Which modes a game offers stays MapModes' answer; the public
+## calls (mode, set_mode) and the signals stay on the scene.
 class_name MapSceneModes
 extends RefCounted
 
@@ -12,14 +14,28 @@ var current: MapModes.Mode = MapModes.Mode.TERRAIN
 
 var _persisted: MapModes.Mode = MapModes.Mode.TERRAIN
 var _scene: MapScene = null
-var _sync_names := Callable()
+var _sync_view := Callable()
+var _parchment: MapSceneParchment = null
+var _good_key: StringName = GoodsCard.DEFAULT_GOOD
 
 
-## `scene` is a Node for the reason MapSeasons gives: MapScene creates this helper in a member initialiser. `sync_names`
-## is the scene's laying out of the country names (its camera moves use it too).
-func _init(scene: Node, sync_names: Callable) -> void:
+## `scene` is a Node for the reason MapSeasons gives: MapScene creates this helper in a member initialiser. `sync_view`
+## is the scene's laying of what follows the mode and the camera (its camera moves use it too).
+func _init(scene: Node, sync_view: Callable, parchment: MapSceneParchment) -> void:
 	_scene = scene as MapScene
-	_sync_names = sync_names
+	_sync_view = sync_view
+	_parchment = parchment
+
+
+## The setting state/map_good as it is now: remembered and put on the parchment.
+func hear_good(value: String) -> void:
+	_good_key = StringName(value)
+	_parchment.set_good(good_id())
+
+
+## The id of the chosen good in the running game (an unknown key reads as the first good); -1 without goods.
+func good_id() -> int:
+	return int(GoodsCard.resolve(ParchmentView.goods_list(Session.game), _good_key).get("id", -1))
 
 
 ## The setting's value as it is now: remembered, and shown unless the pick is on or there is no game.
@@ -45,20 +61,22 @@ func restore(settings: Settings) -> void:
 func apply(target: MapModes.Mode, persist: bool, settings: Settings = null) -> void:
 	var changed := current != target
 	current = target
+	var drawn := MapModes.Mode.TERRAIN if current == MapModes.Mode.GOODS else current
 	var overlay := _scene.overlay()
 	if overlay != null:
-		overlay.set_mode(current)
+		overlay.set_mode(drawn)
 		overlay.sync_modes(Session.game, true)
 	var is_picking := _scene.picking()
 	var capitals := _scene.capital_marks()
 	if capitals != null:
 		capitals.set_picking(is_picking)
-		capitals.set_mode(current)
+		capitals.set_mode(drawn)
 	var country_labels := _scene.country_labels()
 	if country_labels != null:
 		country_labels.set_picking(is_picking)
-		country_labels.set_mode(current)
-	_sync_names.call()
+		country_labels.set_mode(drawn)
+	_parchment.set_mode(int(current), good_id())
+	_sync_view.call()
 	if persist:
 		_persisted = current
 		if settings != null:

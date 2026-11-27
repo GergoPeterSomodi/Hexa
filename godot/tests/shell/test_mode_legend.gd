@@ -7,12 +7,18 @@ const TOP_BAR_H := 40.0
 const TOP_GAP := 12.0
 
 var _legend: ModeLegend
+var _prev_game: Game = null
 
 
 func before_each() -> void:
+	_prev_game = Session.game
 	_legend = (load("res://shell/hud/mode_legend.tscn") as PackedScene).instantiate() as ModeLegend
 	_legend.theme = KitTheme.load_for(1.0)
 	add_child_autofree(_legend)
+
+
+func after_each() -> void:
+	Session.game = _prev_game
 
 
 func _column() -> VBoxContainer:
@@ -185,3 +191,76 @@ func test_supply_shows_its_title_seven_rows_and_the_starving_stripes() -> void:
 		if bool(row["stripes"]):
 			striped.append(str(row["text"]))
 	assert_eq(striped, ["Out of supply, starving"] as Array[String], "only the starving row is striped")
+
+
+# ----- Goods mode (map-overview-build-spec.md R21) -----------------------------------------------------------------
+
+
+## Genoa on north Italy (the session's game is put back after each test) with the legend of the good `key` shown.
+func _show_goods(key: StringName, high_contrast: bool = false) -> Game:
+	assert_eq(Session.new_scenario("north_italy_1480", 1480, &"GEN"), "")
+	var game := Session.game
+	_legend.show_goods(game, &"GEN", game.defs.good_id(key), high_contrast)
+	return game
+
+
+## The swatch of row `row` (0 the first stage), or null when the row has none.
+func _swatch(row: int) -> ModeLegend.Swatch:
+	return (_column().get_child(row + 1) as HBoxContainer).get_child(0) as ModeLegend.Swatch
+
+
+func test_goods_shows_the_grain_rows_and_count_of_north_italy() -> void:
+	var game := _show_goods(&"grain")
+	var grain := game.defs.good_id(&"grain")
+	var view := StateView.of(game.state)
+	var seen := MapModes.discovered_bytes(game, &"GEN")
+	var districts := 0
+	for i: int in game.map.hex_count():
+		if seen[i] == 1 and game.map.land[i] == 1 and Economy.good_of(game, view, game.map.hex_of(i)) == grain:
+			districts += 1
+	assert_gt(districts, 1, "Genoa knows grain districts")
+	assert_true(_legend.visible)
+	assert_eq(_legend.mode(), int(MapModes.Mode.GOODS))
+	assert_eq((_column().get_child(0) as Label).text, "Grain", "the good's name is the title")
+	var words: Array = _legend.rows().map(func(row: Dictionary) -> String: return row["text"])
+	assert_eq(words, ["First stage", "Second stage", "Third stage", "Not here",
+		"%d districts you know make it" % districts])
+	assert_eq(_column().get_child_count(), 6, "the title and five rows")
+	var ramp: Array[Color] = [ParchmentTokens.GOODS_1, ParchmentTokens.GOODS_2, ParchmentTokens.GOODS_3,
+		ParchmentTokens.LAND]
+	for row: int in 4:
+		assert_eq(_swatch(row).colour, ramp[row], "row %d takes the ramp" % row)
+		assert_false(_swatch(row).stripes)
+		var pips := (_column().get_child(row + 1) as HBoxContainer).get_child(1) as ModeLegend.Pips
+		assert_eq(pips.count, [1, 2, 3, 0][row], "row %d pips" % row)
+	var last := _column().get_child(5) as HBoxContainer
+	assert_eq(last.get_child_count(), 1, "the count line is words only")
+	assert_true(last.get_child(0) is Label)
+	assert_true(_legend.accessibility_description.begins_with("Grain: First stage"))
+	assert_true(_legend.accessibility_description.ends_with("%d districts you know make it" % districts))
+	assert_lte(_legend.get_combined_minimum_size().x, ModeLegend.WIDTH, "no wider than the other legends")
+	for node: Node in _legend.find_children("*", "Control", true, false):
+		assert_eq((node as Control).mouse_filter, Control.MOUSE_FILTER_IGNORE, "%s ignores the mouse" % node.name)
+
+
+func test_goods_in_high_contrast_takes_its_land() -> void:
+	_show_goods(&"wine", true)
+	assert_eq((_column().get_child(0) as Label).text, "Wine")
+	assert_eq(_swatch(3).colour, ParchmentTokens.HC_LAND)
+	assert_eq(_swatch(0).colour, ParchmentTokens.GOODS_1)
+
+
+func test_goods_gives_way_to_the_other_legends_and_needs_a_good() -> void:
+	var game := _show_goods(&"grain")
+	_legend.show_mode(MapModes.Mode.YIELDS)
+	assert_eq((_column().get_child(0) as Label).text, ModeLegend.TITLE, "Yields keeps its title")
+	assert_eq(_column().get_child_count(), 11)
+	assert_false(_legend.rows()[0].has("pips"))
+	_legend.show_mode(MapModes.Mode.GOODS)
+	assert_false(_legend.visible, "the goods rows come from show_goods only")
+	_legend.show_goods(game, &"GEN", -1)
+	assert_false(_legend.visible, "an unknown good")
+	_legend.show_goods(game, &"GEN", game.defs.good_id(&"salt"))
+	assert_true(_legend.visible)
+	_legend.set_covered(true)
+	assert_false(_legend.visible, "a screen hides it too")

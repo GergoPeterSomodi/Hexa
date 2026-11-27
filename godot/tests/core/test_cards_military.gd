@@ -79,7 +79,8 @@ func test_map_modes_has_the_supply_mode_and_its_legend() -> void:
 	assert_eq(rows[0].text, "A depot (a village or larger, a port)")
 	assert_eq(rows[-1].text, "Not your land")
 	assert_eq(MapModes.legend_title(MapModes.Mode.SUPPLY), "Supply: where your armies are fed")
-	assert_eq(MapModes.modes(_g).back(), MapModes.Mode.SUPPLY, "the mode follows Food")
+	var offered := MapModes.modes(_g)
+	assert_eq(offered.find(MapModes.Mode.SUPPLY), offered.find(MapModes.Mode.FOOD) + 1, "the mode follows Food")
 
 
 func test_sight_veil_lays_over_unseen_land_and_leaves_seen_land_alone() -> void:

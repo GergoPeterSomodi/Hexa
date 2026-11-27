@@ -118,9 +118,10 @@ static func tiles_show_at(zoom: float, off: float = ZOOM_OFF) -> bool:
 	return zoom > off
 
 
-## Shows the picture as the zoom says; returns whether the tiles should show.
-func apply_zoom(zoom: float) -> bool:
+## Shows the picture as the zoom says, unless something lies solid over it (`covered`); returns whether the tiles should
+## show.
+func apply_zoom(zoom: float, covered: bool = false) -> bool:
 	var alpha := alpha_at(zoom, zoom_off, zoom_on)
-	visible = alpha > 0.0 and _texture != null
+	visible = alpha > 0.0 and _texture != null and not covered
 	modulate.a = alpha
 	return tiles_show_at(zoom, zoom_off)

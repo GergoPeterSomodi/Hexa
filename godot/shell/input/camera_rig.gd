@@ -12,6 +12,11 @@ const GESTURE_PAN_PX := 20.0
 const WHEEL_PAN_PX := 64.0
 const EDGE_PAN_MARGIN_PX := 8.0
 const KEY_ZOOM_NOTCHES := 2.0
+## A focused control in this group takes the arrow keys itself (they move the focus), so they pan nothing then.
+const ARROW_FOCUS_GROUP := &"keeps_arrow_keys"
+## The ui_* action of the same arrow as each pan action.
+const PAN_UI_ACTIONS: Dictionary[StringName, StringName] = {&"cam_pan_left": &"ui_left", &"cam_pan_right": &"ui_right",
+	&"cam_pan_up": &"ui_up", &"cam_pan_down": &"ui_down"}
 
 var camera: Camera2D = null
 var map_size := Vector2.ZERO
@@ -629,7 +634,17 @@ func _free_centre_screen() -> Vector2:
 	return _viewport_size() * 0.5
 
 
+## Whether the arrow of this pan action is held for a focused control (the goods card's buttons).
+func _arrow_taken(action: StringName) -> bool:
+	if not PAN_UI_ACTIONS.has(action) or not is_inside_tree():
+		return false
+	var focused := get_viewport().gui_get_focus_owner()
+	return focused != null and focused.is_in_group(ARROW_FOCUS_GROUP) and Input.is_action_pressed(PAN_UI_ACTIONS[action])
+
+
 func _is_action_active(action: StringName) -> bool:
+	if _arrow_taken(action):
+		return false
 	if bool(_held_actions.get(action, false)):
 		return true
 	if InputMap.has_action(action) and Input.is_action_pressed(action):

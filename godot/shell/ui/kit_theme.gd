@@ -409,6 +409,7 @@ static func _apply_buttons(theme: Theme, fc: Dictionary, pieces: Dictionary, tc:
 		{"name": &"ButtonPrimaryLarge", "prefix": "button_primary", "pressed": "", "font": f_bold, "size": 15, "kind": "prim", "pad": [16.0, 6.0, 16.0, 6.0]},
 		{"name": &"ButtonDanger", "prefix": "button_danger", "pressed": "", "font": f_bold, "size": 14, "kind": "danger", "pad": []},
 		{"name": &"ButtonToggle", "prefix": "button_toggle", "pressed": "toggle_on", "font": f_bold, "size": 14, "kind": "toggle", "pad": []},
+		{"name": &"ButtonChoice", "prefix": "button_primary", "pressed": "button_primary_normal", "font": f_bold, "size": 14, "kind": "toggle", "pad": []},
 		{"name": &"ButtonTab", "prefix": "button_toggle", "pressed": "toggle_on", "font": f_bold, "size": 14, "kind": "toggle", "pad": []},
 		{"name": &"ButtonTabCompact", "prefix": "button_toggle", "pressed": "toggle_on", "font": f_bold, "size": 14, "kind": "toggle", "pad": [6.0, 4.0, 6.0, 4.0]},
 		{"name": &"ButtonMenu", "prefix": "button_menu_secondary", "pressed": "", "font": f_menu, "size": 15, "kind": "sec", "pad": [34.0, 10.0, 34.0, 10.0]},

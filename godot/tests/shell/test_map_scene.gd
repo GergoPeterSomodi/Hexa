@@ -278,12 +278,12 @@ func test_the_fallback_fade_goes_through_the_background_colour_and_back() -> voi
 	fade.run_headless = true
 	_scene.show_season(1, true)
 	await wait_seconds(0.1)
-	assert_eq(_scene.season, "spring", "the swap waits for the world to be dark")
-	assert_ne(_scene.modulate, Color.WHITE, "the world is fading")
+	assert_eq(_scene.season, "spring", "the swap waits for the map to be covered")
+	var curtain := fade.get_node("Curtain") as ColorRect
+	assert_true(curtain.visible and curtain.modulate.a > 0.0 and curtain.color == Tokens.BG, "the background comes")
+	assert_eq(_scene.modulate, Color.WHITE, "the map itself is not modulated")
 	await wait_for_signal(fade.finished, 2.0)
-	assert_eq(_scene.season, "summer")
-	assert_eq(_scene.modulate, Color.WHITE, "the world is back")
-	assert_false(fade.is_fading())
+	assert_true(_scene.season == "summer" and not curtain.visible and not fade.is_fading(), "the new season shows")
 
 
 func test_a_preview_holds_until_the_season_ends() -> void:
@@ -327,7 +327,7 @@ func test_a_show_season_that_came_before_the_season_ended_is_not_lost() -> void:
 
 
 func test_far_zoom_replaces_the_tiles() -> void:
-	var centre := _scene.map_size() / 2.0
+	var centre := _scene.map_size() / 2.0; _scene.parchment().set_options(true, true, false, false, false)  # map/parchment off: reads the tiles and the far picture
 	_scene.frame_at(centre, 1.0)
 	_scene._process(0.0)
 	assert_true(_scene.view().visible)
@@ -370,7 +370,7 @@ func test_a_big_map_loads_a_slice_a_frame() -> void:
 		_scene._load_step(2.0)
 		steps += 1
 	assert_gt(steps, 1, "it took several slices")
-	assert_false(_scene.is_loading())
+	assert_false(_scene.is_loading()); _scene.parchment().set_options(true, true, false, false, false)  # map/parchment off: reads the tiles and the far picture
 	assert_gt(_scene.view().cell_count(), map.cols * map.rows)
 	assert_gt(_scene.view().line_chunks().size(), 0, "the chunks have lines")
 	_scene.frame_at(_scene.map_size() / 2.0, 0.1)
@@ -612,7 +612,7 @@ func test_scenario_game_borders_modes_labels_pennants_and_settings() -> void:
 	var gen_std := _scene.capital_marks().cloth_colour_of(&"GEN")
 	var rebuilds_before := _scene.border_chunk_rebuilds
 	var settings := Settings.new("macOS", false)
-	_scene.configure(settings); settings.set_value("map/sight_veil", false)  # the veil (on by default) keeps Terrain up: test_sight_veil_setting
+	_scene.configure(settings); settings.set_value("map/sight_veil", false); settings.set_value("map/parchment", false)  # veil off: test_sight_veil_setting; parchment off: reads the tiles framed whole
 	assert_true(settings.set_value("accessibility/country_colours", "colour_blind"))
 	assert_gt(_scene.border_chunk_rebuilds, rebuilds_before, "palette switch rebuilds borders")
 	var gen_cb := _scene.capital_marks().cloth_colour_of(&"GEN")

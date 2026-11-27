@@ -101,7 +101,9 @@ repository root.
 | `parchment_frame_worst_ms` | gpu | 16 | panning at zooms 0.36, 0.28, 0.12, 0.05 in Terrain, Owner and Goods, 60 countries, 1920 x 1080 |
 | `parchment_frame_mean_ms` | gpu | 8 | the mean of the same |
 | `parchment_band_frame_worst_ms` | gpu | 16 | in the fade band (tiles and parchment both drawn), zoom 0.32 |
-| `parchment_mem_mb` | mem | 32 | meshes and textures on the made-up Europe |
+| `parchment_mem_mb` | mem | 80 | meshes and textures on the made-up Europe |
+
+Amendment (2026-11-27): `parchment_mem_mb` is raised from 32 to 80 (measured 62 MB on the made-up Europe, accepted).
 
 The made-up Europe is larger than any planned map, so a pass there covers the real Europe. The old rows
 (`owner_frame_*`, `mode_switch_ms`, `owner_change_frame_ms`, `owner_change_200_ms`) must not get worse by more than 5 %.

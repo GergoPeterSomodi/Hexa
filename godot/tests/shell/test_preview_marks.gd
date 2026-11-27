@@ -10,6 +10,10 @@ func before_each() -> void:
 	Session.new_game(MapScene.MAP_ID, MapScene.START_SEED)
 	_scene = (load("res://shell/map/map_scene.tscn") as PackedScene).instantiate() as MapScene
 	_scene.preload_next_season = false
+	var tiles_only := Settings.new("Windows", false)
+	tiles_only.set_value("graphics/preload_next_season", false)
+	tiles_only.set_value("map/parchment", false)  # the 64 px test window fits the whole map: the ghost is read over tiles
+	_scene.configure(tiles_only)
 	add_child_autofree(_scene)
 	_scene.finish_loading()
 	_marks = _scene.preview_marks()

@@ -551,12 +551,12 @@ static func _mode_colour(mode: int, owner_id: int, height_byte: int, palette: Pa
 	return Color(base.r, base.g, base.b, alpha)
 
 
-## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS`, `FOOD`
-## and `SUPPLY` when the game has countries and a chosen player.
+## Available map modes for `game`: `[TERRAIN, OWNER, RELIEF]`, omitting `OWNER` in a map-only game, and adding `YIELDS`, `FOOD`,
+## `SUPPLY` and `GOODS` when the game has countries and a chosen player.
 static func modes(game: Game) -> Array[int]:
 	if game != null and game.has_countries():
 		if game.player != &"":
-			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS, Mode.FOOD, Mode.SUPPLY]
+			return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF, Mode.YIELDS, Mode.FOOD, Mode.SUPPLY, Mode.GOODS]
 		return [Mode.TERRAIN, Mode.OWNER, Mode.RELIEF]
 	return [Mode.TERRAIN, Mode.RELIEF]
 

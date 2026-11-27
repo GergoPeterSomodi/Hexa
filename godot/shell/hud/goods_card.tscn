@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://shell/ui/panel_frame.tscn" id="1_frame"]
+[ext_resource type="Script" path="res://shell/hud/goods_card.gd" id="2_goods"]
+
+[node name="GoodsCard" instance=ExtResource("1_frame")]
+visible = false
+script = ExtResource("2_goods")
+show_close = false

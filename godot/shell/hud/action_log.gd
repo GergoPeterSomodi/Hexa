@@ -17,6 +17,8 @@ signal battle_requested(record: int)
 signal report_requested
 ## An older season's header asked for the History page at that season's turn.
 signal history_requested(turn: int)
+## The card opens or closes (sent before its slide, so the HUD can place it first).
+signal open_changed(open: bool)
 
 ## The filters up to this milestone (LogLines.FILTERS carries the milestone each one arrives in).
 const MILESTONE := 7
@@ -68,6 +70,8 @@ var _refresh_count := 0
 var _slide_tween: Tween = null
 ## The card's resting y (its position when closed-and-shown); the slide starts and ends from it.
 var _rest_y := 0.0
+## The card's rect in the widget's space: its home in action_log.tscn, or where the HUD moved it (place_card).
+var _placed := Rect2(0.0, -CARD_H - CARD_GAP, CARD_W, CARD_H)
 
 
 func _ready() -> void:
@@ -123,6 +127,7 @@ func bind_settings(settings: Settings) -> void:
 		_read_settings()
 		_apply_visibility()
 		refresh()
+		open_changed.emit(_open)
 
 
 ## Caps the open card's height at `available` px; the card is never taller than CARD_H, and its lines scroll when they do not fit.
@@ -134,6 +139,24 @@ func fit_height(available: float) -> void:
 	_card.offset_top = _card.offset_bottom - height  # the card keeps its bottom edge and grows up from it
 	if not (_slide_tween != null and _slide_tween.is_running()):
 		_rest_y = _card.position.y
+
+
+## Where the open card sits unless the HUD moved it: above the icon, in screen px.
+func card_home() -> Rect2:
+	var at := Hud.screen_rect(self).position
+	return Rect2(at + Vector2(0.0, -CARD_H - CARD_GAP), Vector2(CARD_W, CARD_H))
+
+
+## Moves the card to `rect` (screen px; its height caps the card, whose lines then scroll). The open state stays.
+func place_card(rect: Rect2) -> void:
+	if is_node_ready():
+		_move_card(Rect2(rect.position - Hud.screen_rect(self).position, rect.size))
+
+
+## Puts the card back where card_home() says.
+func reset_card() -> void:
+	if is_node_ready():
+		_move_card(Rect2(0.0, -CARD_H - CARD_GAP, CARD_W, CARD_H))
 
 
 ## Opens the card (it slides up) and marks every line read.
@@ -264,8 +287,27 @@ func _set_open(value: bool) -> void:
 		feed.mark_read()
 	if _settings != null:
 		_settings.set_value("state/log_open", _open)
+	open_changed.emit(_open)
 	_slide(_open)
 	refresh()
+
+
+## The card at `rect` in the widget's space. A new place ends a running slide.
+func _move_card(rect: Rect2) -> void:
+	if rect.is_equal_approx(_placed):
+		return
+	_placed = rect
+	if _slide_tween != null and _slide_tween.is_running():
+		_slide_tween.kill()
+		_slide_tween = null
+		_card.visible = _open
+		_card.modulate.a = 1.0
+	_card.custom_minimum_size.y = rect.size.y
+	_card.offset_left = rect.position.x
+	_card.offset_right = rect.end.x
+	_card.offset_bottom = rect.end.y
+	_card.offset_top = rect.position.y
+	_rest_y = _card.position.y
 
 
 ## Slides the card up (opening) or down and out (closing). A slide already running keeps the resting height it started from,

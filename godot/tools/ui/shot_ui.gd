@@ -191,6 +191,7 @@ func _capture_one(
 		app.set("cli_args_override", cli)
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
+	s.set_value("map/parchment", false)  # these pictures show the tiles, framed whole too (map-overview PM5)
 	s.set_value("graphics/preload_next_season", false)
 	s.set_value("accessibility/reduce_motion", true)
 	s.set_value("display/ui_scale", "100" if scale_mult == 1 else "200")

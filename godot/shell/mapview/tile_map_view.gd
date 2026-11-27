@@ -6,7 +6,8 @@
 ## (multiplied) and light (added); the sea; the coast; the pieces' flat ground and a harbour's; the hex grid; rivers
 ## and roads (EdgeLineLayer, one mesh a chunk); the shadows as one group; then the standing things, sorted by depth as
 ## one group: the relief, the six tree wedges, a piece's back and front band, a harbour, the three crossing layers;
-## then the marks (OVERLAYS).
+## then the marks (OVERLAYS). The parchment map over it takes the ground and the lines away (set_ground_shown,
+## set_lines_alpha).
 ##
 ## Seasons: every layer but two shares the season's TileSet (TilesetBuilder), which has three climate slots a source; a
 ## cell is set with the slot of its hex's climate (set_climates), so a season swap writes no cell. Godot rebuilds a
@@ -97,6 +98,10 @@ var _swap_focus := Rect2i()
 var _swap_at := 0
 var _swap_layer := 0
 var _swap_focus_left := 0
+var _groups: Array[CanvasItem] = []  # the shadows and the standing things
+var _ground_shown := true
+var _lines_alpha := 1.0
+var _grid_alpha := 1.0
 
 
 ## Makes the layers for a tileset (TilesetBuilder). Call once, before any set_tile.
@@ -114,6 +119,7 @@ func setup(tiles: TilesetBuilder) -> void:
 	standing.name = "Standing"
 	standing.z_index = STAND_Z
 	standing.y_sort_enabled = true
+	_groups = [shadows, standing]
 	var shadow_material := ShaderMaterial.new()
 	shadow_material.shader = load(SHADOW_SHADER) as Shader
 	if tiles.slots == TilesetBuilder.CLIMATES:
@@ -158,6 +164,7 @@ func setup(tiles: TilesetBuilder) -> void:
 		if WHOLE.has(_layer_names[k]):
 			_whole[k] = _new_layer(k, Vector2i.ZERO)
 	_chunk_array(Vector2i.ZERO)  # the first chunk's layers exist at once: layer(name) is always there
+	_apply_alphas()
 
 
 ## The climate of every hex (MapData.climate: 0 snow, 1 frost, 2 mild; `cols` hexes a row). A cell takes the slot of
@@ -379,6 +386,7 @@ func _new_layer(k: int, chunk: Vector2i) -> TileMapLayer:
 	layer.material = _materials[k]
 	layer.y_sort_enabled = str(spec[1]) == "stand"
 	layer.visible = not _hidden.get(layer_name, false)
+	layer.modulate.a = _layer_alpha(k)
 	var key := k * 1000000 + chunk.y * 1000 + chunk.x
 	layer.set_meta(ORDER, key)
 	var parent := _parents[k]
@@ -659,6 +667,68 @@ func _edge_chunk_keys(store: Dictionary[Vector2i, EdgeLineLayer]) -> Array[Vecto
 	var out: Array[Vector2i] = []
 	out.assign(store.keys())
 	return out
+
+
+# ----- under the parchment ------------------------------------------------------------------------------------------
+
+
+## The tile layers, the grid, the lines, the borders and the castle areas drawn (true) or not; the reach and the marks
+## stay. A part not drawn has alpha 0 (the renderer skips it): hiding a TileMapLayer instead would drop what it drew,
+## and showing it again would build all of it (0.4 s on a large map).
+func set_ground_shown(on: bool) -> void:
+	if on == _ground_shown:
+		return
+	_ground_shown = on
+	_apply_alphas()
+
+
+func ground_shown() -> bool:
+	return _ground_shown
+
+
+## The alpha of the lines (rivers and roads), the borders and the castle areas: they fade as the parchment comes in.
+func set_lines_alpha(alpha: float) -> void:
+	if is_equal_approx(alpha, _lines_alpha):
+		return
+	_lines_alpha = alpha
+	_apply_alphas()
+
+
+func lines_alpha() -> float:
+	return _lines_alpha
+
+
+## The hex grid's alpha by the zoom and its setting.
+func set_grid_alpha(alpha: float) -> void:
+	if is_equal_approx(alpha, _grid_alpha):
+		return
+	_grid_alpha = alpha
+	for one: TileMapLayer in layers_of("grid"):
+		one.modulate.a = _layer_alpha(_layer_at["grid"])
+
+
+## The alpha of a layer's own node: the marks keep theirs, a layer under a group follows the group.
+func _layer_alpha(k: int) -> float:
+	var layer_name := _layer_names[k]
+	if OVERLAYS.has(layer_name) or _parents[k] != self:
+		return 1.0
+	if not _ground_shown:
+		return 0.0
+	return _grid_alpha if layer_name == "grid" else 1.0
+
+
+func _apply_alphas() -> void:
+	if _lines == null:
+		return
+	var ground := 1.0 if _ground_shown else 0.0
+	for node: CanvasItem in _groups:
+		node.modulate.a = ground
+	for node: CanvasItem in [_lines, _borders, _areas]:
+		node.modulate.a = ground * _lines_alpha
+	for k: int in _layer_names.size():
+		if _parents[k] == self and not OVERLAYS.has(_layer_names[k]):
+			for one: TileMapLayer in layers_of(_layer_names[k]):
+				one.modulate.a = _layer_alpha(k)
 
 
 # ----- asking -------------------------------------------------------------------------------------------------------

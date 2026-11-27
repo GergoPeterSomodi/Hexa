@@ -687,3 +687,31 @@ func test_v_asks_for_the_path_at_the_cursor() -> void:
 	assert_eq(asked.size(), 1)
 	_input._unhandled_input(_key(KEY_V, true))
 	assert_eq(asked.size(), 1, "Ctrl+V is not V")
+
+
+## map-overview-build-spec.md R25: 7 asks for the Goods mode, [ and ] for the good before or after; held repeats, other
+## chords and a text field do nothing.
+func test_7_and_the_brackets_ask_for_goods_and_step_its_good() -> void:
+	var log: Array[String] = []
+	_input.mode_requested.connect(func(m: int) -> void: log.append("mode:%d" % m))
+	_input.good_step_requested.connect(func(by: int) -> void: log.append("good:%d" % by))
+	_input._unhandled_input(_key(KEY_7))
+	_input._unhandled_input(_key(KEY_BRACKETLEFT))
+	_input._unhandled_input(_key(KEY_BRACKETRIGHT))
+	assert_eq(log, ["mode:%d" % MapModes.Mode.GOODS, "good:-1", "good:1"])
+	log.clear()
+	_input._unhandled_input(_key(KEY_BRACKETLEFT, true))  # Ctrl+[ steps a window's tabs
+	var held := _key(KEY_BRACKETRIGHT)
+	held.echo = true
+	_input._unhandled_input(held)
+	var edit := LineEdit.new()
+	_vp.add_child(edit)
+	edit.grab_focus()
+	_input._unhandled_input(_key(KEY_7))
+	_input._unhandled_input(_key(KEY_BRACKETLEFT))
+	edit.release_focus()
+	assert_eq(log, [] as Array[String])
+	assert_true(bool(Bindings.apply_overrides({"map_good_next": "K"})["ok"]))
+	_input._unhandled_input(_key(KEY_K))
+	assert_eq(log, ["good:1"], "rebindable")
+	Bindings.reset_defaults()

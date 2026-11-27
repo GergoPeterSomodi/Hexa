@@ -299,3 +299,16 @@ func test_m7_ctrl_right_click_gesture_line_is_on_every_platform() -> void:
 		assert_true(Bindings.gestures_for(platform).has(line), "%s has the storm line" % platform)
 		for old: String in Bindings.gestures_for(platform):
 			assert_false(old.begins_with("Shift+right") and old.contains("storm"), "P: a stale storm line on %s" % platform)
+
+
+func test_the_goods_keys_have_the_spec_keys_and_reach_the_shell() -> void:
+	Bindings.ensure(Bindings.SHELL_MILESTONE)
+	var wanted: Dictionary = {&"view_mode_7": "7", &"map_good_prev": "BracketLeft", &"map_good_next": "BracketRight"}
+	for action: StringName in wanted:
+		var entry := _entry_of(action)
+		assert_false(entry.is_empty(), "%s has a row" % action)
+		assert_eq(Array(entry["events"]), [wanted[action]], "%s default key" % action)
+		assert_eq(str(entry["group"]), "View")
+		assert_true(InputMap.has_action(action), "%s is bound in the shell (R25)" % action)
+		assert_true(bool(Bindings.apply_overrides({String(action): "F8"})["ok"]), "%s can be bound anew" % action)
+		Bindings.reset_defaults()

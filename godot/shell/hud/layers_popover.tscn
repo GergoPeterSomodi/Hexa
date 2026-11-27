@@ -133,6 +133,23 @@ focus_mode = 0
 accessibility_name = "Country tint"
 script = ExtResource("3_sw")
 
+[node name="ParchmentRow" type="HBoxContainer" parent="VBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="VBox/ParchmentRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"TableRow"
+text = "Parchment map"
+
+[node name="ParchmentSwitch" type="CheckButton" parent="VBox/ParchmentRow"]
+layout_mode = 2
+focus_mode = 0
+accessibility_name = "Parchment map"
+script = ExtResource("3_sw")
+
 [node name="MinimapRow" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
 mouse_filter = 2

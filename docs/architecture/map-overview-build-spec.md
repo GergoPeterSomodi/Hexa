@@ -19,7 +19,7 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
 | Far picture | `shell/mapview/far_map.gd` (`FarMap`, z 75; solid at or below 0.20, gone at 0.25) | kept for the modes and the setting that have no parchment; hidden under a solid parchment |
 | Tiles | `shell/mapview/tile_map_view.gd` (ground to z 45, lines 50, areas 82, borders 85, reach 83, marks 90) | the tile layers and lines are hidden under a solid parchment; reach and marks stay on top (D4) |
 | Modes | `core/views/map_modes.gd` (`Mode` TERRAIN..SUPPLY, keys 1 to 6, `MODE_KEYS`, `modes(game)`), `shell/map/mode_overlay.gd` (z 80, 796 lines) | one new mode, GOODS (key 7); the overlay is not edited (D5) |
-| Fog | `MapModes.discovered_bytes` / `discovered_key`, `shell/map/deep_fog.gd`, `MapModes.sight_bytes`, `Knowledge.discovered` | the parchment reads the same bytes; nothing on an undiscovered hex (R12 to R15) |
+| Fog | `MapModes.discovered_bytes` / `discovered_key`, `shell/map/deep_fog.gd`, `MapModes.sight_bytes`, `Knowledge.discovered` | the parchment reads the discovered bytes, not the sight bytes (R14, 2026-11-27); nothing on an undiscovered hex (R12 to R15) |
 | Names | `core/views/country_names.gd` (regions of 3 hexes or more), `shell/mapview/country_labels.gd` (Cinzel, screen space, cover rects), `shell/mapview/map_labels.gd` (plates, off by default) | the parchment has its own names (D7); CountryLabels fades out as it fades in |
 | Marks | `CapitalMarks` z 86, `WorkMarks` 87, `ArmyTokens` 88, `WarMarks` 89, `PathMarks` 84, `PreviewMarks` 82 | capitals hide under a solid parchment (it draws its own); every other mark stays above it |
 | HUD | `shell/hud/top_bar.gd` (Segmented mode switch), `mode_legend.gd`, `map_hover.gd`, `layers_popover.gd`, `shell/ui/soon_tag.gd`, Kit icons `good_*` | the Goods segment, the goods card, the legend rows, a compact hover line |
@@ -44,8 +44,10 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   edge shared by two hexes moves the same way for both, so no gaps or slivers appear. The hash is pure arithmetic, not
   luck: it does not use `core/rng.gd` and gives the same picture on every machine.
 - **R4** Line widths and dash lengths are in screen pixels and do not change with the zoom: coast 3 px, borders 2 px in
-  9 px dashes with 6 px gaps, district lines 1 px dotted. The hatch spacing is in map pixels; when it would be under
+  9 px dashes with 6 px gaps, district lines 0.8 px dotted. The hatch spacing is in map pixels; when it would be under
   3 screen px it becomes a flat tint (no moire).
+  Amendment (2026-11-27): district lines are 0.8 px (1 px in high contrast). The district and mountain inks are the
+  mockup's see-through ones (`#8a7a64` at 0.7, `#7d6a52` at 0.6); high contrast draws them darker and opaque.
 - **R5** Mountain marks: a small ink zig-zag on a hex above 1,400 m, a larger one above 2,400 m (`MapData.height_m`).
 
 ### What it shows in each mode
@@ -63,6 +65,8 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   turned along its long axis (the main axis of its hex centres, kept within plus or minus 55 degrees), sized by its area
   (about 8 px times the square root of its hexes at a 58 px hex, scaled by the hex's screen size) and never longer than
   the region along that axis; 14 to 48 px, scaled by `accessibility/text_size`. Paper halo 4 px.
+  Amendment (2026-11-27): the letters are spaced 0.08 em apart (counted in the fitted width). In Goods mode the name and
+  its halo are 0.82 opaque, as in the mockup; in the other modes and in high contrast they are opaque.
 - **R9** Detail by screen hex width `s` (zoom times 104):
   - `s` under 24 px, the far view: countries and capital dots only, plus goods icons when `s` is 16 px or more;
   - `s` 24 px or more, the town view: also town dots (village or larger, dot size by level), capital and town names
@@ -72,6 +76,19 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   normal by up to one line to clear a capital, else it is drawn anyway: every country is named); goods icons; towns by
   level, then name. A town name that collides with anything placed, or with a HUD cover rect (`Hud.cover_rects`), is
   dropped; its dot stays.
+  Amendment (2026-11-27): a country name that cannot fit its room (D7) at 14 px is left out, though R10 names every one. A goods icon with no free spot in its hex because of a country name is drawn over the name; icons still overlap no other icon, capital or cover rect.
+  Amendment (2026-11-27): a name that would cover a capital is tried clear of it at full size, then at 75 and 50 % (never
+  under 14 px; with larger text also at the size it fits at 100 %). At each size it slides up to one line, or moves the
+  capital's name to the other side of its dot, then takes a farther spot on its own known land (again moving capital
+  names where needed). Only when no size has such a spot is it drawn over the capital. A goods disc is 56 % of the hex
+  wide (12 px at least), with its pips below it.
+  Amendment (2026-11-27): the disc stops growing at about 69 px wide (from a hex about 122 px wide), so the 24 px Kit
+  icon is never drawn above twice its size; the pips follow the disc.
+  Amendment (2026-11-27): where its own known land has room, a country name also keeps clear of the HUD cover rects and
+  of the spots the goods icons would take, trying the places just past them too. It gives up the icons first, then the
+  capitals (it is drawn under a capital rather than under a cover); it stays under a cover only when no spot on its land
+  is clear of it. It may shrink to get out from under a cover, never to get off an icon. Icons are still placed after
+  the names.
 - **R11** Layout runs only when the view changes (`CameraRig.view_changed`), the data changes (owners, discovery, works,
   mode, good) or the cover rects change; never every frame. Only what is on screen is laid out.
 
@@ -81,8 +98,9 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   mountain mark, hatch, tint, goods shade, icon, dot or name is drawn on it or from it.
 - **R13** A coast edge is drawn when its land hex is discovered. A border or district line is drawn only when **both**
   hexes are discovered. A country name, a legend count and a town list read discovered hexes only.
-- **R14** Light fog (discovered, not in sight): owners and goods exact (land facts, as the fog build rules); the sight veil
-  is drawn over it when `map/sight_veil` is on, in a parchment tone.
+- **R14** Light fog (discovered, not in sight): owners and goods exact (land facts, as the fog build rules), and drawn as
+  land in sight is. The parchment does not dim it and lays no sight veil, whatever `map/sight_veil` says (owner's
+  decision, 2026-11-27; the tile view's veil is unchanged). Only undiscovered hexes differ (R12).
 - **R15** The parchment draws no armies. Army tokens, war marks, paths and previews keep their own fog rules and draw above
   it, unchanged.
 
@@ -94,6 +112,11 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   `CountryLabels` are hidden. In the fade band the tile borders and lines fade out as the parchment fades in, and
   `CountryLabels` fades by one minus the parchment's alpha. Reach overlays, the selection and build marks, preview, path,
   work, army and war marks and floaters stay above the parchment at every alpha.
+  Amendment (2026-11-27): there is no resting fade band (D2); the same fades run during the 0.25 s cross-fade only. The
+  place plates (`MapLabels`, key N) fade by one minus the alpha like `CountryLabels`, and names faded out block no plate.
+  With `map/parchment` on the tile view itself is never hidden (showing it again builds every tile layer): its ground is
+  switched off, and at the far zoom of the data modes its reach and marks are hidden with it. The army tokens, paths and
+  reach draw over the parchment's names too (D1).
 - **R18** `map/parchment` off: Terrain and Owner never turn to parchment (today's look); Goods mode still shows it (it is
   the goods map). `map/borders` off hides the parchment's borders too.
 
@@ -103,7 +126,11 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   with a player). The bar's compact steps are measured again so nothing overflows at 1280 x 720.
 - **R20** In Goods mode a kit-framed card ("Goods produced", `PanelFrame`, bottom left of the map area) shows one icon
   button per good that some family makes (Kit `good_*` icons, 6 a row, GameDefs order). The chosen good is marked by the
-  kit's selected state, not by colour alone. Each button's tooltip: "Grain: 14 districts you know make it". A good no
+  kit's selected state, not by colour alone.
+  Amendment (2026-11-27): the chosen good's button is filled with the kit's gold plate with its thick border, as in the
+  mockup (the kit variation `ButtonChoice`, made of the primary button's pieces), and keeps its tick. In a small window
+  the card stays bottom left: the legend moves out of its way before the card leaves its place, and the toasts move off
+  it. Each button's tooltip: "Grain: 14 districts you know make it". A good no
   known district makes is shown and pickable, with "none you know". Under the grid, two greyed rows with a `SoonTag`,
   "Population" and "Unrest" (the mockup's "soon" modes; Food balance is the existing Food mode, key 5; plan question 1).
 - **R21** `ModeLegend` in Goods mode: the good's name as title; rows "First stage", "Second stage", "Third stage" with their
@@ -124,17 +151,21 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
 - **R25** Keys (`bindings.gd`, rebindable): `view_mode_7` "7" (Goods); `map_good_prev` "[" and `map_good_next` "]" step
   the chosen good in Goods mode. The goods card is keyboard reachable: its buttons take focus, arrows move in the grid,
   Enter or Space picks.
+  Amendment (2026-11-27): a mouse press on the map (left, right or middle) gives the keyboard back to the map.
 - **R26** Colour-blind safe: the goods ramp is one hue with lightness steps of at least 15 L* between stages, and the stage
   is also given by the pips and the hover line. Country tints follow `accessibility/country_colours`. High contrast
   (`accessibility/high_contrast`) draws the coast and borders 1 px thicker and the ink darker.
 - **R27** Text contrast: name ink on its paper halo at least 4.5:1; lines on the land at least 3:1 (a test checks the token
   pairs). Every icon has a tooltip (the card's) or a hover line (the map's). Town names are 13 to 17 px, capitals 17 px,
   all scaled by `accessibility/text_size` and the UI scale.
+  Amendment (2026-11-27): the district and mountain inks are decoration, about 2.1:1 on the land in the standard set.
+  3:1 is kept for them in high contrast, and for all other line pairs in both sets.
 
 ### Performance (budgets in plan section 4)
 
 - **R28** Static geometry is built once per map (sliced at `MapScene.slice_ms` a frame on a large map). A change of owner,
   discovery, sight, mode, good or works never rebuilds geometry: it writes texels or sets a uniform.
+  Amendment (2026-11-27): a change of sight alone writes no texel (R14).
 - **R29** On an ownership change only the touched texels are written and the names are laid out again; at most the
   existing `owner_change_frame_ms` (16 ms) with the parchment on.
 
@@ -147,18 +178,27 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   (`shell/mapview/parchment_labels.gd`, a `Control` in the `Names` canvas layer after `Labels`) owns names, dots and
   icons. The facts come from two pure views in `core/views/`: `ParchmentShape` (geometry) and `ParchmentView` (goods
   bytes, counts, legend, names, towns, tip). The shell draws; it holds no rules.
-- **D2 The fade band follows the fit zoom.** `solid = max(fit, 0.28)` and `gone = solid × 1.3`, where `fit` is
-  `ZoomModel.fit_zoom` for the window's free map area. Alpha is 1 at or below `solid`, 0 at or above `gone`, linear
-  between. On north Italy at 1920 x 1080 (fit about 0.65) the whole-map view is parchment and two wheel notches in bring
-  the tiles back; on a large map the parchment starts at hexes about 38 px wide and is solid at 29 px, above `FarMap`'s band. Goods mode
-  forces alpha 1 at every zoom. `reduce_motion` does not matter: the alpha follows the zoom, not time.
+- **D2 The switch follows the fit zoom.** Amended 2026-11-27: no resting half-and-half view (it replaces the
+  zoom-proportional fade band). With `base = max(fit, 0.28)`, where `fit` is `ZoomModel.fit_zoom` for the window's free
+  map area, zooming in the tiles take over at `base × 1.24` and zooming out the parchment comes back under `base × 1.2`
+  (`ParchmentSwitch`; a zoom between the two keeps what it shows). On north Italy at 1920 x 1080 (fit about 0.65) the
+  whole-map view is parchment, one wheel notch in stays parchment and two notches show the tiles; on a large map the
+  tiles take over at hexes about 36 px wide and the parchment comes back under 35 px, above `FarMap`'s band. A crossing
+  cross-fades over 0.25 s of time; at rest the alpha is exactly 0 or 1. It switches at once on a load, on a change of mode
+  or setting, at the end of the country pick and under `reduce_motion`. Goods mode forces alpha 1 at every zoom.
+  Amendment to D1 (2026-11-27): `ParchmentLabels` stands in the map scene's world just after `Parchment`, at its z, not
+  in the `Names` canvas layer, so army tokens, war marks, paths, previews and reach are drawn over its names; it lays out
+  in screen px and draws through the view's inverse transform. Its name spots and icon spots are
+  `ParchmentNameSpots` and `ParchmentIconSpots`.
+  Amendment to D1 (2026-11-27): it is a `Node2D`, so the renderer culls it by what it draws. A `Control` of size 0 gave
+  the renderer an empty rect, and the layer was dropped once the map's point (0, 0) left the screen.
 - **D3 Static geometry, dynamic textures.** `ParchmentShape` gives, once per map, the land polygons (12 points a hex, every
   hex, sea too, so the unknown fill can cover sea), every edge as 3 points with its two hex indexes and a kind (coast or
   land-land), and the mountain marks with their hex. The shell turns them into one `ArrayMesh` a chunk (64 x 32 hexes)
   with the hex index in a vertex attribute. Textures of one texel a hex carry what changes, **already masked by the fog in
   core**: the known owner (`ParchmentView.owner_bytes`: the owner id, 0 unowned, 255 undiscovered, rebuilt by
-  `MapModes.discovered_key` and the owners), sight (`MapModes.sight_bytes`), and the goods bytes (good id plus one, and
-  the stage; 0 when undiscovered). So the shaders are never given a fact the viewer may not know, and the fog rules are
+  `MapModes.discovered_key` and the owners) and the goods bytes (good id plus one, and the stage; 0 when undiscovered);
+  no sight texture (R14, 2026-11-27). So the shaders are never given a fact the viewer may not know, and the fog rules are
   tested on bytes, headless. The shaders decide the rest: 255 is the unknown fill; a land-land edge is a dashed border
   when the owners differ, a dotted district line when they match, nothing when either side is 255; a coast edge is
   drawn when its land side is not 255. Picking a good sets one uniform.
@@ -182,7 +222,8 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
 - **D8 Hatched water and sea in shaders.** The hatch is a strip mesh along the coast edges with UVs (along, across) and a
   small shader of wavy lines; the sea is one quad with a hash speckle. Colours reach shaders only as uniforms.
 - **D9 Colours as tokens.** A new `shell/ui/parchment_tokens.gd` (`ParchmentTokens`, standard and high-contrast sets: sea,
-  speckle, hatch, land, unknown, veil, district line, mountain, border, coast, name ink, halo, the goods ramp, icon disc)
+  speckle, hatch, land, unknown, district line, mountain, border, coast, name ink, halo, the goods ramp, icon disc;
+  no veil, R14, 2026-11-27)
   is added to the lint's `UI_STYLE_ALLOWLIST`; no other new file has a `Color(` literal. `tokens.gd` is not grown.
 - **D10 The goods card is new HUD, not a new frame.** `shell/hud/goods_card.gd` and `.tscn` build on `PanelFrame`,
   `KitButton`, `SoonTag` and `PanelKit` labels. The legend is `ModeLegend` with Goods rows from `ParchmentView.legend`.
@@ -236,13 +277,15 @@ func begin(game: Game) -> void; func step(budget_ms: float) -> void; func is_bui
 func sync(game: Game) -> void                    # texels by key compare; one compare a frame while nothing moves
 func owners_changed(hexes: Array[Vector2i]) -> void
 func set_mode(mode: int) -> void; func set_good(good_id: int) -> void
-func set_options(tint: bool, borders: bool, veil: bool, colour_blind: bool, high_contrast: bool, enabled: bool) -> void
-func apply_zoom(zoom: float, fit: float) -> float  # sets modulate and visible; returns the alpha used
+func set_options(tint: bool, borders: bool, colour_blind: bool, high_contrast: bool, enabled: bool) -> void  # no veil (R14)
+func apply_zoom(zoom: float, fit: float) -> float  # sets visible and the picture's alpha; returns the alpha used
+func picture() -> CanvasGroup                     # holds the layers and fades them as one (its self_modulate)
+func is_fading() -> bool                          # true only while the alpha is between 0 and 1
 var geometry_builds := 0                          # tests: never moves after the first build
 
 # shell/mapview/parchment_labels.gd
-class_name ParchmentLabels extends Control
-func setup(game: Game, viewer: StringName) -> void
+class_name ParchmentLabels extends Node2D
+func setup(game: Game) -> void                    # the viewer is game.player, read with the facts
 func set_mode(mode: int) -> void; func set_good(good_id: int) -> void; func set_alpha(a: float) -> void
 func set_cover(rects: Array[Rect2]) -> void
 func relayout(xform: Transform2D, zoom: float, viewport: Vector2) -> void

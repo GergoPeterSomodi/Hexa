@@ -13,6 +13,7 @@ var _game: Game = null
 var _colour_blind := false
 var _mode: MapModes.Mode = MapModes.Mode.TERRAIN
 var _picking := false
+var _covered := false  # the solid parchment draws its own capitals over the map
 var _items: Array[Dictionary] = []  # {id, tag, capital, pole, cloth}
 var _fallback_theme: Theme = null
 var _fog_rev := -1  # the player's explored revision the pennants were built for (R37)
@@ -46,6 +47,14 @@ func set_mode(mode: MapModes.Mode) -> void:
 ## Sets whether country picking is active and refreshes pennant visibility.
 func set_picking(on: bool) -> void:
 	_picking = on
+	_update_visibility()
+
+
+## Hides the pennants while the parchment map is solid over them.
+func set_covered(on: bool) -> void:
+	if on == _covered:
+		return
+	_covered = on
 	_update_visibility()
 
 
@@ -142,7 +151,8 @@ func _process(_delta: float) -> void:
 
 
 func _update_visibility() -> void:
-	var show_marks := _game != null and _game.has_countries() and (_mode == MapModes.Mode.OWNER or _picking) and not _items.is_empty()
+	var show_marks := _game != null and _game.has_countries() and (_mode == MapModes.Mode.OWNER or _picking) \
+			and not _covered and not _items.is_empty()
 	if show_marks:
 		_sync_textures()
 	visible = show_marks

@@ -10,12 +10,11 @@ const SPECKLE := Color("#8a654624")
 const HATCH := Color("#8a65469e")
 const LAND := Color("#e6e0d4")
 const UNKNOWN := Color("#c3ab85")
-## The sight veil over light fog, laid over the land by its alpha.
-const VEIL := Color("#6b54352e")
 
-# The lines on the land (each 3:1 or more against it).
-const DISTRICT := Color("#6b5c47")
-const MOUNTAIN := Color("#6e5d45")
+# The lines on the land. The borders and the coast are 3:1 or more against it. The district dots and the mountain marks
+# are the approved mockup's faint inks: see-through and about 2:1; high contrast draws them opaque, 3:1 or more.
+const DISTRICT := Color("#8a7a64b3")
+const MOUNTAIN := Color("#7d6a5299")
 const BORDER := Color("#3a2a1c")
 const COAST := Color("#2e2117")
 
@@ -56,18 +55,19 @@ const COAST_PX := 3.0
 const BORDER_PX := 2.0
 const BORDER_DASH_PX := 9.0
 const BORDER_GAP_PX := 6.0
-const DISTRICT_PX := 1.0
+const DISTRICT_PX := 0.8
+const HC_DISTRICT_PX := 1.0
 const HC_EXTRA_PX := 1.0
 ## The paper halo round a name (R8).
 const HALO_PX := 4
 
 
-## Every colour by role, for the standard or the high-contrast set: sea, speckle, hatch, land, unknown, veil, district,
+## Every colour by role, for the standard or the high-contrast set: sea, speckle, hatch, land, unknown, district,
 ## mountain, border, coast, name_ink, town_ink, halo, dot_fill, dot_edge, disc, disc_edge, pip, goods_1, goods_2,
 ## goods_3. A new dictionary each time.
 static func colours(high_contrast: bool) -> Dictionary[StringName, Color]:
 	var out: Dictionary[StringName, Color] = {
-		&"sea": SEA, &"speckle": SPECKLE, &"hatch": HATCH, &"land": LAND, &"unknown": UNKNOWN, &"veil": VEIL,
+		&"sea": SEA, &"speckle": SPECKLE, &"hatch": HATCH, &"land": LAND, &"unknown": UNKNOWN,
 		&"district": DISTRICT, &"mountain": MOUNTAIN, &"border": BORDER, &"coast": COAST, &"name_ink": NAME_INK,
 		&"town_ink": TOWN_INK, &"halo": HALO, &"dot_fill": DOT_FILL, &"dot_edge": DOT_EDGE, &"disc": DISC,
 		&"disc_edge": DISC_EDGE, &"pip": PIP, &"goods_1": GOODS_1, &"goods_2": GOODS_2, &"goods_3": GOODS_3,
@@ -97,3 +97,7 @@ static func coast_px(high_contrast: bool) -> float:
 
 static func border_px(high_contrast: bool) -> float:
 	return BORDER_PX + (HC_EXTRA_PX if high_contrast else 0.0)
+
+
+static func district_px(high_contrast: bool) -> float:
+	return HC_DISTRICT_PX if high_contrast else DISTRICT_PX

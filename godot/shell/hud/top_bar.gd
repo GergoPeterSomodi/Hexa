@@ -1,11 +1,12 @@
 ## Studiolo walnut top bar (PanelBar): brand, the player's country (arms and long name, or the pick's title in a
-## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields, Food, Supply: the modes MapModes.modes offers), the date and End turn (DateEnd, right of the middle),
+## scenario game) or the map info of a map-only game, the mode switch (Terrain, Owner, Relief, Yields, Food, Supply,
+## Goods: the modes offered_modes gives), the date and End turn (DateEnd, right of the middle),
 ## Layers, Help and Pause menu (docs/architecture/m2-build-spec.md section 7.3; ui-and-controls-spec.md section 7).
 ## M4 (spec 6.3) and M5 (spec 6.2): the resource chips (Ducats, People, Food, Stores) sit right after the mode switch with the
 ## study button; they show only for the player of a game with countries (the sandbox and the pick have no chips and no Food
 ## mode). When the bar is tight the gap goes first, then the Stores and Food chips shrink to their medals and values, the
 ## mode buttons tighten, the country name goes, then People's and Ducats' names and changes and the brand, then the Stores
-## chip, the Food chip and the study button; the Ducats and People medals and values hold down to about 870 px (M6, six modes), and
+## chip, the Food chip and the study button; the Ducats and People medals and values hold down to about 875 px (seven modes), and
 ## below that, where nothing else is left, the chips hide (I, L and the country panel still open the study).
 ## It reads Session and Events and sends intents only. The name hides before the mode switch when the window narrows.
 class_name TopBar
@@ -21,15 +22,16 @@ signal study_requested(page: StringName)
 ## A chip was pressed: the study opens at `page` on its `tab` (Ducats: This season, Stores: Goods).
 signal study_tab_requested(page: StringName, tab: StringName)
 
-const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food", "Supply"]
-const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5", "6"]
+const MODE_LABELS: Array[String] = ["Terrain", "Owner", "Relief", "Yields", "Food", "Supply", "Goods"]
+const MODE_KEYS: Array[String] = ["1", "2", "3", "4", "5", "6", "7"]
 const PICK_TAIL := ": choose your country"
 const WATCHING_TEXT := "Watching"
 const SEAL_LETTER := "S"
 const MAX_FITS_PER_FRAME := 3
-## The mode buttons' side padding and font size when the bar is tight (six modes need the room the three had).
+## The mode buttons' side padding, font size and gap when the bar is tight (seven modes need the room the three had).
 const COMPACT_PAD := 1.0
 const COMPACT_FONT := 12
+const COMPACT_GAP := 2
 const BUTTON_STATES: Array[StringName] = [&"normal", &"pressed", &"hover", &"hover_pressed", &"disabled", &"focus"]
 
 @onready var _brand_label: Label = $HBox/Brand
@@ -162,13 +164,14 @@ func set_layers_open(open: bool) -> void:
 		_layers_btn.set_pressed_no_signal(open)
 
 
-## M6 (L17, the Supply segment, key 6): six mode segments, compact padding 1 px (was 2). M6 (L21, the Army chip between Food
-## and Stores): the Army chip has no name (medal, value, change), its change goes after the compact modes and before the
-## country name, and the chip hides between Stores and Food. Measured by test_hud's narrowing test, the width at which
-## each step first happens (px, the window width): the gap 1915, Stores' name 1790, Food's name 1700, the compact modes 1675, the Army change 1490, the country 1435,
-## People's name 1315, Ducats' name 1280, Ducats' change 1240, the brand 1190, Stores 1110, the Army chip 1035, Food 975, the
-## study button 905, the chips 870. The narrowest fit (a game with the chips gone) was about 695 px and the chips are gone
-## below 870 px, so the 700 px window still holds (not re-measured for L21).
+## M6 (L17, the Supply segment, key 6): compact padding 1 px (was 2). M6 (L21, the Army chip between Food and Stores): the
+## Army chip has no name (medal, value, change), its change goes after the compact modes and before the country name, and
+## the chip hides between Stores and Food. With Goods, the seventh segment (key 7), the compact modes also close the gap
+## between their buttons from 8 to 2 px. Measured for Genoa by a 5 px scan, the width at which each step first happens
+## (px, the window width): the gap 1990, Stores' name 1860, Food's name 1775, the compact modes 1745, the Army change
+## 1495, the country 1440, People's name 1320, Ducats' name 1280, Ducats' change 1245, the brand 1190, Stores 1110, the
+## Army chip 1035, Food 975, the study button 910, the chips 875. The narrowest fit (a game with the chips gone) is 699 px,
+## so the 700 px window still holds, with 1 px to spare.
 ## Fits the bar into `width` px: the gap goes first, then the Stores and Food chips shrink to their medals and values, the mode
 ## buttons tighten, the country name (or the map info of a sandbox) goes, then People's and Ducats' names and changes and the
 ## brand, then the Stores chip, the Food chip and the study button, and last of all the chips; the arms,
@@ -180,6 +183,10 @@ func fit_width(width: float) -> void:
 	_fitting = true
 	_fit(width)
 	_fitting = false
+	# While the fit measured, the mode buttons may have been stretched past their switch for a moment, and a switch whose
+	# size ends as it began is not sorted again by itself: its buttons would then lie over the date.
+	_mode_seg.queue_sort()
+	(_mode_seg.get_node("Buttons") as Container).queue_sort()
 
 
 func _fit(width: float) -> void:
@@ -337,8 +344,16 @@ func _refresh_name() -> void:
 	_country_btn.tooltip_text = "Your country (C)"
 
 
+## The modes the switch shows: MapModes.modes, with Goods wherever Yields is (map-overview-build-spec.md R19).
+static func offered_modes(game: Game) -> Array[int]:
+	var out := MapModes.modes(game)
+	if out.has(MapModes.Mode.YIELDS) and not out.has(MapModes.Mode.GOODS):
+		out.append(MapModes.Mode.GOODS)
+	return out
+
+
 func _set_mode_options() -> void:
-	var offered := MapModes.modes(Session.game)
+	var offered := offered_modes(Session.game)
 	if not offered.has(_mode_index):
 		_mode_index = int(MapModes.Mode.TERRAIN)
 	var items: Array[Dictionary] = []
@@ -348,14 +363,16 @@ func _set_mode_options() -> void:
 		items.append({"id": i, "label": MODE_LABELS[i], "tooltip": "%s [%s]" % [MODE_LABELS[i], MODE_KEYS[i]]})
 	_mode_seg.set_options(items)
 	_modes_compact = false  # the new buttons have their own padding
+	_set_mode_gap(false)
 	_mode_seg.select(_mode_index, false)
 
 
-## Tightens (or restores) the padding and font of the mode buttons.
+## Tightens (or restores) the padding and font of the mode buttons and the gap between them.
 func _set_modes_compact(on: bool) -> void:
 	if on == _modes_compact:
 		return
 	_modes_compact = on
+	_set_mode_gap(on)
 	for mode: int in MODE_LABELS.size():
 		var btn := _mode_seg.button_for(mode)
 		if btn == null:
@@ -371,6 +388,14 @@ func _set_modes_compact(on: bool) -> void:
 			btn.add_theme_font_size_override(&"font_size", COMPACT_FONT)
 		else:
 			btn.remove_theme_font_size_override(&"font_size")
+
+
+func _set_mode_gap(tight: bool) -> void:
+	var row := _mode_seg.get_node("Buttons") as HBoxContainer
+	if tight:
+		row.add_theme_constant_override(&"separation", COMPACT_GAP)
+	else:
+		row.remove_theme_constant_override(&"separation")
 
 
 func _on_mode_changed(id: Variant) -> void:
