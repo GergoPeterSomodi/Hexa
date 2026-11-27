@@ -258,18 +258,22 @@ func test_m7_rows_have_the_spec_keys_and_groups() -> void:
 	assert_true(InputMap.has_action(&"game_battle"))
 
 
-## moves in the month (R62): the stop key, its row and the Shift+left click line on every platform; V on no other action.
+## moves in the month (R62): the path key, its row and the Shift+right click line on every platform; V on no other action;
+## none of them says "stop".
 func test_the_waypoint_key_and_gesture_line() -> void:
 	var entry := _entry_of(&"map_waypoint_key")
 	assert_eq([str(entry["since"]), str(entry["group"]), str(entry["label"])],
-		["8", "Map", "Add or remove a stop at the cursor"])
+		["8", "Map", "Add a path point at the cursor, or remove the last"])
 	assert_eq(entry["events"], ["V"], "the default key")
 	for other: Dictionary in Bindings.DEFAULTS:
 		if other["action"] != &"map_waypoint_key":
 			assert_false((other["events"] as Array).has("V"), "P: V bound twice (%s)" % other["action"])
-	var line := "Shift+left click: add a stop to the selected army's march (V at the cursor)"
+	var line := "Shift+right click (Shift+two-finger click): add to the selected army's path; on its last point, remove it (V)"
 	for platform: String in ["macOS", "Windows", "Linux", "default"]:
-		assert_true(Bindings.gestures_for(platform).has(line), "P: %s lacks the stop line" % platform)
+		assert_true(Bindings.gestures_for(platform).has(line), "P: %s lacks the path line" % platform)
+		for old: String in Bindings.gestures_for(platform):
+			assert_false(old.begins_with("Shift+left click"), "P: a stale Shift+left line on %s" % platform)
+			assert_false(old.contains("add a stop"), "P: a stale stop line on %s" % platform)
 	Bindings.ensure()
 	assert_true(InputMap.has_action(&"map_waypoint_key"))
 
@@ -289,7 +293,9 @@ func test_m7_shift_o_is_the_storm_and_plain_o_still_commands() -> void:
 	assert_false(plain.is_action_pressed(&"map_command_storm", false, true), "plain O does not storm")
 
 
-func test_m7_shift_right_click_gesture_line_is_on_every_platform() -> void:
-	var line := "Shift+right click (Shift+two-finger click): storm a fortress with the selected army"
+func test_m7_ctrl_right_click_gesture_line_is_on_every_platform() -> void:
+	var line := "Ctrl+right click (Ctrl+two-finger click): storm a fortress with the selected army"
 	for platform: String in ["macOS", "Windows", "Linux", "default"]:
 		assert_true(Bindings.gestures_for(platform).has(line), "%s has the storm line" % platform)
+		for old: String in Bindings.gestures_for(platform):
+			assert_false(old.begins_with("Shift+right") and old.contains("storm"), "P: a stale storm line on %s" % platform)

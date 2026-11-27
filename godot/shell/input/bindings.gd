@@ -151,7 +151,7 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["Shift+O"] as Array[String]},
 	{"action": &"game_battle", "label": "Last battle", "group": "Game", "since": "7",
 		"events": ["B"] as Array[String]},
-	{"action": &"map_waypoint_key", "label": "Add or remove a stop at the cursor", "group": "Map", "since": "8",
+	{"action": &"map_waypoint_key", "label": "Add a path point at the cursor, or remove the last", "group": "Map", "since": "8",
 		"events": ["V"] as Array[String]},
 ]
 
@@ -161,8 +161,8 @@ const GESTURES: Dictionary = {
 		"Trackpad pinch or mouse wheel: zoom about the pointer",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
-		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
-		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
+		"Shift+right click (Shift+two-finger click): add to the selected army's path; on its last point, remove it (V)",
+		"Ctrl+right click (Ctrl+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Windows": [
@@ -170,8 +170,8 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
-		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
-		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
+		"Shift+right click (Shift+two-finger click): add to the selected army's path; on its last point, remove it (V)",
+		"Ctrl+right click (Ctrl+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Linux": [
@@ -179,8 +179,8 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
-		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
-		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
+		"Shift+right click (Shift+two-finger click): add to the selected army's path; on its last point, remove it (V)",
+		"Ctrl+right click (Ctrl+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 	"default": [
@@ -188,8 +188,8 @@ const GESTURES: Dictionary = {
 		"Shift+wheel or tilt wheel: pan sideways",
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
-		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
-		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
+		"Shift+right click (Shift+two-finger click): add to the selected army's path; on its last point, remove it (V)",
+		"Ctrl+right click (Ctrl+two-finger click): storm a fortress with the selected army",
 		"Shift: hold the works card",
 	] as Array[String],
 }

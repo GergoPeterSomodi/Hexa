@@ -65,7 +65,7 @@ too), the report has an **Armies** section, and `Esc` clears a selected army bef
 at war it shows the score and three peace buttons, **Take what you hold**, **White peace** and **Yield**, each asking first. A war
 declared on you shows a **War!** alert at once on the map, or after the moves and before the report in a season. Armies enter
 enemy land and fight: a right click on an enemy army or a fortress orders an attack or a siege, and the odds card (in place of the
-move card) names the odds and the way: Favourable, Even or Poor. **Shift+right click** (or **Shift+O** at the cursor) storms a
+move card) names the odds and the way: Favourable, Even or Poor. **Ctrl+right click** (or **Shift+O** at the cursor) storms a
 fortress with the selected army. The army panel's **If attacked** segment sets Hold or Withdraw. A battle fought last season has a
 badge on the map; a click, a report or log line, a notification's Go, the Military page's Battles table, the army panel's last
 battle, the hex menu or **B** (the last battle you fought) opens the **battle dock** on the left, day by day (Left, Right, Home,
@@ -82,10 +82,10 @@ the move is final. An army may be ordered again until its points are spent (the 
 longer route stays as a standing march, one leg at the end of each later season. A walk stops when an unseen enemy army comes
 into sight (points kept, `R` goes on) and beside an enemy (the season is over); unmapped land takes a whole season a step. An
 attack is fought at once (automatically until the battle board) and the dock opens after the walk. A move that opens a battle,
-enters enemy land or ends out of supply asks once (`game/confirm_moves`, "Confirm risky moves"). Stops: **Shift+left click** or
-`V` adds one (again on the last removes it, `Esc` removes all, at most 6), the move card's **March** and **Clear stops** do the
-same as a right click and `Esc`. In the season a country declares a war its armies may not enter that enemy's land (the player's
-too). The computer moves by the same rules at the end of the season. Design `docs/design/moves-in-the-month.md`, rules
+enters enemy land or ends out of supply asks once (`game/confirm_moves`, "Confirm risky moves"). Paths: **Shift+right click** or
+`V` orders at once (a march; each further click adds a point to its end; on the last point it removes it, the only one halts;
+at most 6 points before the goal), a plain right click replaces the path, and holding `Shift` previews the longer path. In the
+season a country declares a war its armies may not enter that enemy's land (the player's too). The computer moves by the same rules at the end of the season. Design `docs/design/moves-in-the-month.md`, rules
 `docs/architecture/moves-build-spec.md`; save format 8 (older saves are refused as an older test build).
 
 ## Engine
@@ -285,10 +285,10 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
   - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).
   - **Saves:** `user://saves/` holds `quick`, `1` to `8` and `auto1` to `auto3` (`.sav`, `.png`); the program writes `user://running.lock` while a game runs and asks to load the newest autosave when it finds one left behind. Continue on the main menu loads the newest save and falls back to older ones when its body is damaged. The shell's key milestone is `Bindings.SHELL_MILESTONE` (`"8"`); the Options screen shows the rows up to `Options.TARGET_MILESTONE` (7).
-  - **Armies (M6, M7, moves):** with an army selected, right click or `O` / `Shift+F10` (march at the cursor; on its own hex, halt), `Shift+right click` or `Shift+O` (storm), `Shift+left click` or `V` (add or remove a stop), `Tab` (next army), `R` (continue a halted march), Alt+arrows (move the order cursor), `B` (the last battle you fought). While your own walk is shown, `Space`, `Enter` or `Esc` skip it and do nothing more; a click or an order skips it and then acts.
-  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → staged stops → army selection, country panel or hex selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
+  - **Armies (M6, M7, moves):** with an army selected, right click or `O` / `Shift+F10` (march at the cursor; on its own hex, halt), `Ctrl+right click` or `Shift+O` (storm), `Shift+right click` or `V` (add a path point, or remove the last), `Tab` (next army), `R` (continue a halted march), Alt+arrows (move the order cursor), `B` (the last battle you fought). While your own walk is shown, `Space`, `Enter` or `Esc` skip it and do nothing more; a click or an order skips it and then acts.
+  - **App & Dev:** `Esc` (Esc ladder: console field → popover → top screen → army selection, country panel or hex selection → pause menu), `M` (pause menu), `F1` / `?` (help overlay), `F3` / `` ` `` (debug panel), `Ctrl+R` / `Cmd+R` (new seed), `F11` / `Alt+Enter` / `Ctrl+Cmd+F` (fullscreen), `F12` (screenshot to `user://screenshots/`).
 - **Pointer & trackpad gestures** (`shell/input/camera_rig.gd`):
-  - With an army of yours selected: right click orders its march, `Shift+right click` storms, `Shift+left click` adds a stop (with no army selected it selects as a plain click does).
+  - With an army of yours selected: right click orders its march, `Shift+right click` orders its path (a point added to the end; on the last point it removes it), `Ctrl+right click` storms (with no army selected both act as a plain right click does); `Shift+left click` selects the hex.
   - Mouse wheel (or `Ctrl+wheel` pinch on Windows/Linux) zooms about the pointer (`Shift+wheel` or tilt wheel pans sideways).
   - Mac trackpad two-finger scroll (`InputEventPanGesture`) pans at `GESTURE_PAN_PX` (20 px per delta unit); trackpad pinch (`InputEventMagnifyGesture`) zooms directly about the fingers; left/middle/right drag past `CLICK_SLOP` (6 px) pans 1:1.
 - **Tiles & Map:** tiles are baked by `tools/worldmap/tileset_bake/bake.py` and assembled into `assets/tiles/tiles_<season>.tres` (full) and `assets/tiles/tiles_<season>_half.tres` (0.5× atlases in `assets/tiles/half/`, default on macOS `gl_compatibility` and in the Low preset to avoid `BPTC_RGBA -> RGBA8` 4× VRAM expansion; `import_etc2_astc` is also enabled in `project.godot`) by `tools/build_tileset.gd`; `data/maps/north_italy.tres` is built by `tools/build_map.gd`; the rules are `core/systems/improve.gd`.

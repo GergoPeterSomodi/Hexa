@@ -284,7 +284,7 @@ func test_the_yield_bytes_are_one_byte_a_hex_and_the_same_each_call() -> void:
 
 func test_the_pins_of_4_13() -> void:
 	# M8 (m8-build-spec.md 4.2): fourteen phases, ai_orders first.
-	assert_eq(Season.PHASES, [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
+	assert_eq(Season.PHASES, [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income", &"works", &"people", &"march_on", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
 	assert_eq(Actions.NAMES, ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm", "set_standing"] as Array[String])
 	# MV2 (moves-build R55, D22): the save format is 8 since the moves build; this pin moved with it (7 was the fog build).
 	assert_eq(SaveFile.FORMAT, 8)

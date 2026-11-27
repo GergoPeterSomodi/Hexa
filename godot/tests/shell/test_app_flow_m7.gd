@@ -3,7 +3,7 @@
 ## warning passes) and a march with the odds card: the risk's question, the battle fought in the order, the dock after the live
 ## walk -> a season with a siege of Pavia -> the battle badge, the report's War section and its battle link ->
 ## B and Esc with the dock -> F5 and F9 in the siege -> a peace from the country panel. Smaller tests: the war alert at idle and
-## in DECISIONS, Storm (Shift+O and Shift+right click), the Castle areas switch and its Options row both ways, the milestone
+## in DECISIONS, Storm (Shift+O and Ctrl+right click), the Castle areas switch and its Options row both ways, the milestone
 ## gate and the sandbox. The App runs headless in a SubViewport on a temporary save folder; every event comes from the rules.
 extends GutTest
 
@@ -345,7 +345,7 @@ func test_the_war_alert_waits_in_decisions_before_the_report() -> void:
 	assert_eq(app.requests().decisions.count(), 0, "the queue is empty")
 
 
-## Shift+O and Shift+right click storm with the selected army; with none Shift+O says so.
+## Shift+O and Ctrl+right click storm with the selected army; with none Shift+O says so.
 func test_storm_by_key_and_by_click() -> void:
 	var env := await _savoy()
 	var vp := env["vp"] as SubViewport
@@ -358,7 +358,7 @@ func test_storm_by_key_and_by_click() -> void:
 	var army := Armies.at(Session.game, VERCELLI)[0]
 	_armies_node(app).select_army(army.id)
 	await _wait_frames(2)
-	assert_true(app.map_scene().map_input().storm_ready.call(), "Shift+right click storms while an army is selected")
+	assert_true(app.map_scene().map_input().storm_ready.call(), "Ctrl+right click storms while an army is selected")
 	assert_false(app.requests().war.storm_at(ALESS), "a storm with no war is refused")
 	assert_gt(AppFlowHelpers.toasts(app).size(), 1, "and says why")
 	DevCommands.run("declare MLO", app.context())

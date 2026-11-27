@@ -8,6 +8,9 @@
 ## movement tick, so the beaten army walks off once the armies have stopped.
 ## The chain (R50, moves-build-spec.md): the walks of at-once orders (`now`) all count ticks from 1, so chain() lays them one
 ## after another, then the phase's walks after the last; a chained walk is `fixed` and setup() leaves its ticks as they are.
+## The End-turn leg (moves-build-spec.md R22a, issue 474): its walks and the retreats of its battles have ticks past
+## MovementPhase.NEXT_LEG_TICK; chain() marks them `late` and setup() lays them after the phase's walks and the retreats of the
+## battles phase (each wave's retreats after its own last movement tick), keeping their own spacing.
 class_name ReplayPlan
 extends RefCounted
 
@@ -17,6 +20,8 @@ const STEP_SECONDS := {&"normal": 0.2, &"slow": 0.5}
 const MAX_SECONDS := 6.0
 ## The shortest a shown step gets, in seconds.
 const MIN_STEP := 0.04
+## No late wave (setup's bound for "every tick").
+const NO_LATE := 1 << 30
 
 ## One walk per record: {army, tag, path, seen, ticks, fixed, starts, ends}; starts and ends are PackedFloat64Array, one a step.
 var _walks: Array[Dictionary] = []
@@ -68,14 +73,19 @@ static func chain(records: Array[Dictionary]) -> Array[Dictionary]:
 		if bool(r.get("now", false)):
 			continue
 		var moved := r.duplicate()
-		if end > 0 and r.get("ticks") is PackedInt32Array:
-			moved["ticks"] = _shifted(r["ticks"] as PackedInt32Array, end)
+		if r.get("ticks") is PackedInt32Array:
+			var raw := r["ticks"] as PackedInt32Array
+			if not raw.is_empty() and raw[0] > MovementPhase.NEXT_LEG_TICK:
+				moved["late"] = true
+			if end > 0:
+				moved["ticks"] = _shifted(raw, end)
 		out.append(moved)
 	return out
 
 
 ## Lays the records on the clock at `speed` (an unknown speed takes "normal"). A record whose path has under two hexes, or
-## whose seen and ticks do not fit its path, is left out. A retreat walk is moved after the last movement tick.
+## whose seen and ticks do not fit its path, is left out. A retreat walk is moved after the last movement tick of its wave; the
+## `late` wave (the End-turn leg) is moved after everything of the first wave, its retreats included.
 func setup(records: Array[Dictionary], speed: StringName) -> void:
 	_walks = []
 	_duration = 0.0
@@ -89,23 +99,26 @@ func setup(records: Array[Dictionary], speed: StringName) -> void:
 		if path.size() < 2 or seen.size() != path.size() or ticks.size() != path.size() - 1:
 			continue
 		kept.append({"army": int(r["army"]), "tag": StringName(r["tag"]), "path": path, "seen": seen, "ticks": ticks,
-			"fixed": bool(r.get("fixed", false)), "timed": _timed_flags(path, seen), "starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
-	var retreat := PackedByteArray()
-	var move_last := 0
+			"fixed": bool(r.get("fixed", false)), "late": bool(r.get("late", false)), "timed": _timed_flags(path, seen),
+			"starts": PackedFloat64Array(), "ends": PackedFloat64Array()})
 	var fixed_end := 0
+	var late_from := NO_LATE
 	for w: Dictionary in kept:
 		if bool(w["fixed"]):
 			fixed_end = maxi(fixed_end, _last_tick(w["ticks"] as PackedInt32Array))
-	for w: Dictionary in kept:
-		var back := _is_retreat(w, fixed_end)
-		retreat.append(1 if back else 0)
-		if not back:
-			move_last = maxi(move_last, _last_tick(w["ticks"] as PackedInt32Array))
-	for b: Dictionary in _battles:
-		move_last = maxi(move_last, int(b["tick"]))
-	for i: int in kept.size():
-		if retreat[i] == 1:
-			kept[i]["ticks"] = _after(kept[i]["ticks"] as PackedInt32Array, move_last)
+		if bool(w["late"]):
+			late_from = mini(late_from, (w["ticks"] as PackedInt32Array)[0])
+	var move_last := _lay_wave(kept, false, fixed_end, 0, late_from)
+	if late_from != NO_LATE:
+		# The End-turn leg: its walks and battles move to the tick after the first wave's end, keeping their spacing.
+		var shift := move_last + 1 - late_from
+		for w: Dictionary in kept:
+			if bool(w["late"]):
+				w["ticks"] = _shifted(w["ticks"] as PackedInt32Array, shift)
+		for b: Dictionary in _battles:
+			if int(b["tick"]) >= late_from:
+				b["tick"] = int(b["tick"]) + shift
+		move_last = _lay_wave(kept, true, fixed_end, move_last + 1, NO_LATE)
 	_walks.assign(kept)
 	var last_tick := move_last
 	for w: Dictionary in _walks:
@@ -187,15 +200,38 @@ static func _shifted(ticks: PackedInt32Array, by: int) -> PackedInt32Array:
 	return out
 
 
+## One wave of walks (the `late` ones, or the others): its retreats are laid after its last movement tick (and its battles'
+## ticks, those from `lo` to before `hi`). Returns the wave's last tick, its retreats included.
+func _lay_wave(kept: Array[Dictionary], late: bool, fixed_end: int, lo: int, hi: int) -> int:
+	var retreat := PackedByteArray()
+	var move_last := 0
+	for w: Dictionary in kept:
+		var back := bool(w["late"]) == late and _is_retreat(w, fixed_end, lo, hi)
+		retreat.append(1 if back else 0)
+		if not back and bool(w["late"]) == late:
+			move_last = maxi(move_last, _last_tick(w["ticks"] as PackedInt32Array))
+	for b: Dictionary in _battles:
+		if int(b["tick"]) >= lo and int(b["tick"]) < hi:
+			move_last = maxi(move_last, int(b["tick"]))
+	var end := move_last
+	for i: int in kept.size():
+		if retreat[i] == 1:
+			kept[i]["ticks"] = _after(kept[i]["ticks"] as PackedInt32Array, move_last)
+			end = maxi(end, _last_tick(kept[i]["ticks"] as PackedInt32Array))
+	return end
+
+
 ## A walk that starts on a battle hex after that battle's tick is a retreat (no army walks out of a battle in the movement).
 ## A chained (fixed) walk is never laid again, and a battle of the chained walks (tick up to `fixed_end`) has its retreats there.
-func _is_retreat(w: Dictionary, fixed_end: int = 0) -> bool:
+## Only the battles with a tick from `lo` to before `hi` (the walk's wave) count.
+func _is_retreat(w: Dictionary, fixed_end: int = 0, lo: int = 0, hi: int = NO_LATE) -> bool:
 	if bool(w["fixed"]):
 		return false
 	var path := w["path"] as Array[Vector2i]
 	var ticks := w["ticks"] as PackedInt32Array
 	for b: Dictionary in _battles:
-		if int(b["tick"]) > fixed_end and b["hex"] == path[0] and int(b["tick"]) < ticks[0]:
+		var t := int(b["tick"])
+		if t >= lo and t < hi and t > fixed_end and b["hex"] == path[0] and t < ticks[0]:
 			return true
 	return false
 

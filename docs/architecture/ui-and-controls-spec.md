@@ -347,7 +347,8 @@ navigation. Modifier chords use `command_or_control_autoremap`, so "Ctrl" is Cmd
 | `game_next_unit` / `game_continue_march` | Tab / R | | Game | 6 |
 | `map_cursor_*` (move the selected hex; with an army selected, the order cursor) | Alt+arrows | Option+arrows | Map | 6 |
 | `map_command_key` (a right click at the cursor: the order, or the hex menu; `m6-build-spec.md` 6.1) | O, Shift+F10 | | Map | 6 |
-| `map_command_storm` (storm with the selected army at the cursor; Shift+right click storms at the pointer, read by `MapInput` from the click; `m7-build-spec.md` 6.1) | Shift+O | | Map | 7 |
+| `map_command_storm` (storm with the selected army at the cursor; Ctrl+right click storms at the pointer, read by `MapInput` from the click; `m7-build-spec.md` 6.1, gesture amended 2026-11-27) | Shift+O | | Map | 7 |
+| `map_waypoint_key` (add a point to the selected army's path at the cursor, or take off its final one; Shift+right click does it at the pointer, read by `MapInput` from the click; `moves-build-spec.md` R58, R62) | V | | Map | 8 |
 | `game_battle` (the battle dock on your newest battle) | B | | Game | 7 |
 | `view_mode_7` (the Relations mode; `m9-build-spec.md` 6.1) | 7 | | View | 9 |
 | `game_peace` (the peace screen: the war with the country shown, else your newest; `m9-build-spec.md` 6.1) | P | | Game | 9 |
@@ -371,6 +372,8 @@ so no binding uses them. Windows notes: Alt+F4 is a close request; Alt+Enter is 
 | left press and release within 6 px | click, tap-to-click | select the hex | |
 | left, middle or right drag past 6 px | drag, three-finger drag | pan, 1:1 with the pointer; the camera does not move inside the 6 px (today it does) | |
 | right click within 6 px | right button, two-finger click; Ctrl-click (Godot's macOS layer reports it as right: to confirm in the input probe) | clear the selection (M6: the order) | |
+| the same with Shift only, an army of yours selected | | order its path: march there, add the point to the path under way, or take off the final point (`moves-build-spec.md` R58); with no army, as a right click | |
+| the same with Ctrl only, an army of yours selected | on a Mac a Ctrl-click arrives like this | storm the fortress there (`m7-build-spec.md` 6.1); with no army, as a right click | |
 
 The device preset (`controls/device`) writes `wheel_action` and `gesture_action`: **Both** (default: wheel zooms,
 trackpad scroll pans, pinch zooms), **Mouse** (wheel and Magic Mouse scroll zoom), **Trackpad** (wheel and trackpad

@@ -32,6 +32,11 @@ var next_record_id: int = 1                   # Battles
 var battle_names: Dictionary = {}             # Battles: place (String) -> battles named there
 var sieges: Array[Siege] = []                 # Sieges; hex index order
 var siege_names: Dictionary = {}              # Sieges: place -> sieges named there
+## The End-turn leg's marks (moves-build-spec.md R22a), army id -> &"phase" (its walk took a step in this End turn's movement
+## phase: no End-turn leg) or &"next" (its points are the next season's already: the End-turn leg walked it, or a battle of that
+## leg ended its season; ready_units keeps them). Written by MovementPhase (season, next_leg) and cleared by Allowance.refill:
+## empty at idle, not saved, not in the digest.
+var leg_marks: Dictionary = {}
 ## Human player's country tag, or &"" before picking, in AI-only games, or in a map-only game.
 var player: StringName = &""
 ## Who gives the other countries' orders in the ai_orders phase, or null (M8 4.2): not saved, not in the digest; set by

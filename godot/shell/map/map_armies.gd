@@ -5,9 +5,9 @@
 ## orders only through Session.act; it never changes the game. The orders of an army (march, halt, Continue and storm; the
 ## army panel's buttons come here too) go through its MoveOrders: a running live walk lands first, a risky move is asked about,
 ## the toast is MoveWords' and a battle the walk opened is told (moves-build-spec.md R48 to R53). Multi-leg marches (R58 to
-## R62): Shift+left click and V stage stops for the selected army (MarchStops, the shell's alone), the route is drawn through
-## them, a right click, O or the move card's March orders the march through them, and Esc, another selection, End season and a
-## new or loaded game clear them. The move card is told of each change (MapHover.stops_changed).
+## R62): Shift+right click and V order the selected army's path at once, a point added to its end or its final point taken off
+## (MarchPath), a plain right click replaces the path, and while Shift is held the route and the move card show the extended
+## path (MapHover.preview_changed).
 class_name MapArmies
 extends Node
 
@@ -56,10 +56,10 @@ var _reach: Dictionary = {REACH_LAYER: [], REACH_NEXT_LAYER: []}
 var _zoom := 1.0
 var _colour_blind := false
 var _dirty := false
-## The staged stops of the selected army's march.
-var _stops := MarchStops.new()
-## True after Alt+arrows moved the order cursor, until the pointer moves to a hex: V and March then read the cursor (R62).
+## True after Alt+arrows moved the order cursor, until the pointer moves to a hex: V then reads the cursor (R62).
 var _keyboard := false
+## True while Shift is held over the map (MapInput.extend_changed): the previews are the extended path's.
+var _extending := false
 ## The sight this sync last read: its revision and the player's explored revision (a change of sight with no army event re-syncs).
 var _sight_key: Array = []
 var _links: Array[Array] = []
@@ -102,6 +102,7 @@ func _ready() -> void:
 	input.unit_at_func = _own_unit_at
 	_link(input.waypoint_requested, _on_waypoint_clicked)
 	_link(input.waypoint_key_requested, _on_waypoint_key)
+	_link(input.extend_changed, _on_extend_changed)
 	input.waypoint_ready = _has_army
 	_link(Events.game_started, _on_game_started)
 	_link(Events.game_ended, _on_game_ended)
@@ -109,7 +110,6 @@ func _ready() -> void:
 	for sig: Signal in [Events.army_raised, Events.army_disbanded, Events.army_changed, Events.unit_moved,
 			Events.march_halted, Events.army_starved, Events.unit_lost, Events.season_ended]:
 		_link(sig, _mark_dirty)
-	_link(Events.season_ended, _on_season_ended)
 	sync()
 
 
@@ -156,8 +156,6 @@ func _process(_delta: float) -> void:
 	if colour_blind != _colour_blind:
 		_colour_blind = colour_blind
 		_dirty = true
-	if not _stops.is_empty() and Session.in_season():
-		clear_stops()  # R61: End season has started
 	if _sight_moved():
 		_dirty = true
 	if _dirty:
@@ -241,8 +239,6 @@ func select_army(army_id: int) -> bool:
 		return false
 	_army = army_id
 	_keyboard = false
-	if _stops.army() != army_id:
-		_stops.clear()  # R61: another army is selected
 	_scene.select_hex(NO_HEX)
 	_set_cursor(ArmyView.panel(game, Session.player_tag(), army_id)["hex"] as Vector2i)
 	_hover = NO_HEX
@@ -262,11 +258,10 @@ func clear_army() -> void:
 	_release()
 
 
-## The army lets go: its ring, reach, routes and staged stops go, and the two signals say so. The cursor's mark is the caller's.
+## The army lets go: its ring, reach and routes go, and the two signals say so. The cursor's mark is the caller's.
 func _release() -> void:
 	_army = -1
 	_keyboard = false
-	_stops.clear()
 	_clear_reach()
 	_route.clear_route()
 	_stored.clear_route()
@@ -356,9 +351,9 @@ func continue_army(army_id: int) -> bool:
 	return true
 
 
-## A command at `hex` (a right click, or O at the cursor) with an army of yours selected: a march to it through the staged
-## stops (asked first when risky), or a halt when it is the army's own hex, which drops the stops (R60). False with no army
-## selected (the scene then deselects, and the hex menu comes later).
+## A command at `hex` (a right click, or O at the cursor) with an army of yours selected: a march to it, which replaces any
+## path (asked first when risky), or a halt when it is the army's own hex (R60). False with no army selected (the scene then
+## deselects, and the hex menu comes later).
 func command(hex: Vector2i) -> bool:
 	if _replay_blocks():
 		return true
@@ -373,94 +368,54 @@ func command(hex: Vector2i) -> bool:
 		return true
 	_orders.skip_live()
 	if hex == (ArmyView.panel(game, Session.player_tag(), _army)["hex"] as Vector2i):
-		clear_stops()
 		_halt(game, hex)
 	else:
 		_order_march(game, hex)
 	return true
 
 
-## The move card's "March": the staged march is ordered to staged_target (asked first when risky). False with nothing staged
-## or while the replay runs.
-func march_staged() -> bool:
-	if _stops.is_empty() or _replay_blocks():
-		return false
-	var game := Session.game
-	if not _mine(game, _army):
-		return false
-	_orders.skip_live()
-	_order_march(game, staged_target())
-	return true
-
-
-## Adds or removes a stop at `hex` for the selected army (Shift+left click, V; R58). False when refused (the refusal is said).
-func toggle_stop(hex: Vector2i) -> bool:
+## Shift+right click or V at `hex` with an army of yours selected (R58): with a path under way, a march through it on to `hex`,
+## or, on its final point, without that point (the only one: a halt); with none, as command(hex). Asked first when risky.
+## False when nothing is ordered here: no army, off the map, the replay.
+func extend_path(hex: Vector2i) -> bool:
 	if _replay_blocks():
 		return false
-	if _army < 0 or not _mine(Session.game, _army):
+	var game := Session.game
+	if _army < 0 or not _mine(game, _army):
 		return _refuse("Select an army first.")
-	var why := _stops.toggle(Session.game, Session.player_tag(), _army, hex)
-	if why != "":
-		return _refuse(why)
-	_stops_changed()
-	return true
-
-
-## Drops every staged stop (Esc, the move card's "Clear stops"); false when none were staged.
-func clear_stops() -> bool:
-	if not _stops.clear():
+	if game.map == null or not game.map.has(hex):
 		return false
-	_stops_changed()
+	var a := Armies.by_id(game, _army)
+	var step := MarchPath.next(game, a, hex)
+	if step.is_empty():
+		return command(hex)
+	_orders.skip_live()
+	if bool(step["halt"]):
+		_halt(game, a.hex)
+	else:
+		_order_march(game, step["goal"] as Vector2i, step["via"] as Array[Vector2i])
 	return true
 
 
-func has_stops() -> bool:
-	return not _stops.is_empty()
+## The picture of the order a click at `hex` would give the selected army now: with Shift held and a path under way, the
+## path's (MarchPath.preview); else the plain march's.
+func order_preview(hex: Vector2i) -> Dictionary:
+	var tag := Session.player_tag()
+	if _extending:
+		var path := MarchPath.preview(Session.game, tag, _army, hex)
+		if not path.is_empty():
+			return path
+	return MovePreview.to(Session.game, tag, _army, hex)
 
 
-## The staged stops in order (a copy).
-func stops() -> Array[Vector2i]:
-	return _stops.hexes()
-
-
-## True while the map in `node`'s tree holds staged stops (the Esc ladder's has_stops).
-static func stops_in(node: Node) -> bool:
-	var armies := in_tree(node)
-	return armies != null and armies.has_stops()
-
-
-## The goal the staged route is drawn to, and March orders: the hex under the pointer, else the order cursor after Alt+arrows,
-## else the last stop (the pointer is on the card or off the map, or on the army's own hex). NO_HEX with nothing staged.
-func staged_target() -> Vector2i:
-	var a := Armies.by_id(Session.game, _army) if Session.game != null else null
-	if _stops.is_empty() or a == null or a.tag != Session.player_tag():
-		return NO_HEX
-	var hex := _cursor if _keyboard else _hover
-	return _stops.last() if hex == NO_HEX or hex == a.hex else hex
-
-
-## The move card's picture of the staged march to staged_target ({} with nothing staged).
-func staged_preview() -> Dictionary:
-	var target := staged_target()
-	return {} if target == NO_HEX else _stops.preview(Session.game, Session.player_tag(), target)
-
-
-## The viewport point of the last staged stop's centre, where the move card is pinned.
-func staged_anchor() -> Vector2:
-	return _view.get_global_transform_with_canvas() * _view.centre_of(_stops.last())
-
-
-## An army of yours storms the fortress at `hex` (Shift+right click, Shift+O, the panel's Storm), asked first when risky. False
-## when refused (the refusal is said; a storm takes no staged stops, R60) or there is no such army or hex; true when the order
-## was given or its question is up.
+## An army of yours storms the fortress at `hex` (Ctrl+right click, Shift+O, the panel's Storm), asked first when risky. False
+## when refused (the refusal is said) or there is no such army or hex; true when the order was given or its question is up.
 func storm(army_id: int, hex: Vector2i) -> bool:
 	if _replay_blocks():
 		return false
 	var game := Session.game
 	if game == null or game.map == null or not game.map.has(hex) or not _mine(game, army_id):
 		return false
-	if _stops.army() == army_id:
-		return _refuse(MarchStops.STORM_TEXT)
 	_orders.skip_live()
 	var verdict := Session.check("storm", {"army": army_id, "goal": hex})
 	if not bool(verdict.get("ok", false)):
@@ -482,15 +437,14 @@ func _halt(game: Game, hex: Vector2i) -> void:
 	_say(words, TOAST_TONE)
 
 
-## Orders the selected army's march to `hex` through the staged stops (none staged: a plain march), asked first when risky.
-func _order_march(game: Game, hex: Vector2i) -> void:
-	var via := _stops.via_for(hex)
+## Orders the selected army's march to `hex` through the path points `via` (none: a plain march), asked first when risky (the
+## question names the whole path).
+func _order_march(game: Game, hex: Vector2i, via: Array[Vector2i] = []) -> void:
 	_orders.run(_name_of(game, _army), MoveOrders.march_risks(game, Session.player_tag(), _army, hex, via),
-			_give_march.bind(game, _army, hex, via))
+			_give_march.bind(game, _army, hex, via), MoveOrders.path_line(game, via, hex))
 
 
-## Gives the march (at once, or after "Move"): the army walks in the act. The staged stops go with an order given and stay with
-## a refused one (R60).
+## Gives the march (at once, or after "Move"): the army walks in the act. A refused one changes nothing (R60).
 func _give_march(game: Game, army_id: int, hex: Vector2i, via: Array[Vector2i]) -> void:
 	if not _still(game, army_id):
 		return
@@ -505,8 +459,6 @@ func _give_march(game: Game, army_id: int, hex: Vector2i, via: Array[Vector2i]) 
 	if army_id == _army:
 		_set_cursor(hex)
 		_keyboard = false
-	if _stops.army() == army_id:
-		clear_stops()
 	var walk := verdict.get("walk", {}) as Dictionary
 	_walked(MoveOrders.words(game, Session.player_tag(), army_id, army_name, walk), walk)
 
@@ -615,9 +567,7 @@ func _on_hover(hex: Vector2i) -> void:
 	_hover = hex
 	if hex != NO_HEX:
 		_keyboard = false
-	if has_stops():
-		_stops_changed()  # the pinned card follows the target
-	elif _army >= 0:
+	if _army >= 0:
 		_show_route()
 
 
@@ -626,24 +576,22 @@ func _has_army() -> bool:
 
 
 func _on_waypoint_clicked(map_px: Vector2) -> void:
-	toggle_stop(_view.hex_at(map_px))
+	extend_path(_view.hex_at(map_px))
 
 
 ## V: at the order cursor after Alt+arrows, else the hovered hex, else the cursor (R62).
 func _on_waypoint_key() -> void:
-	toggle_stop(_hover if _hover != NO_HEX and not _keyboard else cursor_hex())
+	extend_path(_hover if _hover != NO_HEX and not _keyboard else cursor_hex())
 
 
-## R61: the season ran.
-func _on_season_ended(_turn: int) -> void:
-	clear_stops()
-
-
-## The staged stops or their target changed: the route is drawn again and the move card told.
-func _stops_changed() -> void:
+## Shift went down or came up: the route is drawn again and the move card told (R59).
+func _on_extend_changed(on: bool) -> void:
+	_extending = on
+	if _army < 0:
+		return
 	_show_route()
 	if is_inside_tree():
-		get_tree().call_group(MapHover.GROUP, "stops_changed")
+		get_tree().call_group(MapHover.GROUP, "preview_changed")
 
 
 ## The hex when it is on the map, else `fallback` (the clamp of the cursor at the map's edge).
@@ -665,9 +613,9 @@ func _set_cursor(hex: Vector2i) -> void:
 		_view.set_tile("marks", hex, CURSOR_TILE)
 
 
-## The route to the hex under the pointer (the order cursor when the pointer is off the map), through the staged stops with a
-## marker on each (to staged_target), and the stored route of a march in progress, thin, when its goal is another hex or it
-## has stops left (R68).
+## The route to the hex under the pointer (the order cursor when the pointer is off the map), with Shift held the extended
+## path's with a pin on each point, and the stored route of a march in progress, thin, when its goal is another hex or it has
+## path points left (R68).
 func _show_route() -> void:
 	var game := Session.game
 	if _army < 0 or not _mine(game, _army):
@@ -678,13 +626,7 @@ func _show_route() -> void:
 	var panel := ArmyView.panel(game, tag, _army)
 	var here := panel["hex"] as Vector2i
 	var target := _hover if _hover != NO_HEX else _cursor
-	if has_stops():
-		target = staged_target()
-		var shown := _stops.preview(game, tag, target).duplicate()
-		shown["via"] = _stops.hexes()  # a marker on every staged stop, the goal's too, and with a refused target
-		_route.show_route(_with_beyond(shown, here))
-	else:
-		_route.show_route(_with_beyond(MovePreview.to(game, tag, _army, target), here))
+	_route.show_route(_with_beyond(order_preview(target), here))
 	_stored.clear_route()
 	var order := panel["order"] as Dictionary
 	if StringName(order["kind"]) == MARCH_KIND:

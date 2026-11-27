@@ -1,9 +1,9 @@
 ## The picture of a multi-leg march before it is ordered (docs/architecture/moves-build-spec.md R59, R67, D29, D32): the route of
-## army `army_id` through the staged stops in order to the pointer's hex, as MovePreview.to gives a plain march (the verdict, the
+## army `army_id` through the path points (`stops`) in order to the pointer's hex, as MovePreview.to gives a plain march (the verdict, the
 ## route, the season stops, crossings, supply, the war words, this season's `leg` and `risks` read on the whole route), plus
-## `legs` ([{from, to, hexes, cost, seasons, arrives_turn, fog}]), `via` (the staged stops) and `total` ({cost (the sum of the
-## legs), seasons, arrives_turn, legs}), and a line for each leg and one for the whole route. The stops are the shell's
-## (MapArmies); nothing here changes the game. A refusal names the stop or the goal it is about ("Stop 2: ...") in the words the
+## `legs` ([{from, to, hexes, cost, seasons, arrives_turn, fog}]), `via` (the path points) and `total` ({cost (the sum of the
+## legs), seasons, arrives_turn, legs}), and a line for each leg and one for the whole route. The points are the caller's
+## (MarchPath); nothing here changes the game. A refusal names the point or the goal it is about ("Point 2: ...") in the words the
 ## viewer may read (MovePreview.refused, R57). Kept in the pinned slot &"via_previews" keyed by [version, army, tag, stops], a
 ## table by the pointer's hex; the legs' plans are MarchVia's (kept per version, army, start and end), so moving the pointer plans
 ## only the last leg. Pure core/views/ code: no nodes, no engine calls, no luck.
@@ -103,15 +103,17 @@ static func _when(game: Game, seasons: int, arrives: int) -> String:
 	return "%s, there in %s." % [span, Calendar.date_text(arrives, game.start_year)]
 
 
-## A refusal with the stop or the goal it is about: the words of the leg's point worded for the viewer, the prefix kept.
+## A refusal with the point or the goal it is about: the words of the leg's point worded for the viewer, the prefix kept.
 static func _refusal(game: Game, tag: StringName, a: Army, stops: Array[Vector2i], hex: Vector2i, reason: String) -> Dictionary:
 	var prefix := ""
 	var tail := reason
-	if reason.begins_with("Stop ") or reason.begins_with("The goal: "):
+	if reason.begins_with("Point ") or reason.begins_with("The goal: "):
 		var cut := reason.find(": ")
 		prefix = reason.substr(0, cut + 2)
 		tail = reason.substr(cut + 2)
 	var at := hex
+	if a != null and reason == MarchVia.TOO_MANY_TEXT % game.defs.max_stops:
+		at = a.hex  # "path is full" names no place: said as it is, whatever the viewer sees at the goal
 	if a != null and prefix != "":
 		var lv := MarchVia.legs_verdict(game, a, tag, stops, hex)
 		if (lv.at as Vector2i) != NO_HEX:
@@ -126,7 +128,7 @@ static func _refusal(game: Game, tag: StringName, a: Army, stops: Array[Vector2i
 	return _bare(out, stops)
 
 
-## A preview without legs: the route's keys of a refusal, the staged stops and an empty total.
+## A preview without legs: the route's keys of a refusal, the path points and an empty total.
 static func _bare(out: Dictionary, stops: Array[Vector2i]) -> Dictionary:
 	var shaped := out.duplicate()
 	var legs: Array[Dictionary] = []

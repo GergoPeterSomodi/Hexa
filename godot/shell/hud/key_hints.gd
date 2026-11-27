@@ -1,6 +1,6 @@
 ## Studiolo bottom contextual bone KeyCap hint strip reflecting live InputMap bindings
 ## (docs/architecture/ui-style-and-feedback-spec.md section 2; ui-style-and-feedback-plan.md U14). While an army of yours is selected
-## it starts with the line that army moves are final (moves-build-spec.md R54), then the key that adds a stop to its march (R62).
+## it starts with the line that army moves are final (moves-build-spec.md R54), then the key that adds a point to its path (R62).
 class_name KeyHints
 extends HBoxContainer
 
@@ -29,7 +29,7 @@ const SELECTED_ITEMS: Array[Array] = [
 
 ## Before the other items while an army of yours is selected.
 const ARMY_ITEMS: Array[Array] = [
-	[&"map_waypoint_key", "stop"],
+	[&"map_waypoint_key", "path point"],
 ]
 
 ## The line of R54, here and in the help overlay.

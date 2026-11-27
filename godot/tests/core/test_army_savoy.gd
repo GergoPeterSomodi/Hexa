@@ -120,17 +120,19 @@ func test_e_the_spring_income_pays_the_upkeep_of_one_army() -> void:
 func test_b_ordered_to_vercelli_it_musters_in_spring_and_walks_the_bridge_in_summer() -> void:
 	var a := _raise_two()
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": VERCELLI, "tag": SAV}).ok))
+	_g.events.clear()
+	# It musters in spring; the End turn of spring walks summer's leg (moves-build-spec.md R22a, issue 474): across the Po.
 	Season.run(_g)
-	assert_eq(a.hex, TURIN, "it musters in spring")
+	assert_eq(a.hex, VERCELLI, "summer's leg walks at the End turn of spring: across the Po")
 	assert_eq(_men(a), 1000)
-	Season.run(_g)  # summer
-	assert_eq(a.hex, VERCELLI, "in summer it walks across the Po")
 	var walk := _moved(a.id)
 	assert_eq(walk.size(), 1)
 	assert_eq(walk[0]["path"], _path([TURIN, VERCELLI]), "the route is the one step over the bridge")
-	assert_eq(Array(walk[0]["ticks"]), [1])
+	assert_eq(Array(walk[0]["ticks"]), [MovementPhase.NEXT_LEG_TICK + 1], "the End-turn leg's first tick")
 	assert_true(bool(walk[0]["arrived"]))
 	assert_eq(a.order, Army.ORDER_HOLD, "it holds at Vercelli from here")
+	Season.run(_g)  # summer
+	assert_eq(a.hex, VERCELLI)
 	assert_eq(_men(a), 1000, "no hunger on the bridge: Vercelli is in supply")
 
 
@@ -144,12 +146,11 @@ func test_c_the_route_to_aosta_by_turin_costs_fifteen_and_waits_for_spring() -> 
 	assert_true(bool(plan["ok"]))
 	assert_eq(int(plan["cost"]), 15, "the route by Turin costs 15 points")
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": AOSTA, "tag": SAV}).ok))
-	Season.run(_g)  # autumn walks to the saddle
-	assert_eq(a.hex, SADDLE, "ten points to the saddle; the step of five waits")
-	Season.run(_g)  # winter: the pass edge is closed by snow
+	assert_eq(a.hex, SADDLE, "ten points to the saddle now; the step of five waits")
+	Season.run(_g)  # the End turn of autumn: winter's leg, the pass edge closed by snow
 	assert_eq(a.hex, SADDLE)
 	assert_eq(a.waiting, Movement.WHY_WINTER, "it waits for spring")
-	Season.run(_g)  # spring 1481 crosses the pass edge
+	Season.run(_g)  # the End turn of winter: spring 1481's leg crosses the pass edge (R22a)
 	assert_eq(a.hex, AOSTA)
 	assert_eq(a.order, Army.ORDER_HOLD)
 
@@ -160,11 +161,10 @@ func test_c_the_route_to_aosta_by_turin_costs_fifteen_and_waits_for_spring() -> 
 func test_d_out_of_supply_on_the_snow_the_army_starves_from_1000_to_648_and_walks_home() -> void:
 	var a := _raise_two()
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": SNOW, "tag": SAV}).ok))
-	Season.run(_g)  # spring: it musters at Turin
-	assert_eq(a.hex, TURIN)
-	assert_eq(_men(a), 1000)
-	Season.run(_g)  # summer walks the 11 points and starves: a tenth of its men
+	Season.run(_g)  # spring: it musters at Turin (fed there); the End turn walks summer's 11 points (R22a)
 	assert_eq(a.hex, SNOW, "eleven points: the snow at 3,169 m")
+	assert_eq(_men(a), 1000)
+	Season.run(_g)  # summer on the snow: it starves, a tenth of its men
 	assert_false(Supply.in_supply(_g, SAV, SNOW, false), "out of supply in summer")
 	assert_eq(_men(a), 900, "summer: 100 men of 1,000 starve")
 	Season.run(_g)  # autumn

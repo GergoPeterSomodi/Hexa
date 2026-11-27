@@ -252,7 +252,7 @@ static func _fortress_notes(game: Game, hex: Vector2i, out: Dictionary) -> Array
 	notes.append("Garrison starves after %d seasons" % stores)
 	notes.append("Taking it opens %d districts" % int(out.opens))
 	if str(out.storm_word) != NO_WORD and str(out.kind_text).begins_with("Besiege"):
-		notes.append("Shift+right click: storm (%s)" % str(out.storm_word))
+		notes.append("Ctrl+right click: storm (%s)" % str(out.storm_word))
 	return notes
 
 

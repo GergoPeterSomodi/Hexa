@@ -4,7 +4,7 @@
 ## kept as a standing march, a walk that stops on sight (Halted, Continue), F5 and F9 in the middle of the season, a battle
 ## in the act with its question and its dock after the live walk, End season (the standing march walks only at the end of the
 ## next season) and End season with the computer playing (its walk and battle in its turn, the replay, the report's army
-## lines). A second test is the multi-leg march (R58 to R72): Shift+left click twice, the preview's legs, Esc on the staged
+## lines). A second test is the multi-leg march (R58 to R72): Shift+right click and V order the path, the preview's legs, Esc on the
 ## stops, a right click, the walk past a stop, F5 and F9 with a stop left, and the standing leg that passes it.
 ## The places are the map's (Novara is (7, 8)). The Milanese armies are made by a state edit, as the M7 flow's.
 ## A sighted halt leaves the enemy two hexes off, and the zone of control stops a walk beside it (R25), so the attack of
@@ -391,7 +391,7 @@ func _order_a_long_march(vp: SubViewport, app: App, second: int) -> void:
 	assert_ne(a.hex, NICE)
 	assert_eq(a.order, Army.ORDER_MARCH, "the rest stands")
 	assert_eq(a.goal, NICE)
-	_toast_with(app, "it marches on to Nice (4, 16) at the end of next season.")
+	_toast_with(app, "it marches on to Nice (4, 16) at End turn.")
 	await _watch_live_walk(app)
 
 
@@ -536,7 +536,7 @@ func _the_computer_answers(vp: SubViewport, app: App, turin: int, second: int) -
 	var report := app.stack().top() as SeasonReport
 	var words := " | ".join(AppFlowHelpers.labels_under(report))
 	assert_true(words.contains("Army of Turin: near Novara (7, 7) → "), "the report's line of the season's walk: " + words)
-	assert_ne(_army(second).hex, second_from, "the standing march walked at the end of the next season")
+	assert_true(_army(second).hex == NICE or _army(second).hex != second_from, "the standing march walked on, or is there")
 	await _close_report(vp, app)
 
 
@@ -555,8 +555,11 @@ func test_a_season_of_moves_through_the_app() -> void:
 	await _march_beside(vp, app, turin)
 	var second_hex := _army(second).hex
 	await _end_season(vp, app)
-	assert_eq(_army(second).hex, second_hex, "the standing march does not walk in the season it was ordered")
-	assert_eq(_army(second).order, Army.ORDER_MARCH)
+	# Issue 474 (owner playtest 2026-11-27, moves-build-spec.md R22a): End turn walks the standing march's next leg, with the
+	# next season's points.
+	assert_ne(_army(second).hex, second_hex, "P: End turn does not move the standing march (issue 474)")
+	assert_true(_army(second).hex == NICE or _army(second).order == Army.ORDER_MARCH, "there, or still marching")
+	assert_true(_army(second).points < Allowance.full(Session.game, _army(second)), "the leg spent the next season's points")
 	await _close_report(vp, app)
 	await _attack_como(vp, app, turin)
 	await _the_computer_answers(vp, app, turin, second)
@@ -565,7 +568,7 @@ func test_a_season_of_moves_through_the_app() -> void:
 # ----- the multi-leg march --------------------------------------------------------------------------------------------------
 
 
-func _staging_state() -> Array:
+func _preview_state() -> Array:
 	return [Session.game.digest(), Session.game.version, Session.unsaved_actions]
 
 
@@ -573,46 +576,76 @@ func _has_pin(app: App, pins: Array[Vector2], hex: Vector2i) -> bool:
 	return pins.has(app.map_scene().view().centre_of(hex))
 
 
-## Two Shift+clicks stage Vercelli and Cuneo; Esc clears them and keeps the army; staged again (a click and V).
-func _stage_two_stops(vp: SubViewport, app: App, army: int) -> void:
-	var armies := _armies_node(app)
+## Shift+right click on Cuneo and V near Chivasso order the path at once: the army walks in the first click, the second adds.
+func _order_a_path(vp: SubViewport, app: App, army: int) -> void:
 	await _select(vp, app, army)
-	var before := _staging_state()
-	await _click_hex(vp, app, VERCELLI, MOUSE_BUTTON_LEFT, true)
-	await _click_hex(vp, app, CUNEO, MOUSE_BUTTON_LEFT, true)
-	assert_eq(armies.stops(), [VERCELLI, CUNEO] as Array[Vector2i], "two stops, in order")
-	assert_true(app.hud().map_hover().move_card().is_staged(), "the card shows March and Clear stops")
-	_key(vp, KEY_ESCAPE)
-	await _wait_frames(2)
-	assert_false(armies.has_stops(), "Esc clears the staged stops")
-	assert_eq(armies.selected_army(), army, "and the army stays selected")
-	assert_eq(app.stack().count(), 0, "no menu")
-	await _click_hex(vp, app, VERCELLI, MOUSE_BUTTON_LEFT, true)
-	await _frame(app, CUNEO)
-	_motion(vp, _screen_of(app, CUNEO))
+	var before := Session.unsaved_actions
+	_walks.clear()
+	await _click_hex(vp, app, CUNEO, MOUSE_BUTTON_RIGHT, true)
+	assert_eq(Session.unsaved_actions, before + 1, "the first click is the order")
+	assert_eq(_army(army).goal, CUNEO)
+	assert_ne(_army(army).hex, TURIN, "the first season walks now")
+	assert_eq(_walks.size(), 1, "one walk")
+	assert_true(bool(_walks[0]["now"]) if not _walks.is_empty() else false)
+	await _watch_live_walk(app)
+	await _select(vp, app, army)
+	await _frame(app, WEST_OF_CHIVASSO)
+	_motion(vp, _screen_of(app, WEST_OF_CHIVASSO))
 	await _wait_frames(2)
 	_press(vp, &"map_waypoint_key")
 	await _wait_frames(2)
-	assert_eq(armies.stops(), [VERCELLI, CUNEO] as Array[Vector2i], "V stages at the hovered hex")
-	assert_eq(_staging_state(), before, "staging never changes the game")
+	assert_eq(Session.unsaved_actions, before + 2, "V orders at the hovered hex: %s" % str(AppFlowHelpers.toasts(app)))
+	assert_eq(app.stack().count(), 0, "a plain path asks nothing")
+	assert_eq([_army(army).goal, Array(_army(army).via)], [WEST_OF_CHIVASSO, [Session.game.map.index_of(CUNEO)]])
 
 
-## The pointer on a third place: one path with the stops pinned, a line a leg and the total.
-func _preview_three_legs(vp: SubViewport, app: App) -> void:
+## With Shift held the pointer on a third place: one path with its points pinned, a line a leg and the total. Shift+right click
+## there adds it, again there takes it off; Esc lets the army go and keeps its order.
+func _preview_the_longer_path(vp: SubViewport, app: App, army: int) -> void:
 	var armies := _armies_node(app)
-	var before := _staging_state()
-	await _frame(app, WEST_OF_CHIVASSO)
-	_motion(vp, _screen_of(app, WEST_OF_CHIVASSO))
+	var before := _preview_state()
+	await _select(vp, app, army)
+	await _frame(app, VERCELLI)
+	var shift := InputEventKey.new()
+	shift.keycode = KEY_SHIFT
+	shift.physical_keycode = KEY_SHIFT
+	shift.shift_pressed = true
+	shift.pressed = true
+	vp.push_input(shift)
+	var at := _screen_of(app, VERCELLI)
+	for offset: Vector2 in [Vector2(5.0, 0.0), Vector2.ZERO]:
+		var moved := InputEventMouseMotion.new()
+		moved.position = at + offset
+		moved.global_position = at + offset
+		moved.shift_pressed = true
+		vp.push_input(moved)
+		await _wait_frames(1)
 	var card := app.hud().map_hover().move_card()
 	assert_true(await _wait_until(func() -> bool: return _lines(card).contains("Whole route: 3 legs"), 300), _lines(card))
 	var text := _lines(card).replace("\n", " ")
-	for part: String in ["Walks ", "Leg 1: Turin (5, 9) to Vercelli (6, 9): 2 move points", "Leg 2: Vercelli (6, 9) to Cuneo (5, 13): ",
-			"Leg 3: Cuneo (5, 13) to near Chivasso (4, 10): ", " move points, 3 seasons, there in "]:
+	for part: String in ["Leg 1: ", " to Cuneo (5, 13): ", "Leg 2: Cuneo (5, 13) to near Chivasso (4, 10): ",
+			"Leg 3: near Chivasso (4, 10) to Vercelli (6, 9): ", " move points, ", "there in "]:
 		assert_true(text.contains(part), "'%s' in: %s" % [part, text])
 	var pins := armies.route_marks().pins()
-	assert_eq(pins.size(), 2, "a marker on each staged stop")
-	assert_true(_has_pin(app, pins, VERCELLI) and _has_pin(app, pins, CUNEO))
-	assert_eq(_staging_state(), before, "the preview never changes the game")
+	assert_eq(pins.size(), 2, "a marker on each point of the path")
+	assert_true(_has_pin(app, pins, CUNEO) and _has_pin(app, pins, WEST_OF_CHIVASSO))
+	assert_eq(_preview_state(), before, "the preview never changes the game")
+	var up := shift.duplicate() as InputEventKey
+	up.pressed = false
+	up.shift_pressed = false
+	vp.push_input(up)
+	await _wait_frames(2)
+	await _click_hex(vp, app, VERCELLI, MOUSE_BUTTON_RIGHT, true)
+	assert_eq(_army(army).goal, VERCELLI, "added")
+	assert_eq(_army(army).via.size(), 2)
+	await _click_hex(vp, app, VERCELLI, MOUSE_BUTTON_RIGHT, true)
+	assert_eq([_army(army).goal, _army(army).via.size()], [WEST_OF_CHIVASSO, 1], "and taken off again")
+	before = _preview_state()
+	_key(vp, KEY_ESCAPE)
+	await _wait_frames(2)
+	assert_eq(armies.selected_army(), -1, "one Esc lets the army go")
+	assert_eq(app.stack().count(), 0, "no menu")
+	assert_eq(_preview_state(), before, "and keeps its order")
 
 
 ## A multi-leg march through the App (MV18; R58 to R72).
@@ -625,31 +658,14 @@ func test_a_multi_leg_march_through_the_app() -> void:
 	var army := Armies.at(Session.game, TURIN)[0].id
 	await _end_season(vp, app)
 	await _close_report(vp, app)
-	await _stage_two_stops(vp, app, army)
-	await _preview_three_legs(vp, app)
-	var armies := _armies_node(app)
-	var full := Allowance.full(Session.game, _army(army))
-	_walks.clear()
-	await _click_hex(vp, app, WEST_OF_CHIVASSO, MOUSE_BUTTON_RIGHT)
-	assert_eq(app.stack().count(), 0, "a plain route asks nothing")
-	var a := _army(army)
-	var cuneo := Session.game.map.index_of(CUNEO)
-	assert_false(armies.has_stops(), "the order empties the staged stops")
-	assert_ne(a.hex, TURIN, "the first season walks now")
-	assert_eq(Array(a.via), [cuneo], "Vercelli is passed, Cuneo is left")
-	assert_eq(a.goal, WEST_OF_CHIVASSO)
-	assert_eq(_walks.size(), 1, "one walk")
-	var path: Array = _walks[0]["path"] if not _walks.is_empty() else []
-	assert_true(path.has(VERCELLI) and path.find(VERCELLI) < path.size() - 1, "the walk went past its first stop: %s" % str(path))
-	assert_true(bool(_walks[0]["now"]) if not _walks.is_empty() else false)
-	_toast_with(app, "on its way to near Chivasso (4, 10) by ")
-	_toast_with(app, "%d of %d move points left." % [a.points, full])
-	await _watch_live_walk(app)
+	await _order_a_path(vp, app, army)
+	await _preview_the_longer_path(vp, app, army)
 	await _select(vp, app, army)
+	var armies := _armies_node(app)
 	await _frame(app, TURIN)
 	var stored := armies.stored_marks()
 	assert_true(stored.is_thin(), "the stored route is drawn thin")
-	assert_eq(stored.pins().size(), 1, "one marker: the stop still ahead")
+	assert_eq(stored.pins().size(), 1, "one marker: the point still ahead")
 	assert_true(_has_pin(app, stored.pins(), CUNEO))
 	assert_true(_panel_words(app).contains("Marching to (4, 10) near Chivasso by Cuneo (5, 13)"), _panel_words(app))
 	await _save_with_a_stop_left(vp, app, army)
@@ -667,15 +683,14 @@ func _save_with_a_stop_left(vp: SubViewport, app: App, army: int) -> void:
 	assert_eq(Session.game.digest(), digest, "F9 gives the game with the stop left")
 	assert_eq(_army_states(), states)
 	assert_eq(_army(army).via.size(), 1, "the stop is kept in the save")
-	assert_false(_armies_node(app).has_stops(), "staged stops are not saved")
 
 
-## The next two ends of a season: nothing at the first, the standing leg at the second, which passes the stop.
+## The next ends of a season: the first walks the standing leg (issue 474, R22a), and the march passes the stop.
 func _walk_on_past_the_stop(vp: SubViewport, app: App, army: int) -> void:
 	var here := _army(army).hex
 	await _end_season(vp, app)
 	await _close_report(vp, app)
-	assert_eq(_army(army).hex, here, "nothing walks at the end of the season it was ordered")
+	assert_ne(_army(army).hex, here, "P: the End turn after the order walks nothing (issue 474)")
 	for _season: int in 4:
 		await _end_season(vp, app)
 		await _close_report(vp, app)

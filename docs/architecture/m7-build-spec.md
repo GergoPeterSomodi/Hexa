@@ -1503,6 +1503,11 @@ show and `LogLines.FILTERS`' War appears.
 
 `Bindings.GESTURES` gains "Shift+right click (Shift+two-finger click): storm a fortress with the selected army".
 
+**Amended 2026-11-27 (owner: "waypoints should be by Shift + RIGHT click").** The storm gesture is now **Ctrl+right click**
+(`MapInput` reads `ctrl_pressed`, with no Shift, Alt or Meta; with no army selected it is a right click), and Shift+right click
+orders the selected army's path (`moves-build-spec.md` R58). Wherever this page says Shift+right click for the storm
+(here, D53, the odds card's note, the tests of section 9), read Ctrl+right click. Shift+O is unchanged.
+
 | `Settings.SCHEMA` key | Type (default) | Page, row | Since |
 |---|---|---|---|
 | `map/castle_areas` (**new**) | bool (true) | Map: "Castle areas with an army selected"; also the Layers popover's "Castle areas" switch | 7 |

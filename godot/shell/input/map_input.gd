@@ -36,13 +36,15 @@ signal cursor_moved(direction: int)
 signal command_key_requested
 ## Shift+O: storm at the cursor (M7 6.1).
 signal storm_key_requested
-## Shift+right click while `storm_ready` says an army of yours is selected: storm at that hex (else command_requested).
+## Ctrl+right click while `storm_ready` says an army of yours is selected: storm at that hex (else command_requested).
 signal storm_requested(map_px: Vector2)
-## Shift+left click while `waypoint_ready` says an army of yours is selected: add or remove a stop at that hex
-## (moves-build-spec.md R58; else the plain select).
+## Shift+right click while `waypoint_ready` says an army of yours is selected: extend its path to that hex, or take off its
+## final point there (moves-build-spec.md R58; else command_requested).
 signal waypoint_requested(map_px: Vector2)
 ## V: the same at the order cursor or the hovered hex (R62).
 signal waypoint_key_requested
+## Shift alone went down (`on`) or came up: the hover previews the extended path while it is held (R59).
+signal extend_changed(on: bool)
 ## B: open the dock on the last battle of yours (M7 6.1).
 signal battle_requested
 ## A click (select or command) while `orders_blocked` says so: it selects and orders nothing (M6 6.4: the replay's skip).
@@ -57,9 +59,9 @@ var orders_blocked: Callable = Callable()
 ## () -> bool: skips a running live walk (MoveReplay.skip_live; moves-build-spec.md R49) and says whether it did. A click on the map
 ## and the keys that order skip it and then act; the End turn keys (Space, Enter) only skip it and do nothing more.
 var live_skip: Callable = Callable()
-## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
+## () -> bool, asked on a Ctrl+right click: true while an army of yours is selected, so the click storms. Unset: no army.
 var storm_ready: Callable = Callable()
-## () -> bool, asked on a Shift+left click: true while an army of yours is selected, so the click stages a stop. Unset: no army.
+## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click orders its path. Unset: no army.
 var waypoint_ready: Callable = Callable()
 ## Callable(screen: Vector2) -> bool, asked on a left click's release: true while one of the viewer's unit tokens stands
 ## under the viewport point (its screen rect, the zoom included). Unset: no units, every click is a hex click.
@@ -89,6 +91,7 @@ var enabled := true:
 		if not enabled:
 			_reset_press()
 			_set_hover(NO_HEX)
+			_set_extend(false)
 
 var _settings: Settings = null
 var _press_action := &""
@@ -98,6 +101,8 @@ var _slop_broken := false
 var _saw_hardware_button := false
 var _last_hover := NO_HEX
 var _block_reason := ""
+## Shift held with no other modifier, as the last key or pointer event said it (extend_changed).
+var _extend := false
 var _blocked_at := -BLOCKED_GAP_MS * 10
 ## () -> int, milliseconds, for the once-a-second rule; tests inject a fake.
 var clock: Callable = Callable()
@@ -115,6 +120,8 @@ func _exit_tree() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_MOUSE_EXIT:
 		_set_hover(NO_HEX)
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_set_extend(false)  # a key let go in another window is not heard
 
 
 ## Applies relevant settings (developer tools gating) and listens for live updates.
@@ -141,8 +148,8 @@ func _disconnect_settings() -> void:
 	_settings = null
 
 
-## While `reason` is not empty, select, command, the command key, upgrade, Tab, R, Ctrl+Z, Shift+O, Shift+right click,
-## Shift+left click, V, B and J emit `blocked(reason)` and nothing else; the camera, the modes, the grid and names keys and the hover work.
+## While `reason` is not empty, select, command, the command key, upgrade, Tab, R, Ctrl+Z, Shift+O, Ctrl+right click,
+## Shift+right click, V, B and J emit `blocked(reason)` and nothing else; the camera, the modes, the grid and names keys and the hover work.
 ## "" lifts it.
 func block_orders(reason: String) -> void:
 	_block_reason = reason
@@ -171,7 +178,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		_on_mouse_motion(event as InputEventMouseMotion)
 	elif event is InputEventKey:
-		_on_key(event as InputEventKey)
+		var key := event as InputEventKey
+		if key.keycode == KEY_SHIFT:
+			_set_extend(key.pressed and not (key.ctrl_pressed or key.alt_pressed or key.meta_pressed))
+		_on_key(key)
+
+
+func _set_extend(on: bool) -> void:
+	if on == _extend:
+		return
+	_extend = on
+	extend_changed.emit(on)
 
 
 func _on_mouse_button(mb: InputEventMouseButton) -> void:
@@ -203,9 +220,7 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		return
 	_skip_live()
 	if released_action == &"map_select":
-		if _stages(mb):
-			waypoint_requested.emit(map_px)
-		elif _on_unit(mb):
+		if _on_unit(mb):
 			unit_requested.emit(mb.position)
 		else:
 			select_requested.emit(map_px)
@@ -213,6 +228,8 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 	elif released_action == &"map_command":
 		if _storms(mb):
 			storm_requested.emit(map_px)
+		elif _extends(mb):
+			waypoint_requested.emit(map_px)
 		else:
 			command_requested.emit(map_px)
 		_mark_handled()
@@ -228,22 +245,28 @@ func _on_unit(mb: InputEventMouseButton) -> bool:
 	return not mb.shift_pressed and unit_at_func.is_valid() and bool(unit_at_func.call(mb.position))
 
 
-## A Shift+right click (no Ctrl, Alt or Meta) with an army of yours selected: a storm, not a command (M7 6.1).
+## A Ctrl+right click (no Shift, Alt or Meta) with an army of yours selected: a storm, not a command (M7 6.1).
 func _storms(mb: InputEventMouseButton) -> bool:
-	return _shift_only(mb) and storm_ready.is_valid() and bool(storm_ready.call())
+	return _ctrl_only(mb) and storm_ready.is_valid() and bool(storm_ready.call())
 
 
-## A Shift+left click (no Ctrl, Alt or Meta) with an army of yours selected: a stop of its march, not a selection (R58).
-func _stages(mb: InputEventMouseButton) -> bool:
+## A Shift+right click (no Ctrl, Alt or Meta) with an army of yours selected: its path's order, not a plain command (R58).
+func _extends(mb: InputEventMouseButton) -> bool:
 	return _shift_only(mb) and waypoint_ready.is_valid() and bool(waypoint_ready.call())
 
 
 ## True when Shift is held and no other modifier.
-static func _shift_only(mb: InputEventMouseButton) -> bool:
+static func _shift_only(mb: InputEventWithModifiers) -> bool:
 	return mb.shift_pressed and not (mb.ctrl_pressed or mb.alt_pressed or mb.meta_pressed)
 
 
+## True when Ctrl is held and no other modifier.
+static func _ctrl_only(mb: InputEventMouseButton) -> bool:
+	return mb.ctrl_pressed and not (mb.shift_pressed or mb.alt_pressed or mb.meta_pressed)
+
+
 func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
+	_set_extend(_shift_only(motion))
 	if _press_button != MOUSE_BUTTON_NONE and motion.position.distance_to(_press_at) >= CLICK_SLOP:
 		_slop_broken = true
 	if _slop_broken or _is_gui_hovered():

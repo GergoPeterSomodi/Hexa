@@ -13,10 +13,10 @@ const OWNS: Array[String] = []
 const NO_HEX := Vector2i(-1, -1)
 ## Leg plans kept per game version before the table is emptied.
 const PLANS_MAX := 256
-const TOO_MANY_TEXT := "too many stops: at most %d before the goal"
-const BAD_STOPS_TEXT := "the stops are not places on the map"
+const TOO_MANY_TEXT := "path is full: at most %d path points before the goal"
+const BAD_STOPS_TEXT := "the path points are not places on the map"
 const SAME_AS_ARMY_TEXT := "the army stands there already"
-const SAME_AS_BEFORE_TEXT := "the same place as the stop before it"
+const SAME_AS_BEFORE_TEXT := "the same place as the path point before it"
 
 
 ## The stops of an order's args (`args["via"]`): an Array of Vector2i (a typed or a plain array, as a log record keeps it), or
@@ -38,7 +38,7 @@ static func read_via(raw: Variant) -> Variant:
 ## cost, waits, reason}, as Movement.plan's), legs ([{from, to, hexes}]), via (the stops as hex indices)}. At most max_stops stops;
 ## each point differs from the one before it (the first from the army's hex); every leg is Movement.goal_verdict from the point
 ## before it, the room checked for the goal only (a stop is passed through). The first refusing leg's words are prefixed
-## "Stop 2: " (or "The goal: "). With no stops it is goal_verdict itself: today's order and today's words.
+## "Point 2: " (or "The goal: "). With no stops it is goal_verdict itself: today's order and today's words.
 static func legs_verdict(game: Game, army: Army, tag: StringName, raw_via: Variant, goal: Vector2i) -> Dictionary:
 	var read: Variant = read_via(raw_via)
 	if read == null:
@@ -63,7 +63,7 @@ static func legs_verdict(game: Game, army: Army, tag: StringName, raw_via: Varia
 	for k: int in points.size():
 		var to := points[k]
 		var last := k == points.size() - 1
-		var prefix := "The goal: " if last else "Stop %d: " % (k + 1)
+		var prefix := "The goal: " if last else "Point %d: " % (k + 1)
 		if to == from:
 			return _refused(prefix + (SAME_AS_ARMY_TEXT if k == 0 else SAME_AS_BEFORE_TEXT), to)
 		var g := Movement.goal_verdict(game, army, tag, to, from if k > 0 else NO_HEX, last)
@@ -94,7 +94,7 @@ static func plan_from(game: Game, army: Army, from: Vector2i, goal: Vector2i) ->
 	var mp := Movement.mp_of(game, army)
 	if Movement.has_hostility():
 		return Movement.replan(game, army.tag, from, goal, mp)
-	var key: Array = [army.id, from, goal, mp, game.turn, army.tag, Movement.war_key(game), hash(game.state.occupier),
+	var key: Array = [army.id, from, goal, mp, Movement.rules_turn(game), army.tag, Movement.war_key(game), hash(game.state.occupier),
 		hash(game.state.garrison)]
 	var table: Dictionary = game.view_cache.pinned(&"via_plans", game.version, func() -> Dictionary: return {}) as Dictionary
 	if table.has(key):
@@ -173,7 +173,7 @@ static func ahead(via: PackedInt32Array, rem: PackedInt32Array) -> PackedInt32Ar
 
 
 ## `army` itself when its stops are `via`, else a copy of it holding `via` (the preview's march with other stops than the kept
-## ones: MovePreview's plain march, ViaPreview's staged stops). The copy is read only; the army is never changed.
+## ones: MovePreview's plain march, ViaPreview's path). The copy is read only; the army is never changed.
 static func with_stops(army: Army, via: PackedInt32Array) -> Army:
 	if army == null or army.via == via:
 		return army

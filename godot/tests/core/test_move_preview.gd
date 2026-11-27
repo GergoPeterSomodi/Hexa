@@ -334,7 +334,7 @@ func test_a_long_march_walks_its_points_and_leaves_the_rest_standing() -> void:
 	assert_eq(int(leg.points_after), int(leg.points_before) - int(leg.cost))
 	assert_true(_has_line(p, "Walks 6 hexes now: 12 of 12 move points, 0 left."), str(_lines_text(p)))
 	assert_true(_has_line(p, "Stops at "), "the stop of a route longer than the season")
-	assert_true(_lines_text(p).any(func(t: String) -> bool: return t.contains("walks on at the end of next season, there in ")))
+	assert_true(_lines_text(p).any(func(t: String) -> bool: return t.contains("walks on at End turn, there in ")))
 
 
 func test_the_points_left_shorten_the_leg() -> void:
@@ -371,7 +371,7 @@ func test_an_army_with_no_points_walks_nothing_and_says_when_it_sets_out() -> vo
 	assert_eq(p.leg.why, &"no_points")
 	assert_true((p.leg.hexes as Array).is_empty())
 	assert_eq(p.leg.end, a.hex)
-	assert_true(_has_line(p, "No move points left this season: it sets out at the end of next season."))
+	assert_true(_has_line(p, "No move points left this season: it sets out at End turn."))
 	assert_false(_has_line(p, "Walks "))
 
 

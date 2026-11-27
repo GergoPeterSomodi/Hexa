@@ -399,6 +399,12 @@ func _shift_btn(button: MouseButton, pos: Vector2, pressed: bool) -> InputEventM
 	return ev
 
 
+func _ctrl_btn(button: MouseButton, pos: Vector2, pressed: bool) -> InputEventMouseButton:
+	var ev := _btn(button, pos, pressed)
+	ev.ctrl_pressed = true
+	return ev
+
+
 func _shift_key(keycode: Key) -> InputEventKey:
 	var ev := InputEventKey.new()
 	ev.keycode = keycode
@@ -414,25 +420,36 @@ func _connect_m7(log: Array[String]) -> void:
 	_input.battle_requested.connect(func() -> void: log.append("battle"))
 
 
-func test_m7_shift_right_click_storms_only_with_an_army_selected() -> void:
+func test_m7_ctrl_right_click_storms_only_with_an_army_selected() -> void:
 	var storms: Array[Vector2] = []
 	var commands: Array[Vector2] = []
 	_input.storm_requested.connect(func(px: Vector2) -> void: storms.append(px))
 	_input.command_requested.connect(func(px: Vector2) -> void: commands.append(px))
 	var army := [false]
 	_input.storm_ready = func() -> bool: return army[0]
-	# no army selected: a Shift+right click is a right click
-	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
-	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
-	assert_eq(commands, [Vector2(121.0, 220.0)], "Shift+right click with no army commands")
+	# no army selected: a Ctrl+right click is a right click
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
+	assert_eq(commands, [Vector2(121.0, 220.0)], "Ctrl+right click with no army commands")
 	assert_true(storms.is_empty(), "and does not storm")
-	# an army of yours selected: the Shift+right click storms at that hex; a plain right click still commands
+	# an army of yours selected: the Ctrl+right click storms at that hex; a plain right click still commands
 	commands.clear()
 	army[0] = true
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
+	assert_eq(storms, [Vector2(121.0, 220.0)], "Ctrl+right click storms at the hex")
+	assert_true(commands.is_empty(), "and does not command")
+	# Shift+right is not the storm any more, and Ctrl with another modifier is a plain right click
 	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
 	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), false))
-	assert_eq(storms, [Vector2(121.0, 220.0)], "Shift+right click storms at the hex")
-	assert_true(commands.is_empty(), "and does not command")
+	for modifier: StringName in [&"shift_pressed", &"alt_pressed", &"meta_pressed"]:
+		for pressed: bool in [true, false]:
+			var ev := _ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(121.0, 220.0), pressed)
+			ev.set(modifier, true)
+			_input._unhandled_input(ev)
+	assert_eq(storms.size(), 1, "P: Shift+right or Ctrl with Shift, Alt or Meta storms")
+	assert_eq(commands.size(), 4, "each of them commands")
+	commands.clear()
 	_input._unhandled_input(_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
 	_input._unhandled_input(_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), false))
 	assert_eq(storms.size(), 1, "a plain right click does not storm")
@@ -441,8 +458,8 @@ func test_m7_shift_right_click_storms_only_with_an_army_selected() -> void:
 	storms.clear()
 	commands.clear()
 	_input.storm_ready = Callable()
-	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
-	_input._unhandled_input(_shift_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), false))
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), true))
+	_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(120.0, 220.0), false))
 	assert_true(storms.is_empty(), "an unset gate never storms")
 	assert_eq(commands.size(), 1, "an unset gate is a right click")
 
@@ -526,6 +543,9 @@ func test_block_orders_emits_blocked_instead_of_each_order_and_changes_nothing()
 		func() -> void: _click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true),
 		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0)),
 		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true),
+		func() -> void:
+			_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true))
+			_input._unhandled_input(_ctrl_btn(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), false)),
 	]
 	for action: StringName in [&"map_command_key", &"game_upgrade", &"game_next_unit", &"game_continue_march",
 			&"game_undo_work", &"map_command_storm", &"game_battle", &"game_report", &"map_waypoint_key"]:
@@ -585,9 +605,10 @@ func test_camera_intents_still_work_while_blocked_and_empty_lifts_it() -> void:
 	assert_true(reasons.is_empty())
 
 
-## moves in the month (R58): Shift+left click stages a stop only while waypoint_ready says an army of yours is selected, even on
-## one of your tokens; else, and with Ctrl, Alt or Meta, it is the plain select. Planted fault: Shift+left that never selects.
-func test_shift_left_asks_for_a_stop_only_while_an_army_is_selected() -> void:
+## moves in the month (R58): Shift+right click asks for the path's order only while waypoint_ready says an army of yours is
+## selected, even on one of your tokens; else, and with Ctrl, Alt or Meta, it is the plain right click. Shift+left click stays
+## the plain select. Planted faults: Shift+right that never commands; Shift+left that extends.
+func test_shift_right_asks_for_the_path_only_while_an_army_is_selected() -> void:
 	var log: Array[String] = []
 	_watch_orders(log)
 	var at: Array[Vector2] = []
@@ -595,36 +616,71 @@ func test_shift_left_asks_for_a_stop_only_while_an_army_is_selected() -> void:
 		at.append(px)
 		log.append("waypoint"))
 	_input.unit_requested.connect(func(_s: Vector2) -> void: log.append("unit"))
-	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	_click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true)
 	_input.waypoint_ready = func() -> bool: return false
-	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
-	assert_eq(log, ["select", "select"], "unset or no army: the select")
+	_click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["command", "command"], "unset or no army: the plain right click")
 	log.clear()
 	_input.waypoint_ready = func() -> bool: return true
+	_input.storm_ready = func() -> bool: return true
 	_input.unit_at_func = func(_s: Vector2) -> bool: return true
-	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
-	assert_eq(log, ["waypoint"], "a stop, on a token too")
+	_click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["waypoint"], "the path and no storm, on a token too")
 	assert_eq(at, [Vector2(250.0, 350.0)] as Array[Vector2])
 	log.clear()
-	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
-	assert_eq(log, ["unit"], "a plain click is unchanged")
+	_click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0))
+	assert_eq(log, ["command"], "a plain right click is unchanged")
+	log.clear()
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["select"], "P: Shift+left that extends or picks the token, with an army selected")
 	log.clear()
 	_input.unit_at_func = Callable()
 	for modifier: StringName in [&"ctrl_pressed", &"alt_pressed", &"meta_pressed"]:
 		for pressed: bool in [true, false]:
-			var ev := _btn(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), pressed)
+			var ev := _btn(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), pressed)
 			ev.shift_pressed = true
 			ev.set(modifier, true)
 			_input._unhandled_input(ev)
-	assert_false(log.has("waypoint"), "Shift with another modifier is no stop: %s" % str(log))
+	assert_eq(log, ["command", "command", "command"], "Shift with another modifier is no path order and no storm")
 	log.clear()
 	_input.orders_blocked = func() -> bool: return true
 	_input.blocked_click.connect(func(_p: Vector2) -> void: log.append("blocked_click"))
-	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	_click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true)
 	assert_eq(log, ["blocked_click"], "refused as any order while the replay runs")
 
 
-func test_v_asks_for_a_stop_at_the_cursor() -> void:
+## R59: Shift alone held, by its key or by the pointer's own modifier, is told once a change; with Ctrl, Alt or Meta it is
+## not; disabled input and the window losing focus let it go. Planted fault: a preview that sticks.
+func test_shift_held_is_told_once_a_change() -> void:
+	var told: Array[bool] = []
+	_input.extend_changed.connect(func(on: bool) -> void: told.append(on))
+	var down := _shift_key(KEY_SHIFT)
+	_input._unhandled_input(down)
+	_input._unhandled_input(down.duplicate())
+	assert_eq(told, [true] as Array[bool], "down, once")
+	var up := _shift_key(KEY_SHIFT)
+	up.pressed = false
+	up.shift_pressed = false
+	_input._unhandled_input(up)
+	assert_eq(told, [true, false] as Array[bool])
+	var moved := _motion(Vector2(250.0, 350.0))
+	moved.shift_pressed = true
+	_input._unhandled_input(moved)
+	_input._unhandled_input(_motion(Vector2(251.0, 350.0)))
+	assert_eq(told, [true, false, true, false] as Array[bool], "the pointer says it too")
+	var with_ctrl := _shift_key(KEY_SHIFT)
+	with_ctrl.ctrl_pressed = true
+	_input._unhandled_input(with_ctrl)
+	assert_eq(told.size(), 4, "Shift with Ctrl is not Shift alone")
+	_input._unhandled_input(down.duplicate())
+	_input.notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
+	assert_eq(told.back(), false, "P: held after the window lost focus")
+	_input._unhandled_input(down.duplicate())
+	_input.enabled = false
+	assert_eq(told.back(), false, "P: held under a screen")
+
+
+func test_v_asks_for_the_path_at_the_cursor() -> void:
 	var asked: Array[int] = []
 	_input.waypoint_key_requested.connect(func() -> void: asked.append(1))
 	_input._unhandled_input(_key(KEY_V))

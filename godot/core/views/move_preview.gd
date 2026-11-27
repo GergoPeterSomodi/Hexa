@@ -112,7 +112,7 @@ static func to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dict
 	return out
 
 
-## The march through staged stops (moves-build-spec.md R59, ViaPreview.via): to()'s keys plus the legs, the stops and the total.
+## The march through path points (moves-build-spec.md R59, ViaPreview.via): to()'s keys plus the legs, the points and the total.
 static func via(game: Game, tag: StringName, army_id: int, stops: Array[Vector2i], hex: Vector2i) -> Dictionary:
 	return ViaPreview.via.call(game, tag, army_id, stops, hex)  # by reference (A14): ViaPreview reads MovePreview
 
@@ -723,7 +723,7 @@ static func _leg_lines(game: Game, a: Army, leg: Dictionary, route: PackedInt32A
 	var why := StringName(leg.why)
 	var hexes: Array[Vector2i] = leg.hexes
 	if why == WHY_NO_POINTS:
-		made.append(["No move points left this season: it sets out at the end of next season.", TONE_WARN])
+		made.append(["No move points left this season: it sets out at End turn.", TONE_WARN])
 	if not hexes.is_empty():
 		made.append([_walks_text(leg, why), TONE_PLAIN])
 	if leg.has("text"):
@@ -767,10 +767,10 @@ static func _walks_text(leg: Dictionary, why: StringName) -> String:
 	return head + ", %d left." % int(leg.points_after)
 
 
-## "Stops at Cerano (7, 9) this season; walks on at the end of next season, there in Autumn 1481." The arrival is the rest of the
-## route walked from the next season on with full points.
+## "Stops at Cerano (7, 9) this season; walks on at End turn, there in Autumn 1481." The arrival is the rest of the
+## route walked from the next season on with full points (each season's leg walks at the End turn before it, R22a).
 static func _stop_text(game: Game, a: Army, leg: Dictionary, route: PackedInt32Array) -> String:
-	var head := "Stops at %s this season; walks on at the end of next season" % Words.place(game, leg.end)
+	var head := "Stops at %s this season; walks on at End turn" % Words.place(game, leg.end)
 	var at := route.find(game.map.index_of(leg.end))
 	if at < 0:
 		return head + "."

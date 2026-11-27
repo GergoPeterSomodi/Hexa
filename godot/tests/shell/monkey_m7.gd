@@ -1,6 +1,6 @@
 ## The M7 part of the UI monkey (test_ui_monkey.gd extends this, which extends MonkeyM6): the war's inputs (m7-build-spec.md
 ## section 9). Every M7 seed plays Savoy (the pick is steered) with a Milanese army made by the console and a war declared through the
-## country panel's Confirm. The inputs: Shift+right click and Shift+O (Storm), B (the newest battle's dock), clicks on the battle
+## country panel's Confirm. The inputs: Ctrl+right click and Shift+O (Storm), B (the newest battle's dock), clicks on the battle
 ## badges and the siege dials, the dock (open, the stepper keys, Play, Full log, Esc), the hex menu's war items, the console's war
 ## commands (the right ones and hostile ones: no word, no army, no hex, no such terms), a declaration and a peace through the
 ## country panel (its Confirm answered or kept), the Castle areas switch, the standing orders (the army panel's segment and the
@@ -195,15 +195,15 @@ func _m7_target(rng: Rng) -> StringName:
 	return other.tag if other != null else MLO
 
 
-## A Shift+right click (Storm's gesture): the pointer moves there first.
-func _m7_shift_click(vp: SubViewport, pos: Vector2) -> void:
+## A Ctrl+right click (Storm's gesture): the pointer moves there first.
+func _m7_ctrl_click(vp: SubViewport, pos: Vector2) -> void:
 	_m45_move(vp, pos)
 	for pressed: bool in [true, false]:
 		var ev := InputEventMouseButton.new()
 		ev.button_index = MOUSE_BUTTON_RIGHT
 		ev.position = pos
 		ev.global_position = pos
-		ev.shift_pressed = true
+		ev.ctrl_pressed = true
 		ev.pressed = pressed
 		vp.push_input(ev)
 
@@ -403,7 +403,7 @@ func _m7_peace(rng: Rng, vp: SubViewport, app: App, forced: bool = false) -> voi
 # ----- Storm ----------------------------------------------------------------------------------------------------------------------------
 
 
-## Shift+right click, or the pointer over the hex and Shift+O, with a Savoyard army selected: a storm of the rules, or its toast.
+## Ctrl+right click, or the pointer over the hex and Shift+O, with a Savoyard army selected: a storm of the rules, or its toast.
 func _m7_storm(rng: Rng, vp: SubViewport, app: App) -> void:
 	var armies := _m6_map_armies(app)
 	var game := Session.game
@@ -421,7 +421,7 @@ func _m7_storm(rng: Rng, vp: SubViewport, app: App) -> void:
 	if not Rect2(Vector2.ZERO, Vector2(vp.size)).has_point(pos):
 		return
 	if rng.randi_range(0, 1) == 0:
-		_m7_shift_click(vp, pos)
+		_m7_ctrl_click(vp, pos)
 	else:
 		_m45_move(vp, pos)
 		await _wait_frames(2)

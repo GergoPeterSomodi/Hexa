@@ -9,7 +9,8 @@
 ## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept). The
 ## set depends on the country alone while the legs are made (a leg writes nothing), so the phase makes it once per country.
 ## MV20: fair warning (FairWarning, R73) is a rule of the ticks too: a step onto the land of a country the walker's country declared
-## war on this season is not taken (&"warned": no halt, the points kept, the march stands and goes on next season).
+## war on this season is not taken (&"warned": no halt, the points kept, the march stands and goes on next season). The End-turn
+## leg (R22a) walks before the calendar, so a war declared this season shuts that land to it too.
 ## MV19: multi-leg marches (MarchVia, R65): the stops left (`via`) pass as the steps land on them; a walk arrives only on its goal
 ## with no stop left; a re-plan or a winter detour goes through the next stop, never straight to the goal; apply writes the stops
 ## left (Armies.set_order, the only writer of Army.via).
@@ -60,6 +61,8 @@ var unseen: Array[Army] = []
 var sight: int = 1
 ## Multi-leg marches (R65): the stops not yet reached after the walked steps, the next first (Army.via at the start).
 var stops_left := PackedInt32Array()
+## The End-turn leg (R22a, MovementPhase.next_leg): its ticks count from tick_base + 1 (0 for every other walk).
+var tick_base: int = 0
 
 
 ## The leg: the steps the army takes this season by its own rules (no other army counted), a detour or a wait at a closed
@@ -264,7 +267,7 @@ static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary, walks: Array 
 		_cut(game, w, k, h, held)
 		return
 	occ[h] = w.cid
-	w.ticks.append(k + 1)
+	w.ticks.append(w.tick_base + k + 1)
 	var from := w.army.hex
 	Armies.set_hex(game, w.army, hex, game.map.hex_of(w.start))
 	Movement.index_move(game, w.army, from, hex)
@@ -316,14 +319,14 @@ static func _engage(game: Game, w: MarchLeg, k: int, prev: Vector2i, hex: Vector
 	var d := Movement.direction(m, m.index_of(prev), m.index_of(hex))
 	var edge := m.edge_index(prev, d)
 	var from := w.army.hex
-	if not Battles.engage(game, w.army, hex, k + 1, edge):
+	if not Battles.engage(game, w.army, hex, w.tick_base + k + 1, edge):
 		return false
 	Movement.index_move(game, w.army, from, w.army.hex)
 	var back := w.walked.slice(k + 1)
 	back.append_array(w.rem)
 	w.rem = back
 	w.walked = w.walked.slice(0, k + 1)
-	w.ticks.append(k + 1)
+	w.ticks.append(w.tick_base + k + 1)
 	w.end = m.index_of(hex)
 	w.engaged = true
 	w.status = &""

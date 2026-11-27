@@ -93,7 +93,7 @@ func test_a_long_march_says_it_walks_and_marches_on() -> void:
 	var a := Armies.by_id(_game, id)
 	assert_ne(a.hex, origin, "the first leg walked in the order")
 	assert_eq(_said.size(), 1)
-	assert_eq(_said[0][0], "The %s walks to %s; it marches on to %s at the end of next season." % [_name_of(id),
+	assert_eq(_said[0][0], "The %s walks to %s; it marches on to %s at End turn." % [_name_of(id),
 		Words.place(_game, a.hex), Words.place(_game, goal)])
 
 
@@ -107,7 +107,7 @@ func test_a_march_with_no_points_left_says_it_sets_out() -> void:
 	_game.version += 1
 	_armies().command(goal)
 	assert_eq(Armies.by_id(_game, id).hex, origin, "nothing walked")
-	assert_eq(_said.back()[0], "The %s sets out for %s at the end of next season." % [_name_of(id), Words.place(_game, goal)])
+	assert_eq(_said.back()[0], "The %s sets out for %s at End turn." % [_name_of(id), Words.place(_game, goal)])
 
 
 func test_a_hold_on_the_army_hex_says_it_holds_once() -> void:
@@ -147,7 +147,7 @@ func test_r_on_a_halted_march_walks_at_once_and_says_so_once() -> void:
 	var a := Armies.by_id(_game, id)
 	assert_ne(a.hex, origin, "the march walks at once")
 	assert_eq(_said.size(), 1, "one toast for R")
-	assert_eq(_said[0][0], "The %s walks to %s; it marches on to %s at the end of next season." % [_name_of(id),
+	assert_eq(_said[0][0], "The %s walks to %s; it marches on to %s at End turn." % [_name_of(id),
 		Words.place(_game, a.hex), Words.place(_game, goal)])
 
 

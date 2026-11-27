@@ -401,6 +401,17 @@ static func season(game: Game) -> void:
 	for a: Army in armies:
 		if a.order == Army.ORDER_STORM and a.hex == a.goal and at(game, a.hex) == null:
 			engage(game, a, a.hex, 0, -1)
+	fight_all(game)
+
+
+## Fights every open battle, in hex index order, as the battles phase does (Combat.fight on input_of, BattleEnd.apply, the
+## retreats as phase walks), then flushes the occupation and refreshes the sight. game.battles is empty after it. The battles
+## phase calls it after the storms' assaults; the End-turn leg (MovementPhase.next_leg, moves-build-spec.md R22a) for the
+## battles its walks opened.
+static func fight_all(game: Game) -> void:
+	if game.map == null or game.defs == null or game.defs.war == null:
+		game.battles.clear()
+		return
 	var list: Array[Battle] = []
 	list.assign(game.battles)
 	list.sort_custom(func(x: Battle, y: Battle) -> bool: return game.map.index_of(x.hex) < game.map.index_of(y.hex))

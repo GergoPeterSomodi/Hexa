@@ -3,8 +3,8 @@
 ## map/path_look). The legs that end out of supply are in MAP_PATH_WARN; a path_stop with the season's numeral at each stop and a
 ## crossing icon (bridge, ford, wade, pass) at each crossing. It draws what MovePreview.to says and only redraws on show_route,
 ## clear_route, set_look and set_zoom. A thin variant (show_route with thin) draws a stored route: the line only, in every look.
-## A march's stops (the preview's `via`, moves-build-spec.md R59, R68) are marked on both: a numbered diamond pin above each
-## staged stop, a small diamond on each stop a stored route still passes.
+## A march's path points (the preview's `via`, moves-build-spec.md R59, R68) are marked on both: a numbered diamond pin above each
+## point of a previewed path, a small diamond on each point a stored route still passes.
 ## The route's start is the army's own hex: the preview's `from` (MapArmies adds it); without one the route starts at its first hex.
 class_name PathMarks
 extends Node2D
@@ -13,8 +13,8 @@ const LAYER_Z := 84
 const STOP_SIZE := 20.0
 const CROSSING_ICON := 16.0
 const NUMERAL_SIZE := 12
-## The staged stop's pin: the diamond's half width, how far its centre stands above the hex's, and its ink edge (screen px at
-## the markers' scale); the stored stop's small diamond.
+## A previewed path point's pin: the diamond's half width, how far its centre stands above the hex's, and its ink edge (screen
+## px at the markers' scale); the stored point's small diamond.
 const PIN_RADIUS := 11.0
 const PIN_LIFT := 22.0
 const PIN_EDGE := 2.0
@@ -53,7 +53,7 @@ func setup(view: TileMapView) -> void:
 
 ## Draws MovePreview's preview of a march: {hexes, stops ([{hex}]), crossings ([{hex, to, kind}]), beyond, from} where `beyond` is
 ## one byte a hex, 1 when the hex is out of supply, and `from` is the army's own hex (the route's first point). `thin` draws the
-## stored route of a march in progress: the line only. `via` ([Vector2i], optional) are the march's stops, marked even when
+## stored route of a march in progress: the line only. `via` ([Vector2i], optional) are the march's path points, marked even when
 ## the route is empty (a refused target).
 func show_route(preview: Dictionary, thin: bool = false) -> void:
 	_thin = thin
@@ -210,7 +210,7 @@ func _draw_markers(px: float, mark: float) -> void:
 				HORIZONTAL_ALIGNMENT_CENTER, STOP_SIZE * mark, size_text, Tokens.MAP_PATH_INK)
 
 
-## The stops: a numbered diamond pin on a short stalk above each staged stop; a small diamond on each stored stop.
+## The path points: a numbered diamond pin on a short stalk above each previewed one; a small diamond on each stored one.
 func _draw_pins(mark: float) -> void:
 	var font := ThemeDB.fallback_font
 	for n: int in range(_pins.size()):

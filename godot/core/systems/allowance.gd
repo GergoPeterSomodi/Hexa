@@ -25,12 +25,15 @@ static func fresh(game: Game, army: Army) -> bool:
 	return top > 0 and army.points == top
 
 
-## The ready_units phase (R13): every army's points become its full.
+## The ready_units phase (R13): every army's points become its full, but an army the End-turn leg marked &"next" (R22a: it
+## walked, or fought, on the next season's points already) keeps what it has left of them. Clears the marks.
 static func refill(game: Game) -> void:
 	if game == null:
 		return
 	for a: Army in game.armies:
-		Armies.set_points(game, a, full(game, a))
+		var kept := StringName(game.leg_marks.get(a.id, &"")) == MovementPhase.MARK_NEXT
+		Armies.set_points(game, a, a.points if kept else full(game, a))
+	game.leg_marks = {}
 
 
 ## A split (R15, D14): the new army's points are the parent's points before the split, and the parent keeps them; each is cut

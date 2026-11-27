@@ -2,9 +2,8 @@
 ## when none can walk), selects it and orders it: a short march by a right click (then a second order on purpose), a march by O
 ## at the order cursor, a march past the season's points, a risky march or a storm (the question answered Move and Cancel in
 ## turn), Continue by R, F5 and F9 in the middle of the season, or End season. A live walk is watched a few frames and often
-## skipped by a click, Esc, Space or F5. The multi-leg step stages one to four stops by Shift+left click or V (water, the
-## army's own hex, the last stop and the same hex twice among them), drops them by V, Esc or "Clear stops", commits them by a
-## right click, O or "March", and saves and loads with stops left.
+## skipped by a click, Esc, Space or F5. The multi-leg step orders a path by Shift+right click or V, adds points (water among
+## them), takes the final point off, replaces the path by a plain right click, and saves and loads with points left.
 ## The invariants are monkey_moves_checks.gd's.
 class_name MonkeyMoves
 extends MonkeyMovesChecks
@@ -12,8 +11,11 @@ extends MonkeyMovesChecks
 ## The counters a moves seed must raise above 0.
 const MOVES_REQUIRED: Array[String] = [
 	"moves_walked", "moves_second", "moves_standing", "moves_confirms", "moves_live_skips", "moves_mid_saves",
-	"moves_stops_staged", "moves_stops_removed", "moves_stops_cleared", "moves_via_committed", "moves_via_saves",
+	"moves_path_extended", "moves_path_removed", "moves_path_refused", "moves_path_replaced", "moves_via_saves",
 ]
+## What a multi-leg step does with a path under way, picked by the dice.
+const MOVES_PATH_ACTS: Array[String] = ["moves_path_extended", "moves_path_extended", "moves_path_removed",
+	"moves_path_refused", "moves_path_replaced"]
 ## The counters the log shows (not asserted).
 const MOVES_LOGGED: Array[String] = [
 	"moves_steps", "moves_orders", "moves_cancels", "moves_loads", "moves_storms", "moves_continues", "moves_frames",
@@ -207,8 +209,6 @@ func _moves_select(vp: SubViewport, app: App, id: int) -> bool:
 	var armies := _m6_map_armies(app)
 	if army == null or armies == null:
 		return false
-	if armies.has_stops():
-		armies.clear_army()
 	await _moves_frame_on(app, army.hex)
 	if armies.selected_army() != id:
 		_send_click(vp, _m6_unit_pos(app, army), MOUSE_BUTTON_LEFT)
@@ -398,7 +398,7 @@ func _moves_continue(rng: Rng, vp: SubViewport, app: App, id: int) -> void:
 		await _moves_live(rng, vp, app, false)
 
 
-## Shift+right click on an enemy's fortress near the army (a storm of the rules, or its toast).
+## Ctrl+right click on an enemy's fortress near the army (a storm of the rules, or its toast).
 func _moves_storm(rng: Rng, vp: SubViewport, app: App, id: int) -> void:
 	var game := Session.game
 	var army := Armies.by_id(game, id)
@@ -414,7 +414,7 @@ func _moves_storm(rng: Rng, vp: SubViewport, app: App, id: int) -> void:
 	await _moves_frame_on(app, goal)
 	if app.stack().count() != 0 or _m6_map_armies(app).selected_army() != id:
 		return
-	if await _moves_give(vp, app, id, _m7_shift_click.bind(vp, _m6_screen_pos(app, goal))):
+	if await _moves_give(vp, app, id, _m7_ctrl_click.bind(vp, _m6_screen_pos(app, goal))):
 		_bump("moves_storms")
 		await _moves_live(rng, vp, app, false)
 
@@ -460,7 +460,7 @@ func _moves_live(rng: Rng, vp: SubViewport, app: App, skip: bool) -> void:
 
 
 ## F5 after an army was ordered this season (one is ordered first when none was), sometimes another order, then F9: the
-## same game, the same armies, no stops staged.
+## same game, the same armies.
 func _moves_save_load(rng: Rng, vp: SubViewport, app: App, id: int, forced: bool) -> void:
 	if not _moves_ordered.values().has(Session.game.turn):
 		await _moves_short(rng, vp, app, id, false)
@@ -508,7 +508,6 @@ func _moves_save_load(rng: Rng, vp: SubViewport, app: App, id: int, forced: bool
 	assert_eq(_moves_all_states(), armies_before, "%s: the same armies, points, halts, marches and stops" % _tag)
 	var layer := _m6_map_armies(app)
 	if layer != null:
-		assert_false(layer.has_stops(), "%s: staged stops are not saved" % _tag)
 		assert_eq(layer.selected_army(), -1, "%s: no army stays selected after a load" % _tag)
 
 
@@ -519,25 +518,34 @@ func _moves_all_states() -> Array:
 	return out
 
 
-# ----- multi-leg ---------------------------------------------------------------------------------------------------------------------
+# ----- multi-leg: the path ------------------------------------------------------------------------------------------------------------
 
 
-## Stops staged for the selected army, some dropped, then committed (or left to Esc); with stops left on the army, F5 and F9.
+## A path ordered by Shift+right click or V (started when none is under way), then points added to its end, hexes the rules
+## refuse among them, the final point taken off, a plain right click that replaces it, and F5 and F9 with points left on it.
 func _moves_multi_leg(rng: Rng, vp: SubViewport, app: App, id: int, want: String) -> void:
-	var layer := _m6_map_armies(app)
-	var committing := want == "moves_via_committed" or want == "moves_via_saves"
-	for k: int in rng.randi_range(1, 4 if not committing else 2):
-		if not await _moves_stage_one(rng, vp, app, id, k == 0 or committing):
+	if not _moves_under_way(id):
+		if not await _moves_path_act(rng, vp, app, id, _moves_goal(rng, id, 8, 20)):
 			return
-	if layer.has_stops() and (want == "moves_stops_removed" or (want == "" and rng.randi_range(0, 3) == 0)):
-		await _moves_toggle(rng, vp, app, id, layer.stops().back())  # V or Shift+left on the last stop takes it off
-	if not layer.has_stops() or app.stack().count() != 0:
-		return
-	if want == "moves_stops_cleared" or (not committing and rng.randi_range(0, 4) == 0):
-		await _moves_clear(rng, vp, app, id)
-		return
-	if not await _moves_commit(rng, vp, app, id):
-		return
+		await _moves_live(rng, vp, app, false)
+		if not _moves_ready(app) or not await _moves_select(vp, app, id) or not _moves_under_way(id):
+			return
+	var what := want
+	if what == "":
+		what = MOVES_PATH_ACTS[rng.randi_range(0, MOVES_PATH_ACTS.size() - 1)]
+	match what:
+		"moves_path_refused":
+			await _moves_path_act(rng, vp, app, id, _moves_water(rng, app, id))
+		"moves_path_removed":
+			await _moves_path_act(rng, vp, app, id, Armies.by_id(Session.game, id).goal)
+		"moves_path_replaced":
+			await _moves_replace(rng, vp, app, id)
+		_:
+			for _k: int in rng.randi_range(1, 3):
+				if not _moves_ready(app) or _m6_map_armies(app).selected_army() != id:
+					return
+				await _moves_path_act(rng, vp, app, id, _moves_next_point(rng, app, id))
+				await _moves_live(rng, vp, app, false)
 	await _moves_live(rng, vp, app, false)
 	var army := Armies.by_id(Session.game, id) if Session.game != null else null
 	if army != null and not army.via.is_empty() and _moves_ready(app) and (want == "moves_via_saves" or rng.randi_range(0, 1) == 0):
@@ -545,75 +553,109 @@ func _moves_multi_leg(rng: Rng, vp: SubViewport, app: App, id: int, want: String
 			await _moves_save_load(rng, vp, app, id, true)
 
 
-## The hex of the next staging act: a far or near land hex, water, the army's own hex, or the last stop.
-func _moves_stop_hex(rng: Rng, app: App, id: int, good: bool) -> Vector2i:
+## Whether army `id` has a march order with a goal not yet reached.
+func _moves_under_way(id: int) -> bool:
+	return Session.game != null and MarchPath.under_way(Armies.by_id(Session.game, id))
+
+
+## A land hex the rules take as the next point of the army's path (or of a new one), MOVES_NO_HEX when the sample finds none.
+func _moves_next_point(rng: Rng, app: App, id: int) -> Vector2i:
 	var game := Session.game
 	var army := Armies.by_id(game, id)
-	var layer := _m6_map_armies(app)
-	var roll := 9 if good else rng.randi_range(0, 9)
-	if roll == 0 and layer.has_stops():
-		return layer.stops().back()
-	if roll == 1:
-		return army.hex
-	if roll == 2:
-		for _t: int in 200:
-			var i := rng.randi_range(0, game.map.hex_count() - 1)
-			if game.map.land[i] != 1 and ImproveRules.hex_distance(army.hex, game.map.hex_of(i)) <= 14:
-				return game.map.hex_of(i)
-	var from: Vector2i = layer.stops().back() if layer.has_stops() else army.hex
+	if army == null or app.map_scene() == null:
+		return MOVES_NO_HEX
+	var from := army.goal if MarchPath.under_way(army) else Movement.NO_HEX
 	for _t: int in MOVES_GOAL_TRIES:
 		var hex := _moves_goal(rng, id, 2, 5) if rng.randi_range(0, 2) == 0 else _moves_goal(rng, id, 8, 18)
-		if hex != MOVES_NO_HEX and hex != from and bool(Movement.goal_verdict(game, army, army.tag, hex,
-				from if layer.has_stops() else Movement.NO_HEX, false).ok):
+		if hex != MOVES_NO_HEX and hex != from and hex != army.hex \
+				and bool(Movement.goal_verdict(game, army, army.tag, hex, from, false).ok):
 			return hex
 	return MOVES_NO_HEX
 
 
-## One staging act at `hex`: Shift+left click, or V with the pointer there. Counts a stop added or taken off; I10 holds.
-func _moves_toggle(rng: Rng, vp: SubViewport, app: App, id: int, hex: Vector2i) -> bool:
+## A hex of water near the army (a point every path refuses), MOVES_NO_HEX when the sample finds none.
+func _moves_water(rng: Rng, app: App, id: int) -> Vector2i:
+	var game := Session.game
+	var army := Armies.by_id(game, id)
+	if army == null or app.map_scene() == null:
+		return MOVES_NO_HEX
+	for reach: int in [8, 14, 40]:
+		for _t: int in 200:
+			var i := rng.randi_range(0, game.map.hex_count() - 1)
+			if game.map.land[i] != 1 and ImproveRules.hex_distance(army.hex, game.map.hex_of(i)) <= reach:
+				return game.map.hex_of(i)
+	return MOVES_NO_HEX
+
+
+## One Shift+right click on `hex`, or V with the pointer there, with the question answered (_moves_give). An order given adds to
+## the path, takes its final point off or starts one; a refused or cancelled one changes nothing (I10). True when the act was
+## made (accepted or not).
+func _moves_path_act(rng: Rng, vp: SubViewport, app: App, id: int, hex: Vector2i) -> bool:
+	if hex == MOVES_NO_HEX:
+		return false
 	var layer := _m6_map_armies(app)
 	await _moves_frame_on(app, hex)
 	if app.stack().count() != 0 or layer.selected_army() != id:
 		return false
 	var game := Session.game
-	var before := layer.stops()
+	var army := Armies.by_id(game, id)
+	var under := MarchPath.under_way(army)
+	var goal := army.goal
+	var ahead := MarchPath.ahead(game, army)
+	var state := _moves_state(id)
+	var refusable := _moves_rules_refuse(army, hex)
+	var cancels := int(_n["moves_cancels"])
 	var digest := game.digest()
 	var version := game.version
-	var unsaved := Session.unsaved_actions
 	var pos := _m6_screen_pos(app, hex)
 	_m45_move(vp, pos)
 	await _wait_frames(1)
-	var card := app.hud().map_hover().move_card()
-	for button: Button in [card.march_button(), card.clear_button()]:
-		if button != null and button.is_visible_in_tree() and button.get_global_rect().has_point(pos):
-			return true  # the pinned card's button is under the pointer: the click would be the card's
-	if rng.randi_range(0, 2) == 0:
-		await _wait_frames(1)
-		_send_chord(vp, KEY_V)
-	else:
-		_moves_shift_left(vp, pos)
-	await _wait_frames(2)
-	if Session.game != game:
+	var send := _send_chord.bind(vp, KEY_V) if rng.randi_range(0, 2) == 0 else _moves_shift_right.bind(vp, pos)
+	var given := await _moves_give(vp, app, id, send)
+	await _wait_frames(1)
+	if Session.game != game or app.stack().count() > 0 and not given:
 		return false
-	_moves_check_staged(game, digest, version, "a staging act")
-	assert_eq(Session.unsaved_actions, unsaved, "%s: a staging act is no action" % _tag)
-	var after := layer.stops()
-	if after.size() > before.size():
-		_bump("moves_stops_staged")
-		assert_eq(after.size(), before.size() + 1, "%s: one stop a click" % _tag)
-		assert_ne(Armies.by_id(game, id).hex, after.back(), "%s: the army's own hex is never a stop" % _tag)
-		assert_eq(game.map.land[game.map.index_of(after.back())], 1, "%s: water is never a stop" % _tag)
-		assert_lte(after.size(), game.defs.max_stops, "%s: no more stops than the defs allow" % _tag)
-	elif after.size() < before.size() and layer.selected_army() == id:
-		_bump("moves_stops_removed")
-		assert_eq(after, before.slice(0, before.size() - 1), "%s: only the last stop comes off" % _tag)
+	if not given:
+		_moves_check_refused(game, digest, version, "a path order refused or cancelled")
+		assert_eq(_moves_state(id), state, "%s: a refused path order leaves the army as it was" % _tag)
+		if refusable and int(_n["moves_cancels"]) == cancels:
+			_bump("moves_path_refused")
+		return true
+	army = Armies.by_id(game, id)
+	if army == null or not under:
+		return true
+	if hex == goal:
+		_bump("moves_path_removed")
+		if ahead.is_empty():
+			assert_eq(army.order, Army.ORDER_NONE, "%s: the only point taken off halts the army" % _tag)
+		elif army.order == Army.ORDER_MARCH:
+			assert_eq(army.goal, ahead.back(), "%s: the point before the last is the goal" % _tag)
+	else:
+		_bump("moves_path_extended")
+		if army.order == Army.ORDER_MARCH:
+			assert_eq(army.goal, hex, "%s: the point added is the goal" % _tag)
+			assert_lte(army.via.size(), ahead.size() + 1, "%s: one point a click" % _tag)
+	assert_lte(army.via.size(), game.defs.max_stops, "%s: the path is no longer than the defs allow" % _tag)
 	return true
 
 
-func _moves_shift_left(vp: SubViewport, pos: Vector2) -> void:
+## Whether the rules refuse the march that a path order at `hex` would give (a halt, and a click on the army, are not marches).
+func _moves_rules_refuse(army: Army, hex: Vector2i) -> bool:
+	var step := MarchPath.next(Session.game, army, hex)
+	if hex == army.hex and step.is_empty():
+		return false
+	if not step.is_empty() and bool(step["halt"]):
+		return false
+	var args := {"army": army.id, "goal": hex}
+	if not step.is_empty():
+		args = {"army": army.id, "goal": step["goal"], "via": step["via"]}
+	return not bool(Session.check("march", args).get("ok", false))
+
+
+func _moves_shift_right(vp: SubViewport, pos: Vector2) -> void:
 	for pressed: bool in [true, false]:
 		var ev := InputEventMouseButton.new()
-		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.button_index = MOUSE_BUTTON_RIGHT
 		ev.position = pos
 		ev.global_position = pos
 		ev.shift_pressed = true
@@ -621,70 +663,22 @@ func _moves_shift_left(vp: SubViewport, pos: Vector2) -> void:
 		vp.push_input(ev)
 
 
-## One stop staged (`good`: a hex the leg accepts), now and then the same hex twice.
-func _moves_stage_one(rng: Rng, vp: SubViewport, app: App, id: int, good: bool) -> bool:
-	var hex := _moves_stop_hex(rng, app, id, good)
-	if hex == MOVES_NO_HEX or not await _moves_toggle(rng, vp, app, id, hex):
-		return false
-	if not good and rng.randi_range(0, 4) == 0:
-		return await _moves_toggle(rng, vp, app, id, hex)
-	return true
-
-
-## Every staged stop dropped by Esc or the card's "Clear stops"; the army stays selected.
-func _moves_clear(rng: Rng, vp: SubViewport, app: App, id: int) -> void:
-	var layer := _m6_map_armies(app)
-	var game := Session.game
-	var digest := game.digest()
-	var version := game.version
-	app.hud().release_console_focus()
-	var button := app.hud().map_hover().move_card().clear_button()
-	if rng.randi_range(0, 2) == 0 and button != null and button.is_visible_in_tree():
-		_m4_press(vp, button)
-		await _wait_frames(2)
-	else:
-		# The ladder's earlier rungs (a popover, the HUD's lists) may take the first Esc.
-		for _i: int in 3:
-			if not layer.has_stops():
-				break
-			_send_chord(vp, KEY_ESCAPE)
-			await _wait_frames(2)
-	if Session.game != game or app.stack().count() != 0:
-		return
-	_moves_check_staged(game, digest, version, "clearing the stops")
-	assert_false(layer.has_stops(), "%s: Esc or Clear stops drops every stop" % _tag)
-	assert_eq(layer.selected_army(), id, "%s: the army stays selected" % _tag)
-	_bump("moves_stops_cleared")
-
-
-## The staged march ordered by a right click, O or the card's "March". A refused order keeps the stops.
-func _moves_commit(rng: Rng, vp: SubViewport, app: App, id: int) -> bool:
-	var layer := _m6_map_armies(app)
-	var staged := layer.stops()
+## A plain right click on a path under way: the order given is a march to that hex alone.
+func _moves_replace(rng: Rng, vp: SubViewport, app: App, id: int) -> void:
+	var army := Armies.by_id(Session.game, id)
+	var had := army != null and not army.via.is_empty()
+	if not had:
+		if not await _moves_path_act(rng, vp, app, id, _moves_next_point(rng, app, id)):
+			return
+		await _moves_live(rng, vp, app, false)
+		if not _moves_ready(app) or not await _moves_select(vp, app, id):
+			return
+		army = Armies.by_id(Session.game, id)
+		had = army != null and not army.via.is_empty()
 	var goal := _moves_goal(rng, id, 2, 16)
-	if goal == MOVES_NO_HEX or goal == staged.back():
-		goal = staged.back()
-	var how := rng.randi_range(0, 5)
-	var done := false
-	if how == 0:
-		await _moves_cursor(rng, vp, app)
-		var army := Armies.by_id(Session.game, id)
-		if app.stack().count() != 0 or layer.selected_army() != id or army == null or layer.cursor_hex() == army.hex:
-			return false
-		done = await _moves_give(vp, app, id, _send_chord.bind(vp, KEY_O))
-	else:
-		await _moves_frame_on(app, goal)
-		if app.stack().count() != 0 or layer.selected_army() != id or layer.stops() != staged:
-			return false
-		var pos := _m6_screen_pos(app, goal)
-		_m45_move(vp, pos)
-		await _wait_frames(1)
-		var button := app.hud().map_hover().move_card().march_button()
-		if how == 1 and button != null and button.is_visible_in_tree():
-			done = await _moves_give(vp, app, id, func() -> void: _m4_press(vp, button))
-		else:
-			done = await _moves_give(vp, app, id, _send_click.bind(vp, pos, MOUSE_BUTTON_RIGHT))
-	if done:
-		_bump("moves_via_committed")
-		assert_false(layer.has_stops(), "%s: an order given empties the staged stops" % _tag)
-	return done
+	if not had or goal == MOVES_NO_HEX or not await _moves_right_click(vp, app, id, goal):
+		return
+	army = Armies.by_id(Session.game, id) if Session.game != null else null
+	if army != null:
+		assert_true(army.via.is_empty(), "%s: a plain right click replaces the whole path" % _tag)
+		_bump("moves_path_replaced")

@@ -11,7 +11,7 @@
 ## (docs/architecture/ui-and-controls-spec.md section 9; ui-style-and-feedback-spec.md section 11).
 ## M6 (monkey_m6.gd): the armies, key 6 (Supply), the army panel, the Raise tab and the console's raise, the hex menu, the Military
 ## page, End season with its replay (skipped by Space, Esc or a click) and F5 and F9; seeds 1495 to 1497, each with the replay on.
-## M7 (monkey_m7.gd): the war's inputs (Shift+right click, Shift+O, B, the badges, the battle dock, the hex menu's war items, the
+## M7 (monkey_m7.gd): the war's inputs (Ctrl+right click, Shift+O, B, the badges, the battle dock, the hex menu's war items, the
 ## console's war commands, the country panel's declare and peace, the Castle areas switch, the standing orders) and its invariants
 ## (no leak of what the player was not told, the dock and the stack, no stuck Confirm); seeds 1498 to 1500, each playing Savoy.
 ## Fog (monkey_fog.gd; FG18): the M8 monkey with the fog step and the fog invariants; seeds 1504 to 1506 play Savoy with the

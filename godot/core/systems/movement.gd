@@ -53,6 +53,9 @@ static var _index: Dictionary = {}
 static var _indexed: bool = false
 ## Test seam: false makes every read the plain scan of game.armies (the equality test of the index, see test_movement_index.gd).
 static var use_index: bool = true
+## The End-turn leg (moves-build-spec.md R22a) walks before the calendar with the NEXT season's rules: while MovementPhase.next_leg
+## walks (set_ahead) the rules' season is the next turn. 0 at every other time.
+static var _ahead: int = 0
 
 
 # --- hostility (D21, D13: M7 makes it war) ---------------------------------------------------------------------------
@@ -219,9 +222,19 @@ static func mp_of(game: Game, army: Army) -> int:
 	return out
 
 
-## Is this season a winter (the snow closes the passes and slows the snowfields).
+## Is this season a winter (the snow closes the passes and slows the snowfields). The End-turn leg reads the next season's.
 static func winter_now(game: Game) -> bool:
-	return Calendar.is_winter(game.turn)
+	return Calendar.is_winter(rules_turn(game))
+
+
+## The turn whose rules a walk uses: the game's, or the next one while the End-turn leg walks (R22a). The plans' keys hold it.
+static func rules_turn(game: Game) -> int:
+	return game.turn + _ahead
+
+
+## The End-turn leg begins (true) and ends (false): MovementPhase.next_leg only; the walk's rules are the next season's between.
+static func set_ahead(on: bool) -> void:
+	_ahead = 1 if on else 0
 
 
 ## A country's name for a message ("the Duchy of Milan"), or its tag when it has no definition.
@@ -344,7 +357,7 @@ static func _components(game: Game, tag: StringName) -> PackedInt32Array:
 ## A check and the order that follows it plan once.
 static func plan(game: Game, army: Army, goal: Vector2i) -> Dictionary:
 	var mp := mp_of(game, army)
-	var key: Array = [army.id, army.hex, goal, mp, game.turn, army.tag, _hostile_revision, war_key(game),
+	var key: Array = [army.id, army.hex, goal, mp, rules_turn(game), army.tag, _hostile_revision, war_key(game),
 		hash(game.state.occupier), hash(game.state.garrison)]
 	var table: Dictionary = game.view_cache.pinned(&"plans", game.version, func() -> Dictionary: return {}) as Dictionary
 	if table.has(key):

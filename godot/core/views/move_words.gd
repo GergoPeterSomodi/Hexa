@@ -6,12 +6,12 @@
 ## named only where the viewer sees it or has discovered it, and the words of a blocked way and of a zone of control are made here
 ## from what the viewer sees, never taken from the engine's text. A march through stops (MV19, R72) names the stops still ahead
 ## (the walk's `via`): "... walks to Cerano (7, 9) on its way to Pavia (10, 9) by Novara (8, 9): 8 of 12 move points left." and
-## "... sets out for Pavia (10, 9) by Novara (8, 9) at the end of next season.", each place named only where the viewer has
+## "... sets out for Pavia (10, 9) by Novara (8, 9) at End turn.", each place named only where the viewer has
 ## discovered it. Pure core/views/ code: no nodes, no engine calls, no luck.
 class_name MoveWords
 extends RefCounted
 
-const STORED_TAIL := " at the end of next season."
+const STORED_TAIL := " at End turn."
 const SIGHTED_GENERIC := "an army came into sight"
 
 
@@ -75,8 +75,8 @@ static func _named(game: Game, viewer: StringName, hex: Vector2i) -> String:
 	return "(%d, %d)" % [hex.x, hex.y]
 
 
-## Walked as far as the points reach: with the rest standing, "... walks to Cerano (7, 9); it marches on to Pavia (10, 9) at the
-## end of next season."
+## Walked as far as the points reach: with the rest standing, "... walks to Cerano (7, 9); it marches on to Pavia (10, 9) at End
+## turn." (the End-turn leg walks it with the next season's points, moves-build-spec.md R22a)
 static func _points(game: Game, viewer: StringName, a: Army, who: String, walk: Dictionary) -> Dictionary:
 	var head := "%s walks to %s" % [who, Words.place(game, walk.get("to", a.hex))]
 	var by := _by(game, viewer, walk)

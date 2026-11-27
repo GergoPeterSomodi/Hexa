@@ -10,6 +10,9 @@ const TITLE := "Move the %s?"
 const MOVE_LABEL := "Move"
 const CANCEL_LABEL := "Cancel"
 const BATTLE_RISK := "This opens a battle at %s."
+## The question's first line for a march with path points: every point in order, the goal last.
+const PATH_LINE := "Path: %s."
+const PATH_JOIN := ", then "
 const STORM_WORDS := "The %s marches to storm %s%s."
 ## The toast of an attack whose army did not live through it (MoveWords reads the army after the walk and finds none).
 const LOST_WORDS := "The %s attacks at %s: %s."
@@ -34,18 +37,33 @@ func wanted() -> bool:
 
 
 ## Gives `order` at once, or, for an order with risks while the setting asks, puts the question first: Move gives the order (on
-## the next idle frame, once the question has left the screen), Cancel does nothing. True when a question was asked.
-func run(army_name: String, risks: Array[Dictionary], order: Callable) -> bool:
+## the next idle frame, once the question has left the screen), Cancel does nothing. True when a question was asked. `path` is
+## path_line's, "" for a plain march.
+func run(army_name: String, risks: Array[Dictionary], order: Callable, path: String = "") -> bool:
 	if risks.is_empty() or not wanted() or not ask.is_valid():
 		order.call()
 		return false
-	ask.call(question(army_name, risks, order))
+	ask.call(question(army_name, risks, order, path))
 	return true
 
 
-## The question about a risky move: "Move the Army of Turin?", one line a risk, "Move" and "Cancel".
-static func question(army_name: String, risks: Array[Dictionary], order: Callable) -> Confirm:
+## "Path: Susa (4, 9), then Pinerolo (4, 10).": the points of a march to `hex` through `via`; "" with no points.
+static func path_line(game: Game, via: Array[Vector2i], hex: Vector2i) -> String:
+	if via.is_empty():
+		return ""
+	var places := PackedStringArray()
+	for point: Vector2i in via:
+		places.append(Words.place(game, point))
+	places.append(Words.place(game, hex))
+	return PATH_LINE % PATH_JOIN.join(places)
+
+
+## The question about a risky move: "Move the Army of Turin?", the path of a march with points, one line a risk, "Move" and
+## "Cancel".
+static func question(army_name: String, risks: Array[Dictionary], order: Callable, path: String = "") -> Confirm:
 	var lines: Array = []
+	if path != "":
+		lines.append(path)
 	for risk: Dictionary in risks:
 		lines.append(str(risk["text"]))
 	var screen := Confirm.make({"title": TITLE % army_name, "lines": lines, "confirm_label": MOVE_LABEL,
@@ -56,8 +74,8 @@ static func question(army_name: String, risks: Array[Dictionary], order: Callabl
 	return screen
 
 
-## The risks of a march of the army to `hex` through the stops `via` (R46, R60: MovePreview.to's, or MovePreview.via's on the
-## whole route); none for a refused march (the order then says why).
+## The risks of a march of the army to `hex` through the path points `via` (R46, R60: MovePreview.to's, or MovePreview.via's on
+## the whole path); none for a refused march (the order then says why).
 static func march_risks(game: Game, tag: StringName, army_id: int, hex: Vector2i, via: Array[Vector2i] = []) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var preview := MovePreview.to(game, tag, army_id, hex) if via.is_empty() else MovePreview.via(game, tag, army_id, via, hex)
@@ -82,7 +100,7 @@ static func storm_risks(game: Game, tag: StringName, army_id: int, hex: Vector2i
 	return out
 
 
-## The risks of Continue: those of the kept march through its kept stops, or of the halted storm it resumes.
+## The risks of Continue: those of the kept march through its kept path points, or of the halted storm it resumes.
 static func continue_risks(game: Game, tag: StringName, army_id: int) -> Array[Dictionary]:
 	var army := Armies.by_id(game, army_id)
 	if army == null:

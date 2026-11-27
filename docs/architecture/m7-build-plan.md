@@ -187,11 +187,11 @@ On Windows (mouse) and on the MacBook (trackpad), with a fresh user folder. New 
 8. I, `]` to **Military**: the Wars table (score, battles, losses, held), the Battles table (Open reopens the dock), the losses
    chart with **Battle** beside Hunger.
 9. Send an army towards Pavia (10, 9): the route stops beside Milan's walls each season. On arrival hover Pavia: "Besiege ·
-   falls in about N seasons", "Garrison starves after 3 seasons", "Taking it opens 6 districts", "Shift+right click: storm
+   falls in about N seasons", "Garrison starves after 3 seasons", "Taking it opens 6 districts", "Ctrl+right click: storm
    (...)". The amber **dial** fills each season; Pavia's hex panel shows the Siege block.
 10. In the siege's second season F5, quit to desktop, Continue: the siege, the dial and the panel as before. Let it fall: "Pavia
     (10, 9) has fallen after N seasons: its land lies open (6 districts)"; the next season an army walks into Lodi and takes it.
-11. Shift+right-click a garrisoned fortress with an army selected: the army marches to storm it; the dock shows an assault with
+11. Ctrl+right-click a garrisoned fortress with an army selected: the army marches to storm it; the dock shows an assault with
     the garrison in the centre.
 12. In Spring 1481, Milan's panel: **Take what you hold** is open; click it: the question names the districts you hold; confirm.
     They become Savoy's (the stripes go, the border moves), every Savoy army on Milan's land is back on Savoy's, and Declare war

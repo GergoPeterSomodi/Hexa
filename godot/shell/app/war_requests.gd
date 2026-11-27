@@ -1,5 +1,5 @@
 ## The App's M7 handlers (docs/architecture/m7-build-spec.md 6.11; B28), kept out of game_requests.gd and app.gd so those stay
-## under their size limits: Storm (Shift+right click and Shift+O), B and every opener of the battle dock (a badge, a log line, a
+## under their size limits: Storm (Ctrl+right click and Shift+O), B and every opener of the battle dock (a badge, a log line, a
 ## report line, a notification's Go, the army panel, the Military page, the hex menu), the siege click, the castle-area item of
 ## the hex menu, the war alert (a war declared on the player), the declare and peace requests, the Castle areas switch's
 ## availability and the map's war layer (MapWars) getting its settings. GameRequests owns one (`war`) and passes the signals and
@@ -134,7 +134,7 @@ func _army_selected() -> bool:
 	return enabled() and armies != null and armies.selected_army() >= 0
 
 
-## Shift+right click with an army selected (MapInput asks storm_ready first): storm at that hex.
+## Ctrl+right click with an army selected (MapInput asks storm_ready first): storm at that hex.
 func _on_storm_clicked(map_px: Vector2) -> void:
 	if enabled() and _scene != null and _scene.view() != null:
 		storm_at(_scene.view().hex_at(map_px))

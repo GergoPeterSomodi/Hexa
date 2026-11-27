@@ -117,13 +117,16 @@ func _check_walks(g: Game, budgets: Dictionary, season: int, winter: bool) -> vo
 		var army_id := int(e["army"])
 		var tag := StringName(str(e["tag"]))
 		var label := "army %d, season %d" % [army_id, season]
+		# The End-turn leg (moves-build-spec.md R22a) walks in the next season's rules (its ticks pass NEXT_LEG_TICK).
+		var ticks := e.get("ticks", PackedInt32Array()) as PackedInt32Array
+		var rules := Calendar.is_winter(season + 1) if not ticks.is_empty() and ticks[0] > MovementPhase.NEXT_LEG_TICK else winter
 		var spent := 0
 		for k: int in path.size() - 1:
 			var here := path[k] as Vector2i
 			var there := path[k + 1] as Vector2i
 			var d := Movement.direction(g.map, g.map.index_of(here), g.map.index_of(there))
 			assert_ne(d, -1, "the path steps to a neighbour, " + label)
-			var cost := steps.cost(g.map.index_of(here), d, winter)
+			var cost := steps.cost(g.map.index_of(here), d, rules)
 			assert_ne(cost, StepCosts.CLOSED, "no closed pass is crossed, " + label)
 			assert_ne(cost, StepCosts.BLOCKED, "no blocked edge is crossed, " + label)
 			assert_true(Movement.open_to(g, tag, there), "the land is open to the country, " + label)

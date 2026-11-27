@@ -381,6 +381,7 @@ first. The M9 spec (next after M8) is read against group C for the AI's walks.
    by leg (the first leg at once, the rest a month at a time at End turn), stopping when an enemy comes into sight; the route
    stays drawn until done and a new command changes it. Fog applies per waypoint (deep-fog legs allowed with the movement
    penalty). Built by `docs/architecture/moves-build-spec.md` section 3.11 (R58 to R72, D29 to D37) and task MV19 of the plan.
+   The gesture was changed on 2026-11-27 (answer 12).
 9. **Fair warning (2026-11-25):** the rule "no country may enter an enemy's land in the season it declares war" applies to every
    country, the player included. The player gets a clear refusal text and a hint. Built by
    `docs/architecture/moves-build-spec.md` section 3.12 (R73, D24) and task MV20.
@@ -392,3 +393,10 @@ first. The M9 spec (next after M8) is read against group C for the AI's walks.
     again" option that is turned back on in Options. This applies from the moves build on; before the board exists every
     battle is automatic anyway, so the question first appears with the board. The setting, its Options row and the question
     are built with this change and stay dormant until then (spec 3.12, R74, D40; task MV21).
+12. **The waypoint gesture and path ordering (2026-11-27):** "waypoints should be by Shift + RIGHT click", then "I don't
+    know why there's a stop in there. The purpose of Shift+right click is to ORDER A PATH." With an army selected each
+    Shift+right click is an order at once (`V` does the same): a march, then a point added to the end of the path under way; on
+    the final point it comes off. A plain right click replaces the path; with no army Shift+right click is a plain right click.
+    The storm gesture moves to Ctrl+right click (Shift+O and the Storm button unchanged), and Shift+left click is the plain
+    select again. There is no staging, no separate commit and no player-facing "stop".
+    This replaces how answer 8 is ordered; the army still walks the route leg by leg.

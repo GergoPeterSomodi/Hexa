@@ -27,6 +27,8 @@ const PHASE_OWNERS := {
 	&"income": ["purse"],  # the upkeep_army line is Treasury's too (M6)
 	&"works": ["main_use", "level", "works", "next_work_id"],
 	&"people": ["people", "people_flows", "food", "main_use", "level"],
+	# The End-turn leg (moves-build-spec.md R22a): the movement phase's walks, then the battles they open, fought as that phase.
+	&"march_on": ["armies", "countries", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck"],
 	&"stats": ["stats", "purse", "stores", "people_close", "people_flows"],  # People.close zeroes the open flows
 	&"calendar": ["turn", "weather", "luck"],
 	&"ready_units": ["armies", "people", "people_flows"],  # the refill: People.levy, then Armies.add_men

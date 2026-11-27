@@ -7,7 +7,7 @@
 ## Moves in the month (moves-build-spec.md 8.4): I1 to I8, each with its planted fault (points over the full, a second walk on
 ## points given back, points that grow outside ready_units, a battle open after an act, two countries on a hex after an act, a
 ## game that does not load, a player's walk at once in a season's records, a standing march without points that moves), the
-## season of clean marches that breaks none, and the soak's `--plant=moves`. MV19: I9 `stops` and I10 `staged` with their plants.
+## season of clean marches that breaks none, and the soak's `--plant=moves`. MV19: I9 `stops` and I10 `refused` with their plants.
 extends GutTest
 
 
@@ -424,11 +424,14 @@ func test_p_stops_of_a_computer_army_without_a_goal_and_off_the_route() -> void:
 	assert_true(_has(Invariants.act_lines(g), "stops"), "P: stops with no goal")
 
 
-func test_p_staged_a_change_while_stops_are_staged() -> void:
+func test_p_refused_a_change_by_a_refused_path_order() -> void:
 	var g := MovesFixture.duel()
+	var home := MovesFixture.named(g, MovesFixture.NAME_HOME)
 	var digest := g.digest()
 	var version := g.version
-	MovePreview.via(g, MovesFixture.SAVOY, MovesFixture.named(g, MovesFixture.NAME_HOME).id, [] as Array[Vector2i], g.armies[0].hex)
-	assert_eq(Invariants.staged_lines(g, digest, version), PackedStringArray(), "a preview changes nothing")
+	var via: Array[Vector2i] = [home.hex]
+	var verdict := g.act("march", {"army": home.id, "goal": home.hex, "tag": MovesFixture.SAVOY, "via": via})
+	assert_false(bool(verdict.ok), "a path that starts on the army is refused")
+	assert_eq(Invariants.refused_lines(g, digest, version), PackedStringArray(), "a refusal changes nothing")
 	g.version += 1
-	assert_true(_has(Invariants.staged_lines(g, digest, version), "staged"), "P: the version moved")
+	assert_true(_has(Invariants.refused_lines(g, digest, version), "refused"), "P: the version moved")

@@ -117,10 +117,10 @@ func test_the_check_and_the_act_agree_for_via() -> void:
 	var a := _sav()
 	var sea := _sea()
 	var cases: Array = [
-		[[SUSA, sea], "Stop 2: armies cannot walk on water"],
-		[[SUSA, SUSA], "Stop 2: " + MarchVia.SAME_AS_BEFORE_TEXT],
-		[[TURIN], "Stop 1: " + MarchVia.SAME_AS_ARMY_TEXT],
-		[[SUSA, Vector2i(-5, 3)], "Stop 2: that is off the map"],
+		[[SUSA, sea], "Point 2: armies cannot walk on water"],
+		[[SUSA, SUSA], "Point 2: " + MarchVia.SAME_AS_BEFORE_TEXT],
+		[[TURIN], "Point 1: " + MarchVia.SAME_AS_ARMY_TEXT],
+		[[SUSA, Vector2i(-5, 3)], "Point 2: that is off the map"],
 		[[NORTH, PINEROLO], "The goal: " + MarchVia.SAME_AS_BEFORE_TEXT],
 		["Susa", MarchVia.BAD_STOPS_TEXT],
 	]

@@ -5,6 +5,10 @@
 ## before production; ready_units refills, then recovers morale.
 ## Moves in the month (moves-build-spec.md R13, R40): ready_units also refills the move points and closes the season's moves
 ## (moved_from for the report, season_from cleared).
+## The End-turn leg (R22a, GitHub issue 474, owner playtest 2026-11-27): march_on, after people and before stats, walks the
+## standing marches that took no step in the movement phase one leg with the next season's points and rules
+## (MovementPhase.next_leg, its battles fought there); ready_units keeps those points (Allowance.refill). So every End turn
+## moves a marching army, after the season's supply and sieges, and the season's report, stats and battles show the leg.
 ## M8 (m8-build-spec.md 4.2, fourteen): ai_orders first, before movement; Game.orders (an OrdersHook, or null) gives the other
 ## countries' orders in it, in three calls the atomic and the sliced paths share (orders_begin, orders_step, orders_end).
 ## The armies' systems are called by reference (A14): a typed call from core/game into a system would make the two
@@ -13,7 +17,7 @@ class_name Season
 extends RefCounted
 
 const PHASES: Array[StringName] = [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production",
-	&"income", &"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"]
+	&"income", &"works", &"people", &"march_on", &"stats", &"calendar", &"ready_units", &"vision"]
 
 
 ## {ok, reason}: may the season end now?
@@ -69,6 +73,8 @@ static func run_phase(game: Game, phase: StringName) -> void:
 			Works.season(game)
 		&"people":
 			People.season(game)
+		&"march_on":
+			MovementPhase.next_leg.call(game)
 		&"stats":
 			StatsSystem.season(game)
 		&"calendar":

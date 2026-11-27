@@ -226,7 +226,7 @@ func test_card_of_puts_the_walk_and_risks_before_the_arrival_in_their_tones() ->
 func test_a_full_card_fits_a_1280_by_720_window() -> void:
 	var preview := {"verdict": {"ok": true}, "arrives_text": "There in Autumn 1481 (3 seasons)", "leg_lines": [
 		["Walks 4 hexes now: 11 of 12 move points, 1 left.", &"plain"],
-		["Stops at near Alessandria (10, 11) this season; walks on at the end of next season, there in Autumn 1481.", &"plain"],
+		["Stops at near Alessandria (10, 11) this season; walks on at End turn, there in Autumn 1481.", &"plain"],
 		["Enters land held by the Duchy of Milan, a country at war with you.", &"warn"],
 		["Enters land held by the Most Serene Republic of Venice, a country at war with you.", &"warn"],
 		["Out of supply: the land feeds 1,000 men a season; 200 men lost a season.", &"warn"]]}

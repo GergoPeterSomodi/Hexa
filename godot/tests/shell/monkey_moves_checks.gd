@@ -1,7 +1,7 @@
 ## The invariants of the moves monkey (MonkeyMoves extends this, which extends MonkeyTile; moves-build-spec.md 8.4; MV15):
 ## every frame, a live walk changes neither the digest nor the version, and else the selected army's token mark says its
 ## panel's points; after every order and every step, I1, I4, I5 and I9 of tests/core/invariants.gd hold, points grow in no
-## season's middle (I3) and an army that walked stands at its walk's end; around every staging act, I10.
+## season's middle (I3) and an army that walked stands at its walk's end; after a refused path order, I10.
 class_name MonkeyMovesChecks
 extends MonkeyTile
 
@@ -75,8 +75,8 @@ func _moves_check_game(game: Game, what: String) -> void:
 	_bump("moves_checks")
 
 
-func _moves_check_staged(game: Game, digest: String, version: int, what: String) -> void:
-	var lines := Invariants.staged_lines(game, digest, version)
+func _moves_check_refused(game: Game, digest: String, version: int, what: String) -> void:
+	var lines := Invariants.refused_lines(game, digest, version)
 	lines.append_array(Invariants.stop_lines(game))
 	assert_eq(Invariants.report(lines) if not lines.is_empty() else "", "", "%s: the invariants after %s" % [_tag, what])
 

@@ -1,7 +1,7 @@
 ## The picture of a multi-leg march (docs/architecture/moves-build-spec.md R59, R67, R68; plan MV19): MovePreview.via gives the
-## legs (from, to, hexes, cost, seasons, arrival), the total (the sum of the legs), the route through every stop in order, this
-## season's leg and risks read on the whole route, a line a leg and one for the whole route; its refusals name the stop and only
-## what the viewer may read (thin fog); the stored route keeps the stops left; the army panel's order line names them; the staged
+## legs (from, to, hexes, cost, seasons, arrival), the total (the sum of the legs), the route through every path point in order, this
+## season's leg and risks read on the whole route, a line a leg and one for the whole route; its refusals name the point and only
+## what the viewer may read (thin fog); the stored route keeps the points left; the army panel's order line names them; the
 ## legs are kept per leg, so a new pointer hex plans only the last one. North Italy (ArmyFixture) and the thin duel. P each.
 extends GutTest
 
@@ -99,9 +99,9 @@ func test_a_refusal_names_the_stop_in_safe_words() -> void:
 			break
 	var p := MovePreview.via(_g, SAV, a.id, _stops([SUSA, sea]), PINEROLO)
 	assert_false(bool(p.verdict.ok))
-	assert_true(str(p.verdict.reason).begins_with("Stop 2: "), str(p.verdict))
+	assert_true(str(p.verdict.reason).begins_with("Point 2: "), str(p.verdict))
 	assert_eq(p.kind, &"refusal")
-	assert_true(str(p.lines[0][0]).begins_with("Stop 2: "))
+	assert_true(str(p.lines[0][0]).begins_with("Point 2: "))
 	assert_eq((p.legs as Array).size(), 0)
 
 
@@ -128,7 +128,7 @@ func test_fog_safe_words_on_the_thin_duel() -> void:
 	if foreign != Army.NO_HEX:
 		var q := MovePreview.via(g, MovesFixture.SAVOY, home.id, _stops([foreign]), fogged)
 		assert_false(bool(q.verdict.ok))
-		assert_true(str(q.verdict.reason).begins_with("Stop 1: "))
+		assert_true(str(q.verdict.reason).begins_with("Point 1: "))
 		assert_false(str(q.verdict.reason).contains(Words.country_the(g, Territory.owner_tag(g, foreign))),
 			"P: a refusal that names the owner of an undiscovered stop: %s" % q.verdict.reason)
 	# the leg with unmapped land is marked
@@ -158,7 +158,7 @@ func test_the_stored_route_keeps_the_stops_left_and_the_order_line_names_them() 
 	assert_false(foreign.has("order"), "P: a stop shown on a foreign army")
 
 
-func test_the_staged_legs_are_planned_once_and_moving_the_pointer_plans_the_last_leg() -> void:
+func test_the_earlier_legs_are_planned_once_and_moving_the_pointer_plans_the_last_leg() -> void:
 	var a := _sav()
 	var stops := _stops([NORTH, VERCELLI])
 	MovePreview.via(_g, SAV, a.id, stops, FAR_SOUTH)
@@ -173,4 +173,4 @@ func test_the_staged_legs_are_planned_once_and_moving_the_pointer_plans_the_last
 	var version := _g.version
 	for hex: Vector2i in [SUSA, NORTH, FAR_EAST]:
 		MovePreview.via(_g, SAV, a.id, stops, hex)
-	assert_eq([_g.digest(), _g.version], [digest, version], "the staged stops never change the game")
+	assert_eq([_g.digest(), _g.version], [digest, version], "the preview never changes the game")

@@ -12,7 +12,7 @@
 ## I8 `stood` (a standing march with no points does not move in the movement phase). I2, I3 and I8 need the watch.
 ## Multi-leg marches (MV19): I9 `stops` (every army's `via`: at most GameDefs.max_stops hexes of the map, none without a goal,
 ## none for a computer country, and a march's stops lie ahead on its route in order; after every season and every act), I10
-## `staged` (staged_lines: the shell's staging, hovering, removing and clearing of stops change neither the digest nor the version).
+## `refused` (refused_lines: a refused path extension, as a preview, changes neither the digest nor the version).
 ## The names: turn, money, goods, people, men, districts, armies, battles, garrisons, morale, wars, chronicle, stats, explored,
 ## controlled, contract, errors. `explored` (spec R4, the explored set only grows) and `controlled` (every land hex a country
 ## controls is explored by it) are the fog invariants of FG14; `Invariants.planted = "fog"` (tests only) breaks `explored`,
@@ -22,7 +22,7 @@ extends RefCounted
 
 const NAMES: Array[String] = ["turn", "money", "goods", "people", "men", "districts", "armies", "battles", "garrisons", "morale",
 	"wars", "chronicle", "stats", "explored", "controlled", "contract", "errors", "points", "spent", "grown", "saved", "walks",
-	"stood", "stops", "staged"]
+	"stood", "stops", "refused"]
 ## A war lives at most this many seasons (WarDef.war_timer_seasons, 40): the timer ends it in the war phase.
 const WAR_MAX := 40
 const MORALE_MAX := Unit.MAX_MORALE
@@ -137,13 +137,13 @@ static func stop_lines(game: Game) -> PackedStringArray:
 	return out
 
 
-## I10: the shell's staged stops never touch the game: the digest and the version as they were before the staging.
-static func staged_lines(game: Game, digest: String, version: int) -> PackedStringArray:
+## I10: a refused path extension changes nothing: the digest and the version as they were before the click.
+static func refused_lines(game: Game, digest: String, version: int) -> PackedStringArray:
 	var out := PackedStringArray()
 	if game.version != version:
-		out.append("staged: the version moved from %d to %d while stops were staged" % [version, game.version])
+		out.append("refused: the version moved from %d to %d by a refused path order" % [version, game.version])
 	if game.digest() != digest:
-		out.append("staged: the digest changed while stops were staged")
+		out.append("refused: the digest changed by a refused path order")
 	return out
 
 
@@ -189,6 +189,8 @@ class Moves extends RefCounted:
 	var _explored := {}
 	## Army id -> hex: the standing marches with no points at the last look.
 	var _standing := {}
+	## The `where` of the look running (the words of a line).
+	var _where: StringName = &""
 
 
 	static func start(game: Game) -> Moves:
@@ -200,14 +202,18 @@ class Moves extends RefCounted:
 
 	## Reads what happened since the last look; `where` is ACT or the phase just run.
 	func look(game: Game, where: StringName) -> void:
-		_walked(game)
+		_where = where
+		var next := where == &"march_on"
+		if next:
+			_next_season(game)
+		_walked(game, next)
 		if Invariants.planted == "moves" and where == &"ai_orders":
 			_plant(game)
 		if where == &"ready_units":
 			_allowance.clear()  # the new season's points: a new count
 			_spent.clear()
 		else:
-			_grown(game, where)
+			_grown(game, where, game.leg_marks if where == &"march_on" else {})
 		if where == &"movement":
 			_stood(game)
 		for line: String in Invariants.point_lines(game):
@@ -216,6 +222,19 @@ class Moves extends RefCounted:
 			for line: String in Invariants.act_lines(game):
 				_add(line)
 		_take(game)
+
+
+	## The march_on phase walks the End-turn leg (moves-build-spec.md R22a) on the next season's points: each army it marked starts
+	## a new count from its full points, and its walks are priced in the next season's rules.
+	func _next_season(game: Game) -> void:
+		for id: Variant in game.leg_marks:
+			var a := Armies.by_id(game, int(id))
+			# An army its battle destroyed is priced with its full points at the last look.
+			var full := Allowance.full(game, a) if a != null else int(_full.get(int(id), 0))
+			_points[int(id)] = full
+			_full[int(id)] = full
+			_allowance[int(id)] = full
+			_spent[int(id)] = 0
 
 
 	func _add(line: String) -> void:
@@ -240,7 +259,7 @@ class Moves extends RefCounted:
 
 
 	## I2: the walks queued since the last look, added to what each army has spent this season.
-	func _walked(game: Game) -> void:
+	func _walked(game: Game, next: bool = false) -> void:
 		if game.events.size() < _events:
 			_events = 0
 		for k: int in range(_events, game.events.size()):
@@ -252,19 +271,20 @@ class Moves extends RefCounted:
 			var had := int(_points.get(id, 0))
 			var fresh := had > 0 and had == int(_full.get(id, 0))
 			var bits: PackedByteArray = _explored.get(tag, PackedByteArray())
-			_spent[id] = int(_spent.get(id, 0)) + _cost(game, e["path"] as Array, had, fresh, bits)
+			_spent[id] = int(_spent.get(id, 0)) + _cost(game, e["path"] as Array, had, fresh, bits, next)
 			var allowed := int(_allowance.get(id, 0))
 			if int(_spent[id]) > allowed:
-				_add("spent: army %d of %s walked %d move points this season, it had %d" % [id, tag, int(_spent[id]), allowed])
+				_add("spent: army %d of %s walked %d move points this season, it had %d (in %s)" % [id, tag, int(_spent[id]), allowed,
+					_where])
 		_events = game.events.size()
 
 
 	## What a walk along `path` (its start first) costs an army that had `had` points: each step's StepCosts in the season's
 	## rules. The first step of a fresh army that wades, costs more than it had or enters unmapped land takes the points it had
 	## (a fog step: GameDefs.fog_step_cost of them).
-	func _cost(game: Game, path: Array, had: int, fresh: bool, bits: PackedByteArray) -> int:
+	func _cost(game: Game, path: Array, had: int, fresh: bool, bits: PackedByteArray, next: bool = false) -> int:
 		var steps := StepCosts.of(game.map, game.defs)
-		var winter := Movement.winter_now(game)
+		var winter := Calendar.is_winter(game.turn + 1) if next else Movement.winter_now(game)
 		var total := 0
 		for k: int in range(1, path.size()):
 			var from := game.map.index_of(path[k - 1] as Vector2i)
@@ -279,10 +299,10 @@ class Moves extends RefCounted:
 		return total
 
 
-	## I3: no army has more points than at the last look.
-	func _grown(game: Game, where: StringName) -> void:
+	## I3: no army has more points than at the last look (but those the End-turn leg walked on the next season's points, `next`).
+	func _grown(game: Game, where: StringName, next: Dictionary = {}) -> void:
 		for a: Army in game.armies:
-			if _points.has(a.id) and a.points > int(_points[a.id]):
+			if _points.has(a.id) and a.points > int(_points[a.id]) and not next.has(a.id):
 				_add("grown: army %d of %s went from %d to %d move points in %s, not in ready_units" % [a.id, a.tag,
 					int(_points[a.id]), a.points, "an act" if where == ACT else str(where)])
 

@@ -35,7 +35,9 @@ func _people(g: Game, hex: Vector2i) -> int:
 
 func test_the_season_runs_the_people_phase_between_works_and_stats() -> void:
 	assert_eq(Season.PHASES.find(&"people"), Season.PHASES.find(&"works") + 1)
-	assert_eq(Season.PHASES.find(&"stats"), Season.PHASES.find(&"people") + 1)
+	# moves-build-spec.md R22a: the End-turn leg (march_on) walks between the people and the stats.
+	assert_eq(Season.PHASES.find(&"march_on"), Season.PHASES.find(&"people") + 1)
+	assert_eq(Season.PHASES.find(&"stats"), Season.PHASES.find(&"march_on") + 1)
 	var g := PeopleFixture.genoa()
 	var before := _people(g, GENOA)
 	Season.begin(g)

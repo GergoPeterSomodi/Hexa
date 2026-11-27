@@ -273,7 +273,7 @@ func _war_rows() -> int:
 	_r["war_armies"] = armies.size()
 	_r["rig_armies_ms"] = _ms(rig_t)
 	rig_t = Time.get_ticks_usec()
-	var worst := {&"movement": 0.0, &"battles": 0.0}
+	var worst := {&"movement": 0.0, &"battles": 0.0, &"march_on": 0.0}
 	var worst_season := 0.0
 	for _n: int in SEASONS:
 		PerfFixture.rearm(game, luck, armies, true)
@@ -291,6 +291,7 @@ func _war_rows() -> int:
 	_r["rig_seasons_ms"] = _ms(rig_t)
 	_r["movement_ms"] = worst[&"movement"]
 	_r["battles_season_ms"] = worst[&"battles"]
+	_r["march_on_ms"] = worst[&"march_on"]  # the End-turn leg (moves-build-spec.md R22a): reported, no budget yet
 	_r["season_ms"] = worst_season  # the war season: the thirteen phases on the made-up Europe with the wars (m7-build-spec.md 8)
 	rig_t = Time.get_ticks_usec()
 	var battles := 0.0

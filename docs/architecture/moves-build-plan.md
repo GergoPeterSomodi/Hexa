@@ -196,11 +196,13 @@ baseline, or past its limit, takes the spec's fallback before merge.
    points, halts and marches. An older save is refused as an older test build.
 9. Look at MV17's signed pictures, including deep fog's "Unmapped land" (deep fog shows on the north Italy map only in the thin
    test fixture).
-10. Multi-leg: select an army, Shift+left click two hexes, rest the pointer on a third: one path with numbered stops, a line for
-    each leg and a total with the seasons; Esc clears the stops (the army stays selected); stage them again and press `V` on the
-    last stop to remove it; right click: the army walks as far as its points reach without halting at a stop; End season: it walks
-    on; the thin route with the markers of the stops ahead stays drawn until the end; F5, quit, Continue: the stops left are still
-    there. With no army selected Shift+left click still selects, and Shift+right click still storms.
+10. Multi-leg (path ordering, owner 2026-11-27): select an army and Shift+right click a far place: it marches at once. Hold
+    Shift and rest the pointer elsewhere: one path with a numbered pin on the point before, a line for each leg and a total with
+    the seasons. Shift+right click there: the point is added; again there: it comes off. Press `V` on another hex: added too.
+    A plain right click replaces the whole path. With a path, End season: the army walks on without halting at a point and the
+    thin route with the markers of the points ahead stays drawn until the end; F5, quit, Continue: the path is still there.
+    With no army selected Shift+right click acts as a right click; Shift+left click selects; Ctrl+right click storms (the task
+    rows above keep the first wording of 2026-11-25).
 11. Fair warning: declare war on Milan and, in the same season, order an army into Milanese land: the order is refused with a
     clear sentence and a hint; an army ordered across its land stops at the border with its points kept; the next season the
     same order is accepted. In a game where a computer country declares war on you, your armies are not stopped (the rule

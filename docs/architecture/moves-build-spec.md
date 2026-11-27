@@ -40,9 +40,9 @@ changes the result.
 8. Lint, import, check_scripts, GUT, both UI `--check`s, `build_map --check`, `build_scenario.gd --check`,
    `build_tile_tabs.gd --check` green; the pictures of 8.5 signed by the art director; the owner has played the plan's
    checklist.
-9. Multi-leg marches (owner request 2026-11-25, section 3.11, R58 to R72): Shift+left click stages stops, the preview and the
-   commit run through them, one `march` with `via` walks the whole route season by season, the stops survive a save, and the
-   AI never uses them (`test_march_via.gd`, `test_via_preview.gd`, `test_waypoints.gd`, I9 and I10).
+9. Multi-leg marches (owner request 2026-11-25, section 3.11, R58 to R72; owner 2026-11-27: path ordering, no staging): each Shift+right click orders
+   the army's path at once, one `march` with `via` walks the whole path season by season, the path survives a save, and the
+   AI never uses it (`test_march_via.gd`, `test_via_preview.gd`, `test_waypoints.gd`, I9 and I10).
 10. The owner's answers of 2026-11-25 (section 3.12, D24, D38 to D40): fair warning holds for every country, the player
    included (R73, `test_fair_warning.gd`), and the End season prompt, its setting and its Options row are built and dormant
    until the board (R74, `test_auto_battles_prompt.gd`).
@@ -64,7 +64,7 @@ changes the result.
 | A battle's attacker gets order none with its goal and route kept (`Battles._step_in`); the beaten side retreats with `unit_moved` (why `retreat`) and halts | `battles.gd`, `godot/core/systems/battle_end.gd` | The winner keeps today's state (D12) |
 | `Military.raise` puts new companies into the first army of the tag on the hex that does not march | `godot/core/systems/military.gd` | Only into a fresh army (R15) |
 | `Armies.clear_moved` empties every army's `moved_from` at the start of the movement phase; the season report's "A → B" lines read `moved_from` | `godot/core/systems/armies.gd`, `godot/core/views/summary_armies.gd` | At-once walks would vanish from the report: `season_from` (R40) |
-| `Season.PHASES`: `ai_orders` first, then `movement`, `battles`, ... `calendar`, `ready_units`, `vision`; Session refuses `act` and `check` while a season runs | `godot/core/game/season.gd`, `godot/shell/autoload/session.gd` | The order the owner chose already holds: the player acts at idle, the computer at End season (R3). PHASES do not change |
+| `Season.PHASES`: `ai_orders` first, then `movement`, `battles`, ... `calendar`, `ready_units`, `vision`; Session refuses `act` and `check` while a season runs | `godot/core/game/season.gd`, `godot/shell/autoload/session.gd` | The order the owner chose already holds: the player acts at idle, the computer at End season (R3). PHASES do not change; owner playtest 2026-11-27 (issue 474): one row is added, `march_on` (the End-turn leg, R22a), after `people` and before `stats` |
 | The AI acts only through `AiKnow.act` (check, then `Game.act`); `AiWar._march`, `_recover`, `_post`, `AiForces` march and halt; seats rotate by turn | `godot/core/ai/` | The AI's marches walk at once with no new code path (R9, R41) |
 | The replay plays the action log through `Game.act`, the AI's records through `LogOrders` | `godot/core/game/replay.gd`, `log_orders.gd` | At-once walks and battles are consequences of logged acts: nothing new to log (section 6) |
 | `MoveReplay` keeps the season's `unit_moved` and plays them after the season with a `ReplayPlan` (ticks, seen flags, battle marks, retreats after the last tick); orders are refused while it runs | `godot/shell/map/move_replay.gd`, `godot/core/views/replay_plan.gd`, `replay_marks.gd`, `godot/shell/map/map_armies.gd` (`REPLAY_BLOCKED`) | A live mode for the player's own walks (R49) and a chained plan for the computer's (R50) |
@@ -98,7 +98,7 @@ changes the result.
 | D13 | Storm | A storm with points left walks at once and its assault is fought on arrival (or at once when it stands on the fortress); with 0 points or mustering it stays a standing storm and the battles phase starts it as today | The design 2.6; one rule for march and storm |
 | D14 | Raise, split, merge, disband | Raise joins only a fresh army that does not march, else makes a new army; split: the new army gets the parent's points (capped at its own full); merge: the lower of the two (capped); disband: capped at the new full | The design 2.5's loophole rules in the D3 form |
 | D15 | The report's moves | New `Army.season_from` (the hex the army stood on when it first moved this season); `ready_units` copies it into `moved_from` and clears it; `clear_moved` at the phase start goes | The report and J must show the season's at-once walks too, and a walk in the next season must not change the report of the last |
-| D16 | The season's order | `Season.PHASES` unchanged; the player's turn is the idle time before End season | Owner answer 2 is today's order |
+| D16 | The season's order | The player's turn is the idle time before End season. Owner playtest 2026-11-27 (issue 474): `Season.PHASES` gains `march_on` after `people` and before `stats` (fifteen phases: ai_orders, movement, battles, supply, sieges, war, production, income, works, people, **march_on**, stats, calendar, ready_units, vision) | Owner answer 2 is today's order. `march_on` comes after the season's supply, sieges and economy (the leg is the next season's and must not change this season's), before `stats` and the calendar (its battles, losses, report line and chronicle are this End turn's) |
 | D17 | The computer | Same action. After a walk that halted on sight, the AI re-reads what it sees (`brief.seen`) and gives that army one more step (`army_retry`, bounded by `order_tries`) | Owner: the AI follows the same rules; a halt it does not answer would park its armies |
 | D18 | The confirm | Shell only, from `MovePreview.leg`'s `risks`; for march, continue and storm; a setting `game/confirm_moves` (on by default) | Owner answer 3; the AI never confirms |
 | D19 | The live walk | `MoveReplay` in a **live mode**; no new `SeasonFlow` state; any input that acts skips it first | A walk is a picture of a done thing; blocking input for it would be a stall |
@@ -111,14 +111,14 @@ changes the result.
 | D26 | Sight after a walk | `Sight.refresh` (the whole army part) once at the walk's end; the per-step sight test reads the walker's own disc only. Fallback (section 9): an incremental refresh | Simplest correct; `Sight.refresh` is a loop over the armies |
 | D27 | Explored along an at-once walk | The steps only (radius 0), as the phase (fog R8); the rings come with the vision phase | One explored rule for both walks; D9's pace depends on it |
 | D28 | Task IDs | `MV0` to `MV18` (and `MV19`, D37; `MV20` and `MV21`, D38) | M, MOV and W are taken or ambiguous |
-| D29 | What a stop is (multi-leg, owner request 2026-11-25) | A **stop is a place the route must pass, not a place the army halts**: the stops and the goal are one longer route walked under one allowance, season by season, by the same engine (`MarchLeg`). The army does not stop at a stop; it halts only for the reasons it halts today | "First leg at once, the rest per month" is exactly R5 applied to the longer route; separate orders per leg would ask a confirm and wait a season at every stop |
+| D29 | What a path point is (multi-leg, owner request 2026-11-25; the code calls the points before the goal `via`, or stops) | A **point is a place the route must pass, not a place the army halts**: the points and the goal are one longer route walked under one allowance, season by season, by the same engine (`MarchLeg`). The army does not halt at a point; it halts only for the reasons it halts today | "First leg at once, the rest per month" is exactly R5 applied to the longer route; separate orders per leg would ask a confirm and wait a season at every point |
 | D30 | How the order carries the stops | `march` gains an optional `via` (list of hexes, in order, the goal not included); **no new action name**; `march_check` and `march` stay a pair | A second action would double the checks, the AI door, the log grammar and `random_player.gd`; an empty or missing `via` is today's march byte for byte |
 | D31 | Where the stops are stored | `Army.via` (hex indices of the stops not yet reached, the goal not in it), a third new field of `army/3` beside `points` and `season_from`; written only by `Armies.set_order`. **Fits `army/3` and FORMAT 8**: `army/3` is unbuilt, so MV19 edits it in place; if a FORMAT 8 build has reached players by then, MV19 bumps to 9 (`OLDEST_FORMAT` 9) and says so | The route alone loses the stops (a re-plan would cut across them), and the preview, the panel and the markers need them |
-| D32 | Staging | **Shell only** (`MapArmies` holds the staged hexes): no act, no log record, no save until the commit; Shift+left click with an army of yours selected stages, without one it selects as today | An undone plan must leave no trace in the game or the digest; the log only holds decisions |
-| D33 | The commit | A plain right click on a hex while stops are staged orders `march {goal: that hex, via: staged}`, so the route drawn under the pointer is the route ordered (what you see is what you commit); a right click on the last staged stop commits with that stop as the goal; the command key O does the same at the cursor | One rule for "right click commands"; the brief's "right click on the last hex" is the special case where the pointer rests on the last stop |
-| D34 | Esc | **Esc clears every staged stop in one press** (a new ladder rung above clearing the army); removing one stop is Shift+left click or `V` on the last stop | Esc already means "step out of whatever is in progress, one level at a time"; a plan of stops is one level; one press that removes only the last stop would need up to six presses to leave and would sit oddly with the other rungs; the one-at-a-time removal already has two ways |
+| D32 | Ordering a path (owner 2026-11-27: path ordering, no staging; replaces "shell only staging") | **No staging**: each Shift+right click (or `V`) with an army of yours selected is an order through `Session.act`; the shell holds no points of its own | The owner: "The purpose of Shift+right click is to ORDER A PATH"; what is clicked is ordered, drawn and saved by the game |
+| D33 | What a click orders (owner 2026-11-27: path ordering, no staging) | With no path under way, a march to the hex. With one (order march, goal not reached): the hex is added (`march {goal: hex, via: points ahead + old goal}`); on the final point, that point comes off (the one before it is the goal; the only point: `halt`). A plain right click, or O, replaces the whole path with that destination. A halted march or a storm is no path under way | One gesture builds and shortens a path; the plain click keeps its one meaning |
+| D34 | Esc (owner 2026-11-27: path ordering, no staging) | Esc has **no rung of its own** for a path: it clears the army selection as before and the order stands. A path is shortened by Shift+right click or `V` on its final point, replaced by a plain right click | Nothing is half done in the shell, so there is nothing for Esc to take back |
 | D35 | The computer | **No multi-leg for the AI** (default): its marches never carry `via`; `Army.via` is empty for every computer army | The AI plans destination by destination each season (`AiWar`, `AiForces`); stops give it nothing and cost soak time |
-| D36 | How many stops | `GameDefs.max_stops` = 6 (at most six stops before the goal, so at most seven legs) | A data value; the check and the shell read it |
+| D36 | How long a path | `GameDefs.max_stops` = 6 (at most six points before the goal, so at most seven legs); a longer order is refused "path is full" | A data value; the check reads it |
 | D37 | Task IDs for this request | One task, `MV19`, in a new group D2 between D and E | It edits `map_armies.gd` and `move_card.gd`, which MV10 also edits, so it cannot be in group D |
 | D38 | Task IDs for the owner's answers of 2026-11-25 | `MV20` (fair warning, R73, group D) and `MV21` (the End season prompt's setting, row and widget, R74, group D2) | MV20 edits the checks and the walk in files no other group D task edits; MV21 edits `settings.gd` and the Options screen, which MV10 edits, so it follows group D |
 | D39 | Order against the battle board | Owner answer 2026-11-25: moves in the month (#432) ships **before** the battle board (#437). Until the board exists a battle fought on a click, and every battle at End season, is fought automatically and the battle dock shows the result (D10, D21) | The rule change is large and wants its own playtest; the board then lands on a tested trigger (section 7.1) and each can be judged alone |
@@ -141,14 +141,20 @@ rule holds for the player's armies and the computer's alike.
   points.
 - **R3 The player first, the computer answers.** The player's orders walk while the flow is idle; at End season the
   `ai_orders` phase runs every computer seat (the first seat rotating each season, M8 D9) and their marches walk at once
-  through the same action; then the movement phase walks the standing marches. `Season.PHASES` is unchanged. P: a phase table
+  through the same action; then the movement phase walks the standing marches that have points left, and `ready_units` walks
+  the End-turn leg of the others in `march_on` (R22a). P: a phase table
   with `movement` before `ai_orders` (the pin of `test_season.gd`).
 - **R4 Confirm only risky moves.** An order whose walk this season opens a battle, enters land of a country at war with the
   walker's, or ends out of supply asks once ("Move" / "Cancel"); every other order is one click; Cancel changes nothing.
   P: a confirm on a plain march; a march into a seen enemy army with no confirm.
 - **R5 Long marches keep their pace.** The first leg walks at once; the rest of the route stays as the standing march and walks
-  one leg a season in the movement phase from the next season on (this season's points are spent). P: an army that walks two
-  legs in one season.
+  one leg a season from the next season on (this season's points are spent). P: an army that walks two legs in one season.
+  **Owner playtest 2026-11-27 (GitHub issue 474):** "after setting a route, End turn does not move the army along it; it moves
+  only when clicked." Every End turn moves a marching army one leg: the leg of the next season walks at the End turn that
+  starts it, with that season's points and rules, in the `march_on` phase (R22a), so after End turn the army has spent them
+  and the player redirects it only with what is left. The pace is unchanged (each season's allowance walks once; the season
+  the army arrives in is the one `walk_plan` names); only the moment moves, from the end of that season to the End turn before
+  it. P: an End turn that leaves a standing march with spent points where it stood (`test_end_turn_leg.gd`).
 - **R6 Stop on sight.** A walk ends on the step after which an enemy army first comes into its sight (D7); the points left
   are kept. P: a walk that walks past a newly seen enemy army.
 - **R7 Orders into deep fog.** An order may name a goal the country has not discovered, and its route may cross undiscovered
@@ -204,6 +210,25 @@ rule holds for the player's armies and the computer's alike.
   left, and only when the army is fresh (invariant I2). P: a walk at once then a phase leg that both take such a step.
 - **R22** The movement phase walks only armies with a march or storm order, not mustering, with points above 0; each leg uses
   the points left and leaves what is left (`Armies.set_points`). P: a phase that walks an army that spent its points at once.
+  It marks the armies whose walk took a step `&"phase"` in `game.leg_marks` (not saved, not in the digest, empty at idle).
+- **R22a The End-turn leg (owner playtest 2026-11-27, issue 474).** The `march_on` phase (after `people`, before `stats`):
+  `MovementPhase.next_leg` walks every army with a march or storm order that took no step in this End turn's movement phase
+  and is not mustering next season (an army that spent its points at once, an order stored with no points or while mustering,
+  a walk that stopped before its first step) one leg of the **next** season: its full points (fresh), and the next season's
+  rules (`Movement.set_ahead`: `winter_now` and the plans' keys read the next turn while it walks, so a pass closed in winter
+  stays closed on the End turn of autumn and opens on the End turn of winter). A storm standing on its fortress waits for the
+  battles phase (R29). The walks are the phase's (`MarchLeg.leg`, the ticks in id order, the seen sets, the zone of control,
+  the room cut, `apply`, which writes the points the leg leaves), their battles are fought at once after the walks
+  (`Battles.fight_all`, the battles phase's path: retreats as phase walks, R27), then the sight is refreshed. Every army it
+  walked and every army of its battles is marked `&"next"`: `Allowance.refill` in `ready_units` keeps their points (the next
+  season's, spent or 0 after a battle) and clears the marks. An army that walked its unspent points in the movement phase
+  (`&"phase"`) is not walked again and gets its full points: one leg each End turn, never two legs of one season. The leg walks
+  in this season (before the calendar): the report line (`close_season` after it), the battle records, the chronicle, the
+  stats and the battle badges are this End turn's, and fair warning (R73) shuts the land of a war declared this season to it.
+  Its ticks count from `MovementPhase.NEXT_LEG_TICK` (1000) so the replay tells it from the movement phase (R50). P: an End
+  turn that leaves a spent standing march where it stood; an untouched standing march that walks a movement-phase leg and an
+  End-turn leg in one End turn; an End-turn leg that crosses a pass the next season closes; its battle left for the next End
+  turn.
 - **R23** Room: the goal's check (`Military.can_stand` with `_adding`) at order time, as today. The at-once walk runs the
   same room cut as the phase with its one walk, so a leg that would end on a hex already full of the walker's companies ends
   on the last hex with room. The phase's step-back rule stays. P: nine companies of one country on a hex after a walk.
@@ -279,7 +304,9 @@ rule holds for the player's armies and the computer's alike.
   `Armies.set_hex` of a walk, a retreat or a peace placement sets it only when it is `NO_HEX`. In `ready_units`,
   `Armies.close_season` sets `moved_from = season_from` and `season_from = NO_HEX` for every army; `Armies.clear_moved` and its
   call at the movement phase's start go. The season report (`SummaryArmies`) keeps reading `moved_from`, so it shows a
-  season's at-once walks and phase walks together, and a walk of the next season does not change the last report (J).
+  season's at-once walks and phase walks together, and a walk of the next season does not change the last report (J). The
+  End-turn leg (R22a) walks before `close_season`, so it is in the report of the End turn that walked it and the new season
+  starts with `season_from` cleared.
   P: an at-once walk missing from the report; a report changed by a walk after it.
 
 ### 3.7 The computer
@@ -309,8 +336,8 @@ rule holds for the player's armies and the computer's alike.
   is out of supply at the season's end, `SupplyView` as the march end's line today). P: a risk from an army the viewer does
   not see (the twin test of R57).
 - **R47** The preview's lines gain, in this order after the war line: "Walks 3 hexes now: 7 of 12 move points, 5 left."; for a
-  route longer than the season "Stops at Cerano (7, 9) this season; walks on at the end of next season, there in Autumn
-  1481."; "No move points left this season: it sets out at the end of next season."; "Unmapped land at (12, 3): the army
+  route longer than the season "Stops at Cerano (7, 9) this season; walks on at End turn, there in Autumn 1481."; "No move
+  points left this season: it sets out at End turn." (owner playtest 2026-11-27, R22a); "Unmapped land at (12, 3): the army
   spends its season finding the way."; then the risk lines. The words are `MovePreview`'s; the move card draws them.
 - **R48** The confirm (shell): `MapArmies.command`, the R key's continue and the Storm requests read `MovePreview.to(...).risks`
   (for a storm, its battle); when it is not empty and `game/confirm_moves` is on, a `Confirm` asks ("Move the Army of Turin?",
@@ -338,8 +365,8 @@ rule holds for the player's armies and the computer's alike.
   points (fog D8: orders are hidden). P: points on a foreign token.
 - **R52** **The words.** `MoveWords.of(game, viewer, army_id, walk)` (`godot/core/views/move_words.gd`, new, pure) gives the
   order's toast: walked ("The Army of Turin walks to Vercelli (6, 9): 8 of 12 move points left."); walked with a standing rest
-  ("... walks to Cerano (7, 9); it marches on to Pavia (10, 9) at the end of next season."); stored ("... sets out for Pavia
-  (10, 9) at the end of next season."); sighted ("... stops at Cerano (7, 9): an army of the Duchy of Milan came into sight at
+  ("... walks to Cerano (7, 9); it marches on to Pavia (10, 9) at End turn."); stored ("... sets out for Pavia
+  (10, 9) at End turn."; owner playtest 2026-11-27, R22a); sighted ("... stops at Cerano (7, 9): an army of the Duchy of Milan came into sight at
   Novara (8, 9)."); battle ("... attacks at Novara (8, 9): the Battle of Novara, 1481."); zone of control ("... stops beside
   an army of the Duchy of Milan at Cerano (7, 9): its season is over."). `MapArmies` shows them instead of today's
   `_marches_words`. P: a toast that names an army out of sight.
@@ -365,80 +392,90 @@ rule holds for the player's armies and the computer's alike.
 
 ### 3.11 Multi-leg marches (owner request 2026-11-25; GitHub issue "Multi-leg marches: Shift+left click adds waypoints to an army's route")
 
-"A stop" is a waypoint (D29). "Staged" stops live in the shell only. Every rule of 3.0 to 3.10 holds for the whole route.
+"A path point" is a waypoint (D29). Every rule of 3.0 to 3.10 holds for the whole route.
 
-- **R58 Staging.** With an army of yours selected, the flow idle and orders not blocked, Shift+left click (no Ctrl, Alt or Meta) on
-  a hex appends it to `MapArmies`' staged stops: no act, no log record, no change of the digest or the version. Refused with a
-  toast, nothing appended: off the map, water, the same hex as the army or as the stop before it, more than `GameDefs.max_stops`,
-  or a leg the verdict refuses (`Movement.goal_verdict` from the previous point, fog-safe words). Shift+left click on the last
-  staged stop removes it. With no army selected Shift+left is the plain select; while the season replay runs it is refused as any
-  order is (`blocked_click`). P: a staging that changes the digest; Shift+left with no army that no longer selects.
-- **R59 The picture before the order.** `MovePreview.via(game, tag, army_id, stops, hex)` (stops staged, `hex` the pointer's hex
-  as the goal) gives the route through every stop in order: for each leg `{from, to, hexes, cost, seasons, arrives_turn}`, the
-  whole route's total cost, seasons and arrival, the verdict, and this season's walk (`leg` and `risks`, R45 and R46) read on the
-  whole route. The map draws one path through the stops, a numbered marker on each stop, and the lines "Leg 2: Vercelli (6, 9)
-  to Novara (8, 9): 5 move points, 1 season, there in Summer 1481." and "Whole route: 3 legs, 14 move points, 2 seasons, there in
-  Autumn 1481." (the hover card's tooltip carries the total). The legs of staged stops are cached per (army, version, from, to), so
-  moving the pointer recomputes only the last leg. P: a total that is not the sum of its legs; a preview that skips a stop.
-- **R60 The commit.** A plain right click on a hex while stops are staged, or O at the cursor, orders `march {army, goal: hex,
-  via: staged}` through `Session.act` (the confirm of R48 reads the whole first season's risks); on `ok` the staged list is
-  emptied; refused, the stops stay and the toast gives the reason. A right click on the army's own hex halts as today and
-  drops the stops. Shift+right click (storm) with stops staged is refused ("A storm takes no stops: clear them first (Esc)");
-  a storm and `continue_march` never take `via`. P: a commit that drops a stop; a storm that drops the stops silently.
-- **R61 Clearing.** `EscLadder` gains `CLEAR_STOPS` (state key `has_stops`) above `CLEAR_SELECTION`: Esc clears every staged stop
-  (D34); the staged stops also clear when another army is selected, the selected army is gone, End season starts, a save is
-  loaded or a new game begins. Shift+left click or `V` on the last staged stop removes it. F5 saves the game without them.
-  P: Esc that leaves stops staged; stops that outlive their army's selection.
-- **R62 A way without Shift.** New binding `map_waypoint_key` ("Add or remove a stop at the cursor", group Map, key `V`, free
-  today): at the order cursor (Alt+arrows) or else the hovered hex it acts as Shift+left click. While stops are staged the move
-  card shows two buttons, "March" (commits to the pointer's hex or the order cursor, as O) and "Clear stops" (as Esc). The
-  help overlay lists the key; each of the four GESTURES lists of `bindings.gd` gains "Shift+left click: add a stop to the
-  selected army's march (V at the cursor)"; `key_hints.gd` shows "V stop" while an army is selected. No other binding changes
-  (checked: `V` and Shift+left are unused; Shift+right click, Shift+O, Shift+wheel and Shift as fast pan and as the held works
-  card are different gestures). P: a binding that duplicates another key; a GESTURES list without the new line.
+**Amended 2026-11-27.** First the gestures (owner: "waypoints should be by Shift + RIGHT click"): the path is **Shift+right
+click** (before: Shift+left click), the storm of the pointer moved from Shift+right click to **Ctrl+right click**, and
+Shift+left click is the plain select again. Then the behaviour (owner 2026-11-27: path ordering, no staging: "I don't know why there's a stop in there. The purpose
+of Shift+right click is to ORDER A PATH."): the staged stops, their commit, the move card's "March" and "Clear stops" and the
+Esc rung are gone (D32 to D34). The issue title above keeps its first wording. R58 to R72 read as amended.
+
+- **R58 Ordering a path.** With an army of yours selected, the flow idle and orders not blocked, Shift+right click (no Ctrl,
+  Alt or Meta) on a hex orders at once through `Session.act` (`MarchPath.next`, D33): with no path under way, exactly what a
+  plain right click there does; with a march order whose goal is not reached, `march {army, goal: hex, via: the points still
+  ahead + the old goal}`; on the final point, `march` to the point before it (`via` the points before that), or `halt` when it
+  is the only point. The army walks at once with the points it has left and the rest stays a standing march. With no army
+  selected Shift+right is the plain right click (the hex menu); Shift+left click is the plain select with or without an army;
+  while the season replay runs it is refused as any order is (`blocked_click`). A risky order is asked about (R48) on the whole
+  path, and the question's first line names it: "Path: Susa (4, 9), then Pinerolo (4, 10)."; the toast is the order's (R72).
+  P: a click that only holds the point back; a final point added twice; Shift+left that orders.
+- **R59 The picture before the order.** While Shift alone is held (`MapInput.extend_changed`) and a path is under way, the map
+  and the move card show the order a click at the hovered hex would give: `MovePreview.via(game, tag, army_id, via, hex)` gives
+  the route through every point in order: for each leg `{from, to, hexes, cost, seasons, arrives_turn}`, the whole route's total
+  cost, seasons and arrival, the verdict, and this season's walk (`leg` and `risks`, R45 and R46) read on the whole route. The
+  map draws one path through the points with a numbered pin on each, and the lines "Leg 2: Vercelli (6, 9) to Novara (8, 9): 5
+  move points, 1 season, there in Summer 1481." and "Whole route: 3 legs, 14 move points, 2 seasons, there in Autumn 1481.".
+  On the final point the preview is the shortened path's under the hovered place's name, its first line "Takes the last point off
+  the path." (or "...: the army halts."). Without Shift, or with no path under way, the preview is the plain march's. The legs
+  are cached per (army, version, from, to), so moving the pointer recomputes only the last leg. P: a total that is not the sum
+  of its legs; a preview that skips a point; a preview that stays after Shift is let go.
+- **R60 The plain click, and refusals.** A plain right click on a hex, or O at the cursor, replaces the whole path with that
+  single destination (`march {army, goal: hex}`); on the army's own hex it halts as today. A refused order, of either kind,
+  says why in a toast and changes nothing. Ctrl+right click and Shift+O storm as before, whatever path is under way (the
+  storm's own check speaks; a storm order replaces the march); a storm and `continue_march` never add to `via`. P: a plain
+  click that extends the path; a refusal that changes the game.
+- **R61 Nothing to clear.** The shell holds no points: Esc, another selection, End season, a save and a load treat the path as
+  the army order it is. `EscLadder` has no rung of its own for it. P: an Esc that needs a second press with a path under way.
+- **R62 A way without Shift.** The binding `map_waypoint_key` ("Add a path point at the cursor, or remove the last", group Map,
+  key `V`): at the order cursor (Alt+arrows) or else the hovered hex it does what Shift+right click does. The help overlay lists
+  the key; each of the four GESTURES lists of `bindings.gd` has "Shift+right click (Shift+two-finger click): add to the selected
+  army's path; on its last point, remove it (V)"; `key_hints.gd` shows "V path point" while an army is selected. The move card
+  has no buttons. No player-facing text calls a path point a stop. No other binding changes (checked: `V` and Ctrl+right are
+  unused; Shift+O, Shift+wheel and Shift as fast pan and as the held works card are different gestures). P: a binding that
+  duplicates another key; a GESTURES list without the line.
 - **R63 The order.** `Movement.march_check` and `march` read `args["via"]` (an `Array[Vector2i]`, default empty): at most
-  `max_stops`; each point differs from the one before it; every leg `goal_verdict` from the previous point (the first from the
-  army's hex), the first refusing leg's words prefixed "Stop 2: " (or "The goal: "); the route is the legs' hexes joined; the room
-  check is for the goal only (a stop is passed through). An empty `via` gives today's order and today's words. The check and the
-  act agree (`test_check_contract.gd`). P: a bad second leg accepted; a check that says yes and an act that refuses.
-- **R64 The stored stops.** `Army.via` (PackedInt32Array of hex indices, the next stop first, the goal not in it) is written
+  `max_stops` ("path is full: at most 6 path points before the goal"); each point differs from the one before it; every leg
+  `goal_verdict` from the previous point (the first from the army's hex), the first refusing leg's words prefixed "Point 2: "
+  (or "The goal: "); the route is the legs' hexes joined; the room check is for the goal only (a point is passed through). An
+  empty `via` gives today's order and today's words. The check and the act agree (`test_check_contract.gd`). P: a bad second leg
+  accepted; a check that says yes and an act that refuses.
+- **R64 The stored points.** `Army.via` (PackedInt32Array of hex indices, the next point first, the goal not in it) is written
   only by `Armies.set_order(game, army, order, goal, route, via)`; a plain march, a storm, a hold and an arrival give an empty
   `via`; `halt` once and a halted march keep goal, route and `via` (Continue resumes them); `halt` twice clears them;
-  `continue_march` re-plans through the kept stops. `army/3` saves it and the digest covers it (`Army.digest_text`);
+  `continue_march` re-plans through the kept points. `army/3` saves it and the digest covers it (`Army.digest_text`);
   `Army.from_dict` refuses a non-hex or more than `max_stops`, and a non-empty `via` with no goal. P: a `via` left after a hold; a
   second writer of `via` (`test_owns.gd`, `test_no_other_writers.gd`).
 - **R65 The walk.** The route is walked as one: one allowance, the same sight, zone-of-control, fog and battle rules, the army
-  not stopping at a stop (D29). `MarchLeg` removes a stop from `via` when a step lands on it. A re-plan (a blocked step,
-  `MAX_REPLANS`, a winter detour) plans from where the army stands to the next stop and then through the rest, never straight
-  to the goal; a stop that cannot be reached halts the army with today's halt words (`blocked` or `no_way`), goal and `via` kept.
-  The first season's allowance walks at once (R5); the rest walks one season at a time in the movement phase, as any standing
-  march. P: a walk or a re-plan that skips a stop; an army that halts at a stop with points left.
-- **R66 Reading a stop.** The events (`unit_moved` paths), the live walk, the replay and the report are those of one march; the
-  report's "marches to" line names the goal. A stop reached on the season's last point is popped and the army waits there for
-  the next season. P: a popped stop that is still on the route's next step.
-- **R67 Deep fog.** A stop may be a hex the country has not discovered (R7); its legs' fog steps spend as any (R36), the preview
+  not halting at a point (D29). `MarchLeg` removes a point from `via` when a step lands on it. A re-plan (a blocked step,
+  `MAX_REPLANS`, a winter detour) plans from where the army stands to the next point and then through the rest, never straight
+  to the goal; a point that cannot be reached halts the army with today's halt words (`blocked` or `no_way`), goal and `via` kept.
+  The first season's allowance walks at once (R5); the rest walks one season at a time at End turn (`march_on`, R22a), as any
+  standing march. P: a walk or a re-plan that skips a point; an army that halts at a point with points left.
+- **R66 Reading a point.** The events (`unit_moved` paths), the live walk, the replay and the report are those of one march; the
+  report's "marches to" line names the goal. A point reached on the season's last move point is popped and the army waits there
+  for the next season. P: a popped point that is still on the route's next step.
+- **R67 Deep fog.** A point may be a hex the country has not discovered (R7); its legs' fog steps spend as any (R36), the preview
   marks "Unmapped land" on the leg that has one (the lines of R47 on the whole route), and every refusal and line names only
-  what the country has discovered or sees (R57). Twin test extended to orders with `via`. P: a leg's refusal that names an
-  unseen hex; a fog step in a leg taken as a normal one.
-- **R68 The route stays drawn.** `MovePreview.stored` gives the remaining stops; `PathMarks` draws the stored route thin with a
-  small marker on each remaining stop (a stop leaves the picture when it is popped); the army panel's order line reads "Marching
+  what the country has discovered or sees (R57; "path is full" names no place and is said as it is). Twin test extended to
+  orders with `via`. P: a leg's refusal that names an unseen hex; a fog step in a leg taken as a normal one.
+- **R68 The path stays drawn.** `MovePreview.stored` gives the points still ahead; `PathMarks` draws the stored route thin with a
+  small marker on each (a marker leaves the picture when its point is popped); the army panel's order line reads "Marching
   to Pavia (10, 9) by Vercelli (6, 9), Novara (8, 9)" and `TileArmy`'s row likewise; a new command (a march with or without
-  `via`, a halt) replaces it. A foreign army's stops are never shown (fog D8). P: a marker for a stop already passed; a stop shown
+  `via`, a halt) replaces it. A foreign army's path is never shown (fog D8). P: a marker for a point already passed; a point shown
   on a foreign army.
 - **R69 The computer.** No `AiKnow.act` call carries `via` and no file of `godot/core/ai/` names it (the door scan of
-  `test_ai_door.gd` gains `"via"`); invariant I9 holds for every army of the AI. The AI may be given stops by a later task, not
+  `test_ai_door.gd` gains `"via"`); invariant I9 holds for every army of the AI. The AI may be given paths by a later task, not
   by this one (D35). P: a computer army with a non-empty `via`.
 - **R70 Saves, log, replay.** `via` is in `army/3` (D31); the action log's `march` record carries it as hexes and `Replay.run`
   reads it back (MV19 proves the round trip through the log's JSON and fixes `Replay._hexes` or the log encoder only if the
-  proof fails); staged stops are never saved. A format-7 file stays older (D22). P: staged stops that load; a log record that
-  loses `via`.
-- **R71 Determinism.** A multi-leg march is one action and one record, draws no luck in check or preview, and the game after a
+  proof fails). A format-7 file stays older (D22). P: a log record that loses `via`.
+- **R71 Determinism.** Each path order is one action and one record, draws no luck in check or preview, and the game after a
   replay of a log with multi-leg marches has the live game's digest. P: a digest that differs between the live game and its
   replay.
 - **R72 The words.** `MoveWords.of` gains the route shape: "The Army of Turin walks to Vercelli (6, 9) on its way to Pavia
   (10, 9) by Novara (8, 9): 8 of 12 move points left."; a stored one: "... sets out for Pavia (10, 9) by Novara (8, 9) at the end
-  of next season."; a halt on sight keeps the line of R52 and the panel says "Halted" with Continue (the stops kept). Only seen
-  or discovered places are named. P: a toast that names a stop out of sight.
+  of next season."; a halt on sight keeps the line of R52 and the panel says "Halted" with Continue (the path kept). Only seen
+  or discovered places are named. P: a toast that names a point out of sight.
 
 ### 3.12 Fair warning for every country, and the End season battle prompt (owner answers 2026-11-25)
 
@@ -580,9 +617,10 @@ static func via(game: Game, tag: StringName, army_id: int, stops: Array[Vector2i
 #   to()'s keys plus legs: Array[{from, to, hexes, cost, seasons, arrives_turn, fog}], stops: Array[Vector2i],
 #   total: {cost, seasons, arrives_turn, legs}; stored() gains stops
 
-# godot/core/views/move_words.gd (edit): of() reads walk.via_text; godot/shell/input/esc_ladder.gd: CLEAR_STOPS
+# godot/core/views/move_words.gd (edit): of() reads walk.via_text
 # godot/shell/input/map_input.gd: signal waypoint_requested(map_px: Vector2); var waypoint_ready: Callable (an army of yours selected)
-# godot/shell/map/map_armies.gd: add_stop(hex) -> bool, remove_last_stop(), clear_stops(), stops() -> Array[Vector2i]; command() reads them
+# godot/shell/map/march_path.gd (new): under_way(army), next(game, army, hex) -> {halt, goal, via}, preview(game, tag, army_id, hex)
+# godot/shell/map/map_armies.gd: extend_path(hex) -> bool, order_preview(hex) -> Dictionary; command() replaces the path
 # godot/shell/input/bindings.gd: action map_waypoint_key, key V
 ```
 
@@ -611,13 +649,12 @@ it to the signal; `MapArmies._mark_dirty` takes one more optional argument.
    The pill shows "Countries are moving"; after the phases the replay plays Milan's walks one after another, then the
    standing marches together; then the report, whose "Your armies" line reads "Army of Turin: Turin → Novara".
 
-**Multi-leg (owner request 2026-11-25).** 6. The Army of Turin is selected. Shift+left click on Vercelli stages stop 1, Shift+left
-click on Novara stage 2; the pointer rests on Pavia: one path runs Turin, Vercelli, Novara, Pavia with markers 1 and 2, the lines
-"Leg 1: ... 1 season", "Leg 2: ...", "Leg 3: ..." and "Whole route: 3 legs, 14 move points, 2 seasons, there in Summer 1481", and
-this season's walk as in step 2. Esc would clear the two stops; instead a right click on Pavia asks nothing (a plain route) and
-orders the march: the army walks as far as its points reach, passes Vercelli without stopping, the toast says "... walks to Cerano
-(7, 9) on its way to Pavia (10, 9) by Novara (8, 9)". The route stays drawn thin with the markers of the stops still ahead; at End
-season the army walks on, and a marker leaves the picture when the army has passed its stop.
+**Multi-leg (owner request 2026-11-25; owner 2026-11-27: path ordering, no staging).** 6. The Army of Turin is selected. Shift+right click on Cuneo orders the
+march at once: the army walks as far as its points reach and the rest stands. With Shift held the pointer rests near Chivasso:
+one path runs by Cuneo with marker 1, the lines "Leg 1: ... 2 seasons", "Leg 2: ..." and "Whole route: 2 legs, ... there in
+...". A Shift+right click there adds the point (the toast names the way, "... by Cuneo (5, 13)"); again there takes it off;
+a plain right click anywhere would replace the whole path. The route stays drawn thin with the markers of the points still
+ahead; at End season the army walks on, and a marker leaves the picture when the army has passed its point.
 
 ---
 
@@ -645,8 +682,11 @@ a preview and a pause draw nothing.
   mark, the beaten side's retreat) on one `ReplayPlan`. The game already holds the end; the picture only moves tokens.
 - **The computer's walks and the standing marches** are recorded while the season runs and played after it, as today, through
   `ReplayPlan.chain` (R50): first the at-once walks of `ai_orders` one after another in the order they were done (that is the
-  seat order of the season), each with its battle mark and retreat, then the movement phase's walks together tick by tick. The
-  6-second cap still bounds the whole.
+  seat order of the season), each with its battle mark and retreat, then the movement phase's walks together tick by tick,
+  then (owner playtest 2026-11-27, R22a) the End-turn leg's walks together after the retreats of the battles phase, with their
+  own battle marks and retreats (`ReplayPlan.chain` marks the records whose ticks pass `MovementPhase.NEXT_LEG_TICK` `late`;
+  `setup` lays each wave's retreats after its own walks; an empty tick takes no time). The 6-second cap still bounds the
+  whole.
 
 **Tools.** `godot/tools/soak.gd --digest` prints the digests the refactor (MV1) must keep. `war_report.gd --armies=march` and
 `perf_fixture.gd` order marches through `Game.act`, so those now walk their first leg when given: their tables are re-read in
@@ -716,9 +756,9 @@ with Savoy thin at radius 2 (`FogFixture.thin`). `ArmyFixture.spent(g, army, poi
 | `shell/test_live_walk.gd` | R49: the live batch plays, lands on the core hexes, never changes the game; skipped by an order, R, End season, F5, Space, Esc, a click; instant and reduce motion play nothing; the camera follows | an order refused during a live walk |
 | `shell/test_move_confirm.gd` | R48: a confirm for each risk, none for a plain march, Cancel changes nothing, the setting off | an act before the answer |
 | `shell/test_app_flow_moves.gd` | done-when 2 through the App headless: select, preview, walk, a second walk, a standing rest, the sighted halt and Continue, a battle and its dock, End season with the computer's walks replayed, the report's lines, F5 and F9 mid-season | as the steps |
-| `core/test_march_via.gd` (MV19) | R63 to R66, R70, R71: the check and the act agree for `via` (a bad leg refused with its prefix, too many stops, a stop equal to its neighbour); the joined route; the walk passes a stop without halting; a re-plan goes through the next stop; a unreachable stop halts with the words and Continue resumes; `halt` once keeps and twice clears `via`; save, load, save equal; `Replay.run` of a log with multi-leg marches equals the live digest; the log's JSON round trip keeps `via` | each of R63 to R66 and R70 |
-| `core/test_via_preview.gd` (MV19) | R59, R67, R68: legs, totals (the sum of the legs), seasons and arrival per leg; the whole route's `leg` and `risks`; the stored route's stops; the fog-safe words on `FogFixture.thin`; the cache by leg | a total that is not the sum; a skipped stop |
-| `shell/test_waypoints.gd` (MV19) | R58, R60 to R62: Shift+left stages, again on the last removes, with no army selects, refused while the season replay runs; the digest and version never change before the commit; right click and O commit the staged route; a refusal keeps the stops; Esc clears all (ladder rung); a new selection, End season, load and a new game clear; `V` at the cursor; the card's "March" and "Clear stops"; the storm refused with stops | each |
+| `core/test_march_via.gd` (MV19) | R63 to R66, R70, R71: the check and the act agree for `via` (a bad leg refused with its prefix, too long a path, a point equal to its neighbour); the joined route; the walk passes a point without halting; a re-plan goes through the next point; a unreachable point halts with the words and Continue resumes; `halt` once keeps and twice clears `via`; save, load, save equal; `Replay.run` of a log with multi-leg marches equals the live digest; the log's JSON round trip keeps `via` | each of R63 to R66 and R70 |
+| `core/test_via_preview.gd` (MV19) | R59, R67, R68: legs, totals (the sum of the legs), seasons and arrival per leg; the whole route's `leg` and `risks`; the stored route's points; the fog-safe words on `FogFixture.thin`; the cache by leg | a total that is not the sum; a skipped point |
+| `shell/test_waypoints.gd` (MV19) | R58 to R62, R68: Shift+right marches, adds to the end, takes the final point off, halts on the only one; a halted or arrived march starts anew; with no army a right click, Shift+left selects; refused while the season replay runs; refusals and a full path change nothing; `V` at the cursor; a plain right click and O replace; the storm's own check; the question names the path; the Shift preview on the map and the card; the App with real events, F5 and F9 | each |
 | `core/test_fair_warning.gd` (MV20) | R73: the player's march into the land of a country it declared war on this season refused with the words and the hint; a route across that land walks to the border and stops (`warned`, points kept, no halt) and walks on next season; the same march the next season accepted; the country the war was declared on is not stopped; a computer country under the same check; the preview's `warned` line; check and act agree; the words name only the declared enemy | a march that enters in the declaration season; the player exempt; a refusal with no hint; the defender stopped |
 | `shell/test_auto_battles_prompt.gd` (MV21) | R74: the prompt's three answers and the box on a stub count; the setting kept and read back; no prompt with a count of 0, with `auto` or `board`, or with "Your battles" Auto; the Options row hidden while `available()` is false; the digest and the log unchanged | a prompt with a count of 0; a box that keeps nothing; a prompt that acts on the game |
 
@@ -745,13 +785,13 @@ with Savoy thin at radius 2 (`FogFixture.thin`). `ArmyFixture.spent(g, army, poi
 | `shell/test_app_flow_m6.gd`, `test_app_flow_m7.gd` | the march walks before End season (the army's hex after the order); the M7 flow's battle is fought at the order and the dock opens after the walk; the replay after End season shows only the computer's and the standing walks | R1, R8, R50 | MV10 |
 | `shell/test_army_panel.gd`, `test_army_tokens.gd`, `test_army_tab.gd`, `test_army_flags.gd` | the points row, the token mark, `points_text` | R51 | MV9 |
 | `shell/monkey_m6.gd`, `monkey_m7.gd` | the march step expects the army to have walked; "orders blocked" only during the season replay | R1, R49 | MV15 |
-| `shell/test_map_input.gd`, `test_esc_ladder.gd`, `test_bindings.gd`, `test_help_overlay.gd`, `test_key_hints.gd`, `test_move_card.gd` | the Shift+left case, the `CLEAR_STOPS` rung, `map_waypoint_key` and the GESTURES lines, the card's staged buttons; the existing Shift+right storm cases unchanged | R58, R61, R62 | MV19 |
+| `shell/test_map_input.gd`, `test_bindings.gd`, `test_help_overlay.gd`, `test_key_hints.gd`, `test_move_card.gd` | the Shift+right case, `extend_changed`, `map_waypoint_key` and the GESTURES lines; the storm cases on Ctrl+right | R58, R59, R62 | MV19 |
 | `core/test_armies.gd`, `test_snapshot.gd`, `test_save_file.gd`, `test_owns.gd`, `test_no_other_writers.gd` | `via` in `army/3` and its refusals; its only writer | R64, R70 | MV19 |
 | `core/test_check_contract.gd`, `random_player.gd` | `march` with a random `via`; the pair rule holds | R63 | MV19 |
 | `core/test_walk_twin.gd`, `test_ai_door.gd`, `test_invariants.gd` | orders with `via` in the twin test; the scan gains `"via"`; I9 and I10 | R67, R69 | MV19 |
-| `core/test_moves_replay.gd`, `shell/test_app_flow_moves.gd` | a multi-leg march in the 20 seasons; the multi-leg step of section 5 through the App, F5 and F9 with stops left | R70, R71 | MV19 for `test_moves_replay.gd`, MV18 for `test_app_flow_moves.gd` |
+| `core/test_moves_replay.gd`, `shell/test_app_flow_moves.gd` | a multi-leg march in the 20 seasons; the multi-leg step of section 5 through the App, F5 and F9 with a path under way | R70, R71 | MV19 for `test_moves_replay.gd`, MV18 for `test_app_flow_moves.gd` |
 
-**Unchanged, must stay green:** `test_season.gd` (PHASES pinned), `test_replay.gd`, `test_war_property.gd`, `test_ai_turn.gd`,
+**Unchanged, must stay green:** `test_season.gd` (PHASES pinned; owner playtest 2026-11-27: the pin gains `march_on`, R22a), `test_replay.gd`, `test_war_property.gd`, `test_ai_turn.gd`,
 `test_ai_determinism.gd`, `test_combat_*` and the bands test (the fight does not change), `test_sight.gd`, `test_knowledge.gd`,
 the tile window's tests other than `test_army_tab.gd`.
 
@@ -770,8 +810,11 @@ card changed are made again and signed. **The owner is asked before any windowed
 **Invariants** (`tests/core/invariants.gd`, read by the soak every season and by the monkey after every act):
 - **I1** every army: 0 <= points <= its full.
 - **I2** no army spends more than its full points in a season: the step costs of its `unit_moved` paths of the season (recomputed
-  with `StepCosts`, a wade or fog step counted as the points it had) add up to at most its full.
-- **I3** points grow only in `ready_units` (never inside an act or another phase).
+  with `StepCosts`, a wade or fog step counted as the points it had) add up to at most its full. The walks queued in
+  `march_on` (the End-turn leg, R22a) are the next season's: the watch starts a new count from the full points for the armies
+  it marked and prices their steps in the next season's rules; I3 lets those armies' points grow in `march_on` only.
+- **I3** points grow only in `ready_units` (never inside an act or another phase), and in `march_on` for the armies the
+  End-turn leg walked or whose battle it fought (R22a: their points are the next season's).
 - **I4** `game.battles` is empty at idle.
 - **I5** after every act: at most `stack_limit` companies of one country on a hex; no two countries on a hex outside a battle;
   no army on a hex it cannot stand on.
@@ -779,9 +822,9 @@ card changed are made again and signed. **The owner is asked before any windowed
 - **I7** no `unit_moved` with `now` of the player's country is in the season replay's records.
 - **I8** an army with a standing march and 0 points does not move in the movement phase.
 - **I9** every army: `via` has at most `GameDefs.max_stops` entries, each a hex of the map, none while the goal is `NO_HEX`; every
-  army of a computer country has an empty `via`; after each step of a walk the stops left are all still ahead on the route (the
+  army of a computer country has an empty `via`; after each step of a walk the points left are all still ahead on the route (the
   route's hexes contain `via` in order).
-- **I10** (monkey) staging, hovering, removing and clearing stops never change the digest or the version; only the commit does.
+- **I10** (monkey) a refused or cancelled path order changes neither the digest nor the version, nor the army.
 
 `tools/soak.gd --plant=moves` (tests only) gives one army its points back in the middle of a season: I2 and I3 must catch it, print
 the replay line and exit 1.
@@ -792,10 +835,11 @@ Every frame: a live walk never changes the digest or the version; the token mark
 After every act: I1, I3, I4, I5, and the army's hex equals the walk's `to`. Counters `moves_walked`, `moves_second` (a second order
 for an army in one season), `moves_standing`, `moves_confirms`, `moves_live_skips`, `moves_mid_saves` above 0 on every seed.
 
-**Multi-leg step (MV19 gives the helpers, MV15 plays it):** with an own army selected the monkey Shift+clicks one to four stops
-(including the pointer on the last stop, the same hex twice and water), presses `V` and Esc, commits by right click or O, and
-sometimes saves and loads with stops left. Counters `moves_stops_staged`, `moves_stops_removed`, `moves_stops_cleared`,
-`moves_via_committed`, `moves_via_saves` above 0 on every seed; I9 and I10 after every act and frame.
+**Multi-leg step (MV19 gives the helpers, MV15 plays it):** with an own army selected the monkey orders a path by Shift+right
+click or `V` (started when none is under way), adds points, clicks water, takes the final point off, replaces the path by a
+plain right click, and sometimes saves and loads with points left. Counters `moves_path_extended`, `moves_path_removed`,
+`moves_path_refused`, `moves_path_replaced`, `moves_via_saves` above 0 on every seed; I9 after every act, I10 after every
+refused one.
 
 ---
 
@@ -816,13 +860,13 @@ MV0 records the baseline of the existing rows; MV16 adds the new rows and measur
 | **new** `live_walk_frame_ms` (`perf_ui`) | cpu | 2.0 | under 0.5 | one frame of a live walk with a battle mark and a retreat, mean of 30 (as `replay_frame_ms`) |
 | **new** `move_confirm_push_ms` (`perf_ui`) | gpu | 16 | under 8 | the confirm pushed cold and drawn |
 | `route_hover_ms`, `tokens_refresh_ms`, `army_panel_open_ms` | as today | as today | unchanged within 5 % | the leg, the points mark, the points row |
-| **new** `preview_via_ms` (`perf_core`) | cpu | 4.0 | about 1.5 | `MovePreview.via` with 5 staged stops and a new pointer hex, the staged legs cached, worst of 50; cold (all 6 legs) at most 12 |
+| **new** `preview_via_ms` (`perf_core`) | cpu | 4.0 | about 1.5 | `MovePreview.via` with 5 path points and a new pointer hex, the earlier legs cached, worst of 50; cold (all 6 legs) at most 12 |
 | **new** `march_via_ms` (`perf_core`) | cpu | 6.0 worst | about 2 | `march_check` then `march` with 6 stops on north Italy (7 route searches), worst of 50; one AI step is unaffected (the AI sends none) |
 
 Fallbacks: past `walk_now_worst_ms`, `Sight.refresh` becomes an incremental `Sight.moved(game, army, from)` (the walker's disc out,
 its new disc in, per-country counts kept in `SightCache`); past `walk_battle_ms` after MV3, the battle end's area and control
 caches are dropped once per act instead of once per battle; past `preview_leg_ms`, the leg reuses the plan's `walk_plan` first
-stop and computes the risks only for the hovered hex; past `preview_via_ms`, the preview computes the legs behind the pointer's hex only on a pause of the pointer (the staged legs stay cached); past `march_via_ms`, `legs_verdict` plans the legs from one shared cost field per leg start.
+stop and computes the risks only for the hovered hex; past `preview_via_ms`, the preview computes the legs behind the pointer's hex only on a pause of the pointer (the earlier legs stay cached); past `march_via_ms`, `legs_verdict` plans the legs from one shared cost field per leg start.
 
 ---
 
@@ -847,11 +891,16 @@ stop and computes the risks only for the hovered hex; past `preview_via_ms`, the
 - **The fog test of the AI.** At-once walks reveal land mid-turn; the rewritten `test_ai_fog.gd` keeps the hidden facts out of
   reach of this season's walks (8.2).
 - **Many tests move at once.** Every edited test keeps its planted faults; the changed tests are listed with their reason.
-- **A stop is a place to pass, not to stop** (D29). A player who expects the army to wait at each stop will see it walk on; the
-  card says "passes", the toast and the markers show it; a "halt at stops" option is not built (an owner question only if asked).
-- **Shift+left click is new on the map.** Every other Shift use was checked (R62); the click only means something with an army
-  selected, so a player who holds Shift for fast pan or the works card and clicks with an army selected stages a stop. The key
-  list and the gesture lines say so; Esc clears.
+- **A point is a place to pass, not to halt** (D29). A player who expects the army to wait at each point will see it walk on;
+  the card's legs, the toast and the markers show it; a "halt at each point" option is not built (an owner question only if asked).
+- **Shift+right click orders** (it was the storm until 2026-11-27). A player used to the old storm gesture sends a march instead,
+  at once and for good (moves are final); a risky one is still asked about, and the key list, the gesture lines and the odds card
+  name Ctrl+right click. A player who holds Shift for fast pan or the works card and right clicks with an army selected adds to
+  its path.
+- **A halted path is replaced.** After a halt (sight, blocked, a battle) Shift+right click starts a new march; `R` is the way to
+  keep the old path.
+- **Ctrl+click on a Mac.** Godot's macOS layer reports Ctrl+left click as a right click with Ctrl held, so there it storms with
+  the selected army (to confirm with the input probe; the storm still asks when it is risky).
 - **Route search cost.** Up to 7 searches per check and per hover; the legs are cached and the perf rows gate it (section 9).
 - **`army/3` is edited after MV2.** If a FORMAT 8 build has shipped when MV19 starts, the format becomes 9 (D31).
 - **Reload to retry the dice.** Accepted by the owner (the design's answer 7 of 2026-11-24).
@@ -873,8 +922,8 @@ These sections are amended by this page; the old pages stay as written.
 | tilewin-build-spec.md | R21 (`points_text` optional) | Filled (R51) |
 | ui-family-audit.md | 4.3 way 3, 4.4 (the save of a battle at idle), 5.1 (U2's trigger) | Section 7.1: the trigger is `fight_now`; no battle is open at idle until the board |
 | moves-in-the-month.md | 2.5 (Option A switch), 2.8 (deep fog refused), 3 ("the save format goes up once for both"; "behaviour oracle") | D25; owner answer 6 and D9; FORMAT 8 now, `battle/2` with #437; no Godot oracle (Appendix B) |
-| ui-and-controls-spec.md | 3.3 (the Esc ladder), 4.1 (the pointer actions), the key table | A rung `CLEAR_STOPS`; Shift+left click with an army selected stages a stop; the key `V` (R61, R62) |
-| m7-build-spec.md | 6.1 (Shift+right click storms) | Unchanged; refused while stops are staged (R60) |
+| ui-and-controls-spec.md | 3.3 (the Esc ladder), 4.1 (the pointer actions), the key table | Shift+right click with an army selected orders its path, Ctrl+right click storms; the key `V` (R58, R62; no new Esc rung) |
+| m7-build-spec.md | 6.1 (Shift+right click storms) | The gesture is Ctrl+right click (owner, 2026-11-27); open with a path under way (R60) |
 | m8-build-spec.md | D23, 4.2 (fair warning, a rule of the AI only) | A rule of every country, the player included; the AI keeps its filter and meets the check as a backstop (R73, D24) |
 
 ## Appendix B. Where the design and today's code disagree
@@ -891,5 +940,6 @@ These sections are amended by this page; the old pages stay as written.
 | 8 | Points are given back in the calendar step | The season's refills are in `ready_units` (after `calendar`) | `ready_units` (R13) |
 | 9 | The season report and its "moves" are not discussed | `moved_from` is cleared at the movement phase's start, so at-once walks would vanish from the report | `season_from` (R40) |
 | 10 | Sight is refreshed for the moved army only | `Sight.refresh` rebuilds the army part of every country | Whole refresh at the walk's end, incremental only as the perf fallback (D26) |
-| 11 | (Owner request 2026-11-25) "Shift+left on the map is free" | Shift+left click is the select click with a modifier that is ignored (`MapInput._on_unit` only skips tokens); it is free as a gesture and with no army selected stays a select | Shift+left stages a stop only while an army of yours is selected (R58) |
-| 12 | "The army marches leg by leg, the first leg at once, the rest per month" | `march` takes `{army, goal}` and stores one route; the re-plan goes to the goal | One longer route through the stops, walked as every route is (D29, R65); `via` in `march` and in `army/3` (D30, D31) |
+| 11 | (Owner request 2026-11-25) "Shift+left on the map is free" | Shift+left click is the select click with a modifier that is ignored (`MapInput._on_unit` only skips tokens); it is free as a gesture and with no army selected stays a select | Superseded 2026-11-27: Shift+right orders the path while an army of yours is selected (R58), and Shift+left is the plain select again |
+| 12 | "The army marches leg by leg, the first leg at once, the rest per month" | `march` takes `{army, goal}` and stores one route; the re-plan goes to the goal | One longer route through the points, walked as every route is (D29, R65); `via` in `march` and in `army/3` (D30, D31) |
+| 13 | (Owner playtest 2026-11-27, issue 474) "The first leg at once, the rest one leg a month at End turn" | The standing march's next leg walked in the movement phase of the season after the order, so the End turn right after the order moved nothing (its points were spent) and the army moved only when clicked | The End-turn leg (R22a): the next season's leg walks at the End turn before it (`march_on`), with its points and rules |

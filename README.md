@@ -79,10 +79,13 @@ march walks. The replay shows what you could see: first the computer's moves one
 The **Movement replay speed** option also sets the speed of your own walks; your walk is only a picture of a move already
 made, and **Space**, **Enter** or **Esc** skips it.
 
-**Stops on the way.** With an army selected, **Shift**+left-click (or **V** at the cursor) adds a stop; up to six. The route is
-drawn through the stops with each part's cost and seasons. Do it again on the last stop to remove it; **Esc** removes them
-all. A right-click (or **O**, or the card's **March** button) on the goal orders the march through them. The army passes a
-stop without halting there, and the stops still ahead stay marked on the map. A storm takes no stops.
+**A path.** With an army selected, **Shift**+right-click orders a path, one point a click: the first click marches there,
+each further one adds a point to the end, and the army walks at once as far as its points reach (**V** at the cursor does the
+same). Shift+right-click the last point again to take it off; take off the only one and the army halts. A plain right-click
+(or **O**) replaces the whole path with that one destination. Hold **Shift** while you hover to see the longer path with each
+part's cost and seasons. The army passes a point without halting there, the points still ahead stay marked on the map, and a
+path holds up to six points before its goal. A march that is halted is no longer under way: **R** goes on, Shift+right-click
+starts a new path.
 
 **Fair warning.** In the season a country declares war, its armies may not enter that enemy's land. This holds for you too:
 an order into the land is refused with a hint, and a march across it stops at the border, keeps its points and goes on next
@@ -91,13 +94,13 @@ season. The country that was declared on is not held back.
 | Control | Does |
 |---|---|
 | Right-click, or **O** / **Shift+F10** at the cursor | march the selected army there; on its own hex, halt it |
-| **Shift**+right-click, or **Shift+O** | storm the fortress there |
-| **Shift**+left-click, or **V** | add a stop for the selected army; on the last stop, remove it |
+| **Ctrl**+right-click, or **Shift+O** | storm the fortress there |
+| **Shift**+right-click, or **V** | add a point to the selected army's path; on the last point, remove it |
 | **R** | continue a halted march |
 | **Tab** | select the next army |
 | **Alt**+arrows | move the order cursor |
 | **Space**, **Enter** or **Esc** while your walk is shown | skip it |
-| **Esc** | remove the stops, then clear the selection |
+| **Esc** | clear the selection (the army keeps its orders) |
 | **Space** or **Enter** | end the season |
 
 ## Conquest

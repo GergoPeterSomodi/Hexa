@@ -48,7 +48,7 @@ func test_walked_names_the_place_and_the_points_left() -> void:
 func test_walked_with_a_standing_rest_says_where_it_marches_on_to() -> void:
 	assert_true(MovesFixture.standing(_g, _a, FAR_GOAL))
 	var w := _words(_walk(&"points", Vector2i(1, 6), 6, {"standing": true, "points": 0}))
-	assert_eq(w.text, "The %s walks to %s; it marches on to %s at the end of next season." % [
+	assert_eq(w.text, "The %s walks to %s; it marches on to %s at End turn." % [
 		_a.name, Words.place(_g, Vector2i(1, 6)), Words.place(_g, FAR_GOAL)])
 
 
@@ -56,7 +56,7 @@ func test_stored_says_when_it_sets_out() -> void:
 	assert_true(MovesFixture.standing(_g, _a, FAR_GOAL))
 	for why: StringName in [&"mustering", &"no_points"]:
 		var w := _words(_walk(why, _a.hex, 0, {"points": 0}))
-		assert_eq(w.text, "The %s sets out for %s at the end of next season." % [_a.name, Words.place(_g, FAR_GOAL)], String(why))
+		assert_eq(w.text, "The %s sets out for %s at End turn." % [_a.name, Words.place(_g, FAR_GOAL)], String(why))
 
 
 func test_a_goal_the_country_has_not_discovered_is_named_by_its_coordinates() -> void:
@@ -70,7 +70,7 @@ func test_a_goal_the_country_has_not_discovered_is_named_by_its_coordinates() ->
 	assert_ne(goal, ArmyFixture.NO_HEX, "the thin map has undiscovered land")
 	_a.goal = goal
 	var w := _words(_walk(&"no_points", _a.hex, 0))
-	assert_true(str(w.text).contains("sets out for (%d, %d) at the end" % [goal.x, goal.y]), "P: an undiscovered place is named: %s" % str(w.text))
+	assert_true(str(w.text).contains("sets out for (%d, %d) at End turn" % [goal.x, goal.y]), "P: an undiscovered place is named: %s" % str(w.text))
 
 
 func test_sighted_keeps_the_engines_words_for_an_army_in_sight() -> void:

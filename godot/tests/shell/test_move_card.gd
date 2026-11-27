@@ -221,29 +221,6 @@ func test_the_walk_of_this_season_leads_the_card() -> void:
 	assert_eq(_variation_of(_card(), lines[0]), &"Label")
 
 
-## moves in the month (R62): the staged march's buttons lead the card, only while staged; the card itself still lets the mouse
-## through. Planted faults: buttons on a plain march; buttons left on a hidden card.
-func test_the_staged_buttons_show_only_while_staged() -> void:
-	var card := (load("res://shell/hud/move_card.tscn") as PackedScene).instantiate() as MoveCard
-	add_child_autofree(card)
-	card.show_move({"title": "x", "way_out": "", "lines": [["y", &"plain"]]})
-	assert_false(card.is_staged())
-	assert_null(card.march_button())
-	card.set_staged(true)
-	assert_true(card.is_staged())
-	assert_eq(card.march_button().get_parent().get_index(), 0, "the buttons lead, so the words never move them")
-	assert_eq(card.line_texts(), ["y"] as Array[String])
-	var pressed: Array[String] = []
-	card.march_pressed.connect(func() -> void: pressed.append("march"))
-	card.clear_pressed.connect(func() -> void: pressed.append("clear"))
-	card.march_button().pressed.emit()
-	card.clear_button().pressed.emit()
-	assert_eq(pressed, ["march", "clear"] as Array[String])
-	assert_eq(card.mouse_filter, Control.MOUSE_FILTER_IGNORE)
-	card.hide_card()
-	assert_false(card.is_staged())
-
-
 ## The war line, then the walk, then the risks in the warning tone; a risk that is the supply line too shows once, in its
 ## first place, in the stronger (bad) tone. Planted faults: a risk in the plain tone; a line shown twice.
 func test_the_leg_lines_keep_their_order_and_tones_and_a_repeat_shows_once() -> void:

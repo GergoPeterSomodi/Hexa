@@ -302,7 +302,7 @@ func test_end_season_runs_phases_drains_and_emits_season_ended_once_last() -> vo
 	assert_eq(game.version, version + 1)
 	assert_eq(game.action_log[game.action_log.size() - 2]["action"], "end_season")
 	assert_eq(Session.unsaved_actions, unsaved + 1)
-	assert_eq(Session.last_phase_ms.keys(), ["ai_orders", "movement", "battles", "supply", "sieges", "war", "production", "income", "works", "people", "stats", "calendar", "ready_units", "vision"])
+	assert_eq(Session.last_phase_ms.keys(), ["ai_orders", "movement", "battles", "supply", "sieges", "war", "production", "income", "works", "people", "march_on", "stats", "calendar", "ready_units", "vision"])
 	for phase: String in Session.last_phase_ms:
 		assert_true(float(Session.last_phase_ms[phase]) >= 0.0)
 

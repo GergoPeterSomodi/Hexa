@@ -70,17 +70,17 @@ func test_help_and_key_hints_say_army_moves_are_final() -> void:
 	var actions := hints.hint_actions()
 	Events.army_selected.emit(1)
 	assert_eq(hints.note_text(), words)
-	# moves in the month (R62): "V stop" comes first while an army is selected, the other key caps stay
-	var with_stop: Array[StringName] = [&"map_waypoint_key"]
-	with_stop.append_array(actions)
-	assert_eq(hints.hint_actions(), with_stop, "the stop key, then the key caps")
-	assert_eq(_hint_words(hints, 1), "stop")
+	# moves in the month (R62): "V path point" comes first while an army is selected, the other key caps stay
+	var with_path: Array[StringName] = [&"map_waypoint_key"]
+	with_path.append_array(actions)
+	assert_eq(hints.hint_actions(), with_path, "the path key, then the key caps")
+	assert_eq(_hint_words(hints, 1), "path point")
 	assert_eq(hints.get_child(0), hints.note_label(), "the line leads, so the room never cuts it first")
 	hints.set_context(true)
 	assert_eq(hints.note_text(), words, "kept when the context changes")
 	Events.army_cleared.emit()
 	assert_eq(hints.note_text(), "")
-	assert_false(hints.hint_actions().has(&"map_waypoint_key"), "no stop key with no army")
+	assert_false(hints.hint_actions().has(&"map_waypoint_key"), "no path key with no army")
 
 
 ## The words of the hint at child `at` of the strip.

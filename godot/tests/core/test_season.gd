@@ -6,7 +6,7 @@ func test_phases_are_pinned() -> void:
 	# M8 (m8-build-spec.md 4.2): fourteen phases, ai_orders before movement; M7: battles after movement, sieges after supply,
 	# war before production.
 	assert_eq(Season.PHASES, [&"ai_orders", &"movement", &"battles", &"supply", &"sieges", &"war", &"production", &"income",
-		&"works", &"people", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
+		&"works", &"people", &"march_on", &"stats", &"calendar", &"ready_units", &"vision"] as Array[StringName])
 
 
 func test_end_check_rows() -> void:
