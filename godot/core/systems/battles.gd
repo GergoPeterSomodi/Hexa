@@ -228,7 +228,7 @@ static func _begin(game: Game, b: Battle, army: Army, stand: Vector2i) -> void:
 ## The army stands on the battle hex and its march ends in the battle (order none; the goal and route are kept).
 static func _step_in(game: Game, army: Army, hex: Vector2i, stand: Vector2i) -> void:
 	Armies.set_hex(game, army, hex, stand)
-	Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
+	Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route, army.via)
 
 
 ## The crossing, river and uphill flags of a battle from its last step (4.6): the attacker's stand hex is under the battle hex

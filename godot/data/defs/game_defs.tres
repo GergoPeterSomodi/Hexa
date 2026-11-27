@@ -151,3 +151,4 @@ wait_ratio_percent = 200
 wait_extra_seasons = 2
 land_sight = 1
 fog_step_cost = -1
+max_stops = 6

@@ -70,12 +70,25 @@ func test_help_and_key_hints_say_army_moves_are_final() -> void:
 	var actions := hints.hint_actions()
 	Events.army_selected.emit(1)
 	assert_eq(hints.note_text(), words)
-	assert_eq(hints.hint_actions(), actions, "the key caps stay")
+	# moves in the month (R62): "V stop" comes first while an army is selected, the other key caps stay
+	var with_stop: Array[StringName] = [&"map_waypoint_key"]
+	with_stop.append_array(actions)
+	assert_eq(hints.hint_actions(), with_stop, "the stop key, then the key caps")
+	assert_eq(_hint_words(hints, 1), "stop")
 	assert_eq(hints.get_child(0), hints.note_label(), "the line leads, so the room never cuts it first")
 	hints.set_context(true)
 	assert_eq(hints.note_text(), words, "kept when the context changes")
 	Events.army_cleared.emit()
 	assert_eq(hints.note_text(), "")
+	assert_false(hints.hint_actions().has(&"map_waypoint_key"), "no stop key with no army")
+
+
+## The words of the hint at child `at` of the strip.
+func _hint_words(hints: KeyHints, at: int) -> String:
+	for part: Node in hints.get_child(at).get_children():
+		if part is Label:
+			return (part as Label).text
+	return ""
 
 
 func test_help_overlay_shows_platform_gestures_and_updates_live_on_rebind() -> void:

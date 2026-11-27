@@ -151,6 +151,8 @@ const DEFAULTS: Array[Dictionary] = [
 		"events": ["Shift+O"] as Array[String]},
 	{"action": &"game_battle", "label": "Last battle", "group": "Game", "since": "7",
 		"events": ["B"] as Array[String]},
+	{"action": &"map_waypoint_key", "label": "Add or remove a stop at the cursor", "group": "Map", "since": "8",
+		"events": ["V"] as Array[String]},
 ]
 
 const GESTURES: Dictionary = {
@@ -160,6 +162,7 @@ const GESTURES: Dictionary = {
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
 		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
+		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Windows": [
@@ -168,6 +171,7 @@ const GESTURES: Dictionary = {
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
 		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
+		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
 		"Shift: hold the works card",
 	] as Array[String],
 	"Linux": [
@@ -176,6 +180,7 @@ const GESTURES: Dictionary = {
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
 		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
+		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
 		"Shift: hold the works card",
 	] as Array[String],
 	"default": [
@@ -184,6 +189,7 @@ const GESTURES: Dictionary = {
 		"Left, middle or right drag: pan the map",
 		"Right click (two-finger click): order the selected army; with none, the hex menu",
 		"Shift+right click (Shift+two-finger click): storm a fortress with the selected army",
+		"Shift+left click: add a stop to the selected army's march (V at the cursor)",
 		"Shift: hold the works card",
 	] as Array[String],
 }

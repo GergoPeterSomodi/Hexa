@@ -41,6 +41,9 @@ var standing: StringName = STANDING_HOLD
 var points: int = 0
 ## The hex it stood on when it first moved this season; NO_HEX when it has not moved (R40).
 var season_from: Vector2i = NO_HEX
+## Multi-leg marches (moves-build-spec.md R64, D31): hex indices of the stops not yet reached, the next first, the goal not in
+## it; empty for a march with no stops and for every order that is not a march. Written only by Armies.set_order.
+var via: PackedInt32Array = PackedInt32Array()
 
 
 func men() -> int:
@@ -66,6 +69,27 @@ func unit(unit_id: int) -> Unit:
 	return null
 
 
+## A copy for a plan or a preview, never game state (callers only read it): every field of this army, the companies shared,
+## standing on `at` with the order, goal, route, stops (moves-build-spec.md R65) and move points given.
+func copy_for(at: Vector2i, an_order: StringName, a_goal: Vector2i, a_route: PackedInt32Array, stops: PackedInt32Array,
+		left: int) -> Army:
+	var c := Army.new()
+	c.id = id
+	c.tag = tag
+	c.name = name
+	c.units = units
+	c.created_turn = created_turn
+	c.standing = standing
+	c.season_from = season_from
+	c.hex = at
+	c.order = an_order
+	c.goal = a_goal
+	c.route = a_route.duplicate()
+	c.via = stops.duplicate()
+	c.points = left
+	return c
+
+
 ## Plain: names as text, hexes as pairs, the route packed, the units as unit/2 in id order.
 func to_dict() -> Dictionary:
 	var list: Array = []
@@ -76,7 +100,7 @@ func to_dict() -> Dictionary:
 		"order": String(order), "goal": [goal.x, goal.y], "route": route.duplicate(), "waiting": String(waiting),
 		"halt_why": String(halt_why), "halt_text": halt_text, "moved_from": [moved_from.x, moved_from.y],
 		"supply": supply, "lost_last": lost_last, "created_turn": created_turn, "standing": String(standing),
-		"points": points, "season_from": [season_from.x, season_from.y],
+		"points": points, "season_from": [season_from.x, season_from.y], "via": via.duplicate(),
 	}
 
 
@@ -105,8 +129,9 @@ static func from_dict(d: Dictionary) -> Army:
 			return null
 		cells[key] = value
 	var path: Variant = _route_from(d.get("route", null))
+	var stops: Variant = _route_from(d.get("via", null))
 	var raw_units: Variant = d.get("units", null)
-	if path == null or not (raw_units is Array) or ints["supply"] > 2:
+	if path == null or stops == null or not (raw_units is Array) or ints["supply"] > 2:
 		return null
 	if not [ORDER_NONE, ORDER_HOLD, ORDER_MARCH, ORDER_STORM].has(StringName(texts["order"])):
 		return null
@@ -136,12 +161,15 @@ static func from_dict(d: Dictionary) -> Army:
 	a.moved_from = cells["moved_from"]
 	a.season_from = cells["season_from"]
 	a.route = path
+	a.via = stops
+	if not a.via.is_empty() and a.goal == NO_HEX:
+		return null  # R64: stops with no goal
 	return a
 
 
 ## "id|tag|name|c,r|created_turn|order|goal|route|waiting|halt_why|halt_text|moved_from|supply|lost_last|" and the units'
-## digest texts in id order, joined by ";", then "|standing|points|season_from". The goal, moved_from and season_from are "c,r", the
-## route comma-separated indices.
+## digest texts in id order, joined by ";", then "|standing|points|season_from|via". The goal, moved_from and season_from are "c,r",
+## the route and via comma-separated indices.
 func digest_text() -> String:
 	var parts := PackedStringArray()
 	for u: Unit in units:
@@ -149,10 +177,13 @@ func digest_text() -> String:
 	var path := PackedStringArray()
 	for index: int in route:
 		path.append(str(index))
-	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s|%s|%d|%d,%d" % [
+	var stops := PackedStringArray()
+	for index: int in via:
+		stops.append(str(index))
+	return "%d|%s|%s|%d,%d|%d|%s|%d,%d|%s|%s|%s|%s|%d,%d|%d|%d|%s|%s|%d|%d,%d|%s" % [
 		id, String(tag), name, hex.x, hex.y, created_turn, String(order), goal.x, goal.y, ",".join(path),
 		String(waiting), String(halt_why), halt_text, moved_from.x, moved_from.y, supply, lost_last, ";".join(parts), String(standing),
-		points, season_from.x, season_from.y,
+		points, season_from.x, season_from.y, ",".join(stops),
 	]
 
 

@@ -38,6 +38,11 @@ signal command_key_requested
 signal storm_key_requested
 ## Shift+right click while `storm_ready` says an army of yours is selected: storm at that hex (else command_requested).
 signal storm_requested(map_px: Vector2)
+## Shift+left click while `waypoint_ready` says an army of yours is selected: add or remove a stop at that hex
+## (moves-build-spec.md R58; else the plain select).
+signal waypoint_requested(map_px: Vector2)
+## V: the same at the order cursor or the hovered hex (R62).
+signal waypoint_key_requested
 ## B: open the dock on the last battle of yours (M7 6.1).
 signal battle_requested
 ## A click (select or command) while `orders_blocked` says so: it selects and orders nothing (M6 6.4: the replay's skip).
@@ -54,6 +59,8 @@ var orders_blocked: Callable = Callable()
 var live_skip: Callable = Callable()
 ## () -> bool, asked on a Shift+right click: true while an army of yours is selected, so the click storms. Unset: no army.
 var storm_ready: Callable = Callable()
+## () -> bool, asked on a Shift+left click: true while an army of yours is selected, so the click stages a stop. Unset: no army.
+var waypoint_ready: Callable = Callable()
 ## Callable(screen: Vector2) -> bool, asked on a left click's release: true while one of the viewer's unit tokens stands
 ## under the viewport point (its screen rect, the zoom included). Unset: no units, every click is a hex click.
 var unit_at_func := Callable()
@@ -134,8 +141,8 @@ func _disconnect_settings() -> void:
 	_settings = null
 
 
-## While `reason` is not empty, select, command, the command key, upgrade, Tab, R, Ctrl+Z, Shift+O, Shift+right click, B
-## and J emit `blocked(reason)` and nothing else; the camera, the modes, the grid and names keys and the hover work.
+## While `reason` is not empty, select, command, the command key, upgrade, Tab, R, Ctrl+Z, Shift+O, Shift+right click,
+## Shift+left click, V, B and J emit `blocked(reason)` and nothing else; the camera, the modes, the grid and names keys and the hover work.
 ## "" lifts it.
 func block_orders(reason: String) -> void:
 	_block_reason = reason
@@ -196,7 +203,9 @@ func _on_mouse_button(mb: InputEventMouseButton) -> void:
 		return
 	_skip_live()
 	if released_action == &"map_select":
-		if _on_unit(mb):
+		if _stages(mb):
+			waypoint_requested.emit(map_px)
+		elif _on_unit(mb):
 			unit_requested.emit(mb.position)
 		else:
 			select_requested.emit(map_px)
@@ -221,7 +230,17 @@ func _on_unit(mb: InputEventMouseButton) -> bool:
 
 ## A Shift+right click (no Ctrl, Alt or Meta) with an army of yours selected: a storm, not a command (M7 6.1).
 func _storms(mb: InputEventMouseButton) -> bool:
-	return mb.shift_pressed and not (mb.ctrl_pressed or mb.alt_pressed or mb.meta_pressed) and storm_ready.is_valid() and bool(storm_ready.call())
+	return _shift_only(mb) and storm_ready.is_valid() and bool(storm_ready.call())
+
+
+## A Shift+left click (no Ctrl, Alt or Meta) with an army of yours selected: a stop of its march, not a selection (R58).
+func _stages(mb: InputEventMouseButton) -> bool:
+	return _shift_only(mb) and waypoint_ready.is_valid() and bool(waypoint_ready.call())
+
+
+## True when Shift is held and no other modifier.
+static func _shift_only(mb: InputEventMouseButton) -> bool:
+	return mb.shift_pressed and not (mb.ctrl_pressed or mb.alt_pressed or mb.meta_pressed)
 
 
 func _on_mouse_motion(motion: InputEventMouseMotion) -> void:
@@ -311,7 +330,7 @@ func _on_game_key(key: InputEventKey) -> bool:
 ## The action of the keys that order or select (the ones block_orders gates), or &"".
 func _gated_key(key: InputEventKey) -> StringName:
 	for action: StringName in [&"game_report", &"game_undo_work", &"game_next_unit", &"game_continue_march",
-			&"map_command_storm", &"game_battle", &"map_command_key"]:
+			&"map_command_storm", &"game_battle", &"map_command_key", &"map_waypoint_key"]:
 		if _is_action_pressed_exact(key, action):
 			return action
 	return &""
@@ -333,6 +352,8 @@ func _emit_gated(action: StringName) -> void:
 			battle_requested.emit()
 		&"map_command_key":
 			command_key_requested.emit()
+		&"map_waypoint_key":
+			waypoint_key_requested.emit()
 
 
 ## The CURSOR_* value of the Alt+arrow action the key presses, or -1.

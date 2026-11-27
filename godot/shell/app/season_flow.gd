@@ -1,4 +1,5 @@
-## The season flow (docs/architecture/m3-build-spec.md 6.3): End season pressed -> busy ring -> the season runs -> the
+## The season flow (docs/architecture/m3-build-spec.md 6.3): End season pressed -> (the battle question of
+## moves-build-spec.md R74, when there is a battle to ask about) -> busy ring -> the season runs -> the
 ## report (Full), a toast (Brief, Off) -> back to the map with the guard, the season swap and the autosave. The App owns
 ## it and hands it callables for everything it does not know itself (the map, the report screen, the toasts, the
 ## autosave step), so it is tested with a fake clock and no scene.
@@ -62,6 +63,13 @@ var finish_season: Callable = Callable()
 var finish_step: Callable = Callable()
 ## () -> Vector2i: (seats done, seats) (Session.orders_progress).
 var orders_progress: Callable = Callable()
+## () -> int: the player's battles this End season would ask about; the default is BattlesAtEnd.count (0 until the battle
+## board). Tests give a stub.
+var battle_count: Callable = Callable()
+## () -> bool: the battle board's own "Your battles" is Auto, so nothing is asked (R74). Invalid (no board yet): it is not.
+var battles_on_auto: Callable = Callable()
+## (screen: Screen) -> void: puts the battle question on the App's screen stack. Invalid means nothing is asked.
+var push_ask: Callable = Callable()
 ## The clock value before which End season is refused.
 var guard_until: int = 0
 
@@ -74,6 +82,7 @@ var _begun := false  # begin_season ran for the season in hand
 var _left := 0  # seasons still to play (count)
 var _played := 0
 var _camera_at := -CAMERA_QUIET_MS * 100
+var _ask: AutoBattlesAsk = null  # the battle question that is up; the season waits for its answer
 
 
 func _init() -> void:
@@ -96,6 +105,7 @@ func _exit_tree() -> void:
 func reset() -> void:
 	_stage = &""
 	_reopened = false
+	_ask = null
 	guard_until = 0
 	_hold(false)
 	_set_state(State.IDLE)
@@ -118,9 +128,11 @@ static func autosave_due(turn: int, start_year: int, every: String) -> bool:
 	return false
 
 
-## Starts the season; true when it began. Refused on an echo (a held key), outside IDLE, inside the guard, or when the
-## rules refuse (the reason is toasted, tone bad). The season itself runs after one drawn frame (the busy ring).
-## During the movement replay the same request skips it instead and starts no season (M6 6.4); it returns false.
+## Starts the season; true when it began. Refused on an echo (a held key), outside IDLE, inside the guard, while the
+## battle question is up, or when the rules refuse (the reason is toasted, tone bad). The season itself runs after one
+## drawn frame (the busy ring). During the movement replay the same request skips it instead and starts no season
+## (M6 6.4); it returns false. When there is a battle to ask about (R74) the question goes up, it returns false, and the
+## answer starts the season.
 func request_end(echo: bool = false, count: int = 1) -> bool:
 	if echo:
 		return false
@@ -129,12 +141,57 @@ func request_end(echo: bool = false, count: int = 1) -> bool:
 		return false
 	if live_skip.is_valid():
 		live_skip.call()  # the player's own walk lands first (R49); the season goes on
-	if _state != State.IDLE or _now() < guard_until:
+	if _state != State.IDLE or _now() < guard_until or _asking():
 		return false
+	if not _season_allowed() or _ask_first(count):
+		return false
+	_start(count)
+	return true
+
+
+## What the rules say to End season; a refusal's reason is toasted.
+func _season_allowed() -> bool:
 	var verdict := Session.end_season_check()
-	if not bool(verdict.get("ok", false)):
-		_toast(String(verdict.get("reason", "")), &"bad", &"")
+	if bool(verdict.get("ok", false)):
+		return true
+	_toast(String(verdict.get("reason", "")), &"bad", &"")
+	return false
+
+
+func _asking() -> bool:
+	return _ask != null and is_instance_valid(_ask) and not _ask.is_queued_for_deletion()
+
+
+## Puts the battle question up when it is wanted (AutoBattlesAsk.wanted); true when it is up and the season must wait.
+func _ask_first(count: int) -> bool:
+	if not push_ask.is_valid():
 		return false
+	var battles: int = int(battle_count.call()) if battle_count.is_valid() else BattlesAtEnd.count(Session.game, Session.player_tag())
+	var on_auto: bool = battles_on_auto.is_valid() and battles_on_auto.call() == true
+	if not AutoBattlesAsk.wanted(settings, battles, on_auto):
+		return false
+	var ask := AutoBattlesAsk.make_for(battles, settings)
+	if ask == null:
+		return false
+	_ask = ask
+	ask.answered.connect(_on_battles_answered.bind(ask, count))
+	push_ask.call(ask)
+	return true
+
+
+## The question's answer. Yes and No both run the season: until the battle board every battle is fought automatically, and
+## the board build gives No its effect. Esc runs nothing. An answer of a question the flow has dropped (reset) is ignored.
+func _on_battles_answered(choice: StringName, ask: AutoBattlesAsk, count: int) -> void:
+	if ask != _ask:
+		return
+	_ask = null
+	if choice == AutoBattlesAsk.CANCEL or _state != State.IDLE or not _season_allowed():
+		return
+	_start(count)
+
+
+## The season (or `count` seasons) begins: RUNNING.
+func _start(count: int) -> void:
 	_stage = &"orders"
 	_armed = false
 	_begun = false
@@ -148,7 +205,6 @@ func request_end(echo: bool = false, count: int = 1) -> bool:
 		while _state == State.RUNNING and _stage != &"" and guard < SYNC_STEP_CAP:
 			_tick()
 			guard += 1
-	return true
 
 
 ## The camera moved (the App connects CameraRig.view_changed): the AI's slices shrink for CAMERA_QUIET_MS.

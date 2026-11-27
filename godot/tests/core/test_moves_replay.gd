@@ -5,7 +5,8 @@
 ## log cannot carry: the computer draws it while it thinks, and a replay does not think, as test_replay.gd's _no_ai); a save
 ## made at idle in the middle of a
 ## season (an army walked, a march standing) loads to the same digest, saves byte for byte the same, and plays on alike to the
-## last season. R73 (MV20): no computer army meets fair warning. P: the log with one march's goal changed replays to another
+## last season. R73 (MV20): no computer army meets fair warning. MV19 (R70, R71): some of Savoy's marches pass a stop (`via`),
+## the replay and the save keep them, and I9 holds every season. P: the log with one march's goal changed replays to another
 ## digest.
 extends GutTest
 
@@ -68,6 +69,8 @@ func _order(g: Game, action: String, args: Dictionary, counts: Dictionary) -> vo
 	var res := g.act(action, full)
 	assert_true(bool(res["ok"]), "%s: the check said yes: %s" % [action, str(res.get("reason", ""))])
 	_count(counts, action)
+	if args.has("via"):
+		_count(counts, "march with stops")
 	var walk := res.get("walk", {}) as Dictionary
 	if not walk.is_empty():
 		_count(counts, "player walks", 1 if int(walk["steps"]) > 0 else 0)
@@ -131,14 +134,28 @@ func _play_orders(g: Game, counts: Dictionary) -> void:
 			for goal: Vector2i in _goals(g, a, rng):
 				var action := "storm" if bool(g.check("storm", {"army": id, "goal": goal, "tag": S})["ok"]) else "march"
 				var args := {"army": id, "goal": goal}
-				if bool(g.check(action, {"army": id, "goal": goal, "tag": S})["ok"]):
+				if action == "march" and rng.randi_range(0, 2) == 0:
+					_add_stop(g, a, args, own, rng)
+				if bool(g.check(action, {"army": id, "goal": goal, "tag": S, "via": args.get("via", [])})["ok"]):
 					_order(g, action, args, counts)
 					break
+
+
+## A stop for a march (MV19): one of Savoy's own hexes off the army's hex and the goal, kept when the march through it is allowed.
+func _add_stop(g: Game, a: Army, args: Dictionary, own: PackedInt32Array, rng: RandomNumberGenerator) -> void:
+	if own.is_empty():
+		return
+	var stop := g.map.hex_of(own[rng.randi_range(0, own.size() - 1)])
+	var via: Array[Vector2i] = [stop]
+	if stop != a.hex and stop != args["goal"] and bool(g.check("march", {"army": a.id, "goal": args["goal"], "tag": S,
+			"via": via})["ok"]):
+		args["via"] = via
 
 
 ## The end of a season; counts the computer's refusals of fair warning.
 func _end_season(g: Game, hook: AiTurn, counts: Dictionary) -> void:
 	assert_true(bool(Season.run(g)["ok"]), "the season ends")
+	assert_eq(Invariants.stop_lines(g), PackedStringArray(), "I9 after the season")
 	for c: Country in g.countries:
 		for line: String in hook.trace_of(c.tag):
 			if line.contains("refused") and line.contains(FairWarning.HINT_TEXT):
@@ -191,8 +208,8 @@ func _play() -> Dictionary:
 			assert_eq(var_to_bytes(Snapshot.of(loaded)), var_to_bytes(Snapshot.of(g)), "save, load, save: byte-equal")
 			for a: Army in g.armies:
 				var b := Armies.by_id(loaded, a.id)
-				assert_eq([b.points, b.season_from, b.order, b.goal, b.route, b.halt_why],
-					[a.points, a.season_from, a.order, a.goal, a.route, a.halt_why], "army %d as it was" % a.id)
+				assert_eq([b.points, b.season_from, b.order, b.goal, b.route, b.halt_why, b.via],
+					[a.points, a.season_from, a.order, a.goal, a.route, a.halt_why, a.via], "army %d as it was" % a.id)
 			loaded_hook = _attach(loaded, {})
 			out["saved_turn"] = g.turn
 		_end_season(g, hook, counts)
@@ -210,7 +227,7 @@ func test_twenty_seasons_replay_and_a_mid_season_save_plays_on_alike() -> void:
 	var counts := got["counts"] as Dictionary
 	gut.p("saved in turn %d, counts %s" % [got["saved_turn"], str(counts)])
 	assert_eq(g.turn, SEASONS + 1)
-	for key: String in ["march", "raise", "declare_war", "player walks", "player battles at once", "ai walks",
+	for key: String in ["march", "march with stops", "raise", "declare_war", "player walks", "player battles at once", "ai walks",
 			"ai battles at once"]:
 		assert_gt(int(counts.get(key, 0)), 0, "the run has %s" % key)
 	assert_eq(int(counts.get("ai warned", 0)), 0, "no computer army meets fair warning (R73)")

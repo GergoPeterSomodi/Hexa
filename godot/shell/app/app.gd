@@ -564,7 +564,7 @@ func _on_back_requested() -> void:
 		"has_screen": top != null,
 		"hud_list_open": _hud != null and _hud.has_open_list(),
 		"has_selection": _map_scene != null and _map_scene.selected != MapScene.NO_HEX,
-		"has_army": _requests.has_army(),
+		"has_army": _requests.has_army(), "has_stops": MapArmies.stops_in(self),
 		"dock_open": _hud != null and _hud.is_dock_open(),
 	}
 	match EscLadder.decide(state):
@@ -575,6 +575,8 @@ func _on_back_requested() -> void:
 		EscLadder.CLOSE_HUD_LIST:
 			if _hud != null:
 				_hud.close_lists()
+		EscLadder.CLEAR_STOPS:
+			MapArmies.in_tree(self).clear_stops()
 		EscLadder.CLEAR_SELECTION:
 			_requests.clear_selection()
 		EscLadder.OPEN_PAUSE_MENU:

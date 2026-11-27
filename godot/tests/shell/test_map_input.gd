@@ -517,14 +517,18 @@ func test_block_orders_emits_blocked_instead_of_each_order_and_changes_nothing()
 	_watch_orders(log)
 	_input.blocked.connect(func(reason: String) -> void: reasons.append(reason))
 	_input.storm_ready = func() -> bool: return true
+	_input.waypoint_ready = func() -> bool: return true
+	_input.waypoint_requested.connect(func(_p: Vector2) -> void: log.append("waypoint"))
+	_input.waypoint_key_requested.connect(func() -> void: log.append("waypoint_key"))
 	_input.block_orders("Countries are moving")
 	var intents: Array[Callable] = [
 		func() -> void: _click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0)),
+		func() -> void: _click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true),
 		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0)),
 		func() -> void: _click_at(MOUSE_BUTTON_RIGHT, Vector2(250.0, 350.0), true),
 	]
 	for action: StringName in [&"map_command_key", &"game_upgrade", &"game_next_unit", &"game_continue_march",
-			&"game_undo_work", &"map_command_storm", &"game_battle", &"game_report"]:
+			&"game_undo_work", &"map_command_storm", &"game_battle", &"game_report", &"map_waypoint_key"]:
 		intents.append(func() -> void: _input._unhandled_input(_chord_of(action)))
 	for intent: Callable in intents:
 		var before := reasons.size()
@@ -579,3 +583,51 @@ func test_camera_intents_still_work_while_blocked_and_empty_lifts_it() -> void:
 	_input._unhandled_input(_chord_of(&"game_next_unit"))
 	assert_eq(log, ["select", "next"], "lifted")
 	assert_true(reasons.is_empty())
+
+
+## moves in the month (R58): Shift+left click stages a stop only while waypoint_ready says an army of yours is selected, even on
+## one of your tokens; else, and with Ctrl, Alt or Meta, it is the plain select. Planted fault: Shift+left that never selects.
+func test_shift_left_asks_for_a_stop_only_while_an_army_is_selected() -> void:
+	var log: Array[String] = []
+	_watch_orders(log)
+	var at: Array[Vector2] = []
+	_input.waypoint_requested.connect(func(px: Vector2) -> void:
+		at.append(px)
+		log.append("waypoint"))
+	_input.unit_requested.connect(func(_s: Vector2) -> void: log.append("unit"))
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	_input.waypoint_ready = func() -> bool: return false
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["select", "select"], "unset or no army: the select")
+	log.clear()
+	_input.waypoint_ready = func() -> bool: return true
+	_input.unit_at_func = func(_s: Vector2) -> bool: return true
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["waypoint"], "a stop, on a token too")
+	assert_eq(at, [Vector2(250.0, 350.0)] as Array[Vector2])
+	log.clear()
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0))
+	assert_eq(log, ["unit"], "a plain click is unchanged")
+	log.clear()
+	_input.unit_at_func = Callable()
+	for modifier: StringName in [&"ctrl_pressed", &"alt_pressed", &"meta_pressed"]:
+		for pressed: bool in [true, false]:
+			var ev := _btn(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), pressed)
+			ev.shift_pressed = true
+			ev.set(modifier, true)
+			_input._unhandled_input(ev)
+	assert_false(log.has("waypoint"), "Shift with another modifier is no stop: %s" % str(log))
+	log.clear()
+	_input.orders_blocked = func() -> bool: return true
+	_input.blocked_click.connect(func(_p: Vector2) -> void: log.append("blocked_click"))
+	_click_at(MOUSE_BUTTON_LEFT, Vector2(250.0, 350.0), true)
+	assert_eq(log, ["blocked_click"], "refused as any order while the replay runs")
+
+
+func test_v_asks_for_a_stop_at_the_cursor() -> void:
+	var asked: Array[int] = []
+	_input.waypoint_key_requested.connect(func() -> void: asked.append(1))
+	_input._unhandled_input(_key(KEY_V))
+	assert_eq(asked.size(), 1)
+	_input._unhandled_input(_key(KEY_V, true))
+	assert_eq(asked.size(), 1, "Ctrl+V is not V")

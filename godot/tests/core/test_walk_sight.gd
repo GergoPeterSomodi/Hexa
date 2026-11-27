@@ -229,6 +229,20 @@ func test_a_step_onto_the_goal_arrives_though_an_enemy_comes_into_sight() -> voi
 	assert_eq(p.halt_why, &"")
 
 
+## Multi-leg marches (R65): a step onto the goal with a stop still ahead is no arrival, so R33's exception does not cover it.
+func test_a_goal_passed_on_the_way_to_a_later_stop_still_stops_on_sight() -> void:
+	var s := _knights_scene()
+	var k: Army = s.k
+	var via: Array[Vector2i] = [K_GOAL]
+	var res := _g.act("march", {"army": k.id, "goal": K_SIGHTED_AT, "via": via, "tag": SAV})
+	assert_true(bool(res.ok), str(res.reason))
+	assert_eq(k.hex, K_SIGHTED_AT, "P: a passed goal taken for the arrival, so the walk goes on past a newly seen army")
+	assert_eq(StringName(res.walk.stopped), WalkNow.SIGHTED)
+	assert_eq(int(res.walk.steps), 2)
+	assert_eq([k.order, k.goal, k.halt_why], [Army.ORDER_NONE, K_SIGHTED_AT, Movement.WHY_SIGHTED])
+	assert_eq(k.via, PackedInt32Array([_g.map.index_of(K_GOAL)]), "the stop is still ahead")
+
+
 # --- R35: Continue --------------------------------------------------------------------------------------------------------------
 
 

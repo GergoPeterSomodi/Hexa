@@ -1,6 +1,6 @@
 ## Studiolo bottom contextual bone KeyCap hint strip reflecting live InputMap bindings
 ## (docs/architecture/ui-style-and-feedback-spec.md section 2; ui-style-and-feedback-plan.md U14). While an army of yours is selected
-## it starts with the line that army moves are final (moves-build-spec.md R54).
+## it starts with the line that army moves are final (moves-build-spec.md R54), then the key that adds a stop to its march (R62).
 class_name KeyHints
 extends HBoxContainer
 
@@ -25,6 +25,11 @@ const SELECTED_ITEMS: Array[Array] = [
 	[&"app_back", "clear"],
 	[&"app_help", "keys"],
 	[&"view_hud", "hide HUD"],
+]
+
+## Before the other items while an army of yours is selected.
+const ARMY_ITEMS: Array[Array] = [
+	[&"map_waypoint_key", "stop"],
 ]
 
 ## The line of R54, here and in the help overlay.
@@ -160,7 +165,10 @@ func _rebuild() -> void:
 		_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_note)
 
-	var items: Array[Array] = SELECTED_ITEMS if _has_selection else (COMPACT_IDLE_ITEMS if _compact else IDLE_ITEMS)
+	var items: Array[Array] = []
+	if _army_selected:
+		items.append_array(ARMY_ITEMS)
+	items.append_array(SELECTED_ITEMS if _has_selection else (COMPACT_IDLE_ITEMS if _compact else IDLE_ITEMS))
 	for entry: Array in items:
 		var action := entry[0] as StringName
 		var desc := str(entry[1])

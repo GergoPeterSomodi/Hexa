@@ -1,12 +1,16 @@
 ## Map hex hover card controller using HoverCard + HexCard, with tooltip delay, viewport/MapArea clamping,
 ## drag/UI suppression, and live refresh on Events.hex_changed
 ## (docs/architecture/ui-and-controls-spec.md section 7; ui-style-and-feedback-plan.md U14). The points mark of one of your
-## army tokens has its own hover (moves-build-spec.md R51): its words take the card's place while the pointer is on it.
+## army tokens has its own hover (moves-build-spec.md R51): its words take the card's place while the pointer is on it. While
+## stops of a march are staged (R59, R62) the move card stays up, pinned by the last stop, with MapArmies' staged picture and
+## its two buttons.
 class_name MapHover
 extends Control
 
 const HOVER_CARD_SCENE := preload("res://shell/ui/hover_card.tscn")
 const CURSOR_OFFSET := Vector2(18.0, 18.0)
+## The pinned move card's top is never lower than this share of the map area, so its lines have room below.
+const PINNED_LOWEST := 0.4
 ## The group MapArmies calls for the order cursor (order_cursor_moved); the move card (6.7) is this node's child.
 const GROUP := &"map_hover"
 const MOVE_CARD_SCENE := preload("res://shell/hud/move_card.tscn")
@@ -114,6 +118,18 @@ static func clamp_card_position(pointer: Vector2, card_size: Vector2, bounds: Re
 	return Vector2(x, y)
 
 
+## The place of the move card pinned by `anchor` (a staged stop) inside `bounds`: right of the stop (left of it by the right
+## edge) and below it, but never lower than PINNED_LOWEST. The card's size plays no part, so it does not jump as its words change.
+static func pinned_card_position(anchor: Vector2, bounds: Rect2) -> Vector2:
+	var pad := float(Tokens.S2)
+	var x := anchor.x + CURSOR_OFFSET.x
+	if x + MoveCard.CARD_W > bounds.end.x - pad:
+		x = anchor.x - MoveCard.CARD_W - float(Tokens.S3)
+	var max_x := maxf(bounds.position.x + pad, bounds.end.x - MoveCard.CARD_W - pad)
+	var max_y := maxf(bounds.position.y + pad, bounds.position.y + bounds.size.y * PINNED_LOWEST)
+	return Vector2(clampf(x, bounds.position.x + pad, max_x), clampf(anchor.y + CURSOR_OFFSET.y, bounds.position.y + pad, max_y))
+
+
 func configure(settings: Settings) -> void:
 	if settings == _settings:
 		if settings != null:
@@ -157,6 +173,11 @@ func order_cursor_moved(hex: Vector2i, screen: Vector2) -> void:
 	_keyboard = true
 	_cursor_hex = hex
 	_cursor_screen = screen
+	_refresh_move()
+
+
+## MapArmies' staged stops or their target changed (called on the group): the pinned card follows, or goes.
+func stops_changed() -> void:
 	_refresh_move()
 
 
@@ -245,8 +266,10 @@ func _move_hex() -> Vector2i:
 
 
 ## Whether the move card replaces the hex card now: an army of yours is selected, the hex is on the map, not the army's own,
-## and the hover is live (no drag, no UI under the pointer).
+## and the hover is live (no drag, no UI under the pointer). Always while stops are staged.
 func _move_wanted() -> bool:
+	if _staging() != null:
+		return true
 	var game := Session.game
 	if _tip != "" or _army < 0 or not hover_cards_enabled or _dragging or game == null or game.map == null:
 		return false
@@ -266,6 +289,13 @@ func _refresh_move() -> void:
 	_elapsed = 0.0
 	if _card != null:
 		_card.clear()
+	var staging := _staging()
+	_move.set_staged(staging != null)
+	if staging != null:
+		_hide_odds()
+		_move.show_move(staging.staged_preview())
+		_position_move()
+		return
 	var tag := Session.player_tag()
 	var preview := MovePreview.to(Session.game, tag, _army, _move_hex())
 	var odds := OddsCard.odds_of(Session.game, tag, _army, _move_hex(), preview)
@@ -277,6 +307,14 @@ func _refresh_move() -> void:
 		_hide_odds()
 		_move.show_move(preview)
 	_position_move()
+
+
+## The armies' layer while it holds staged stops for the selected army, else null.
+func _staging() -> MapArmies:
+	if _army < 0 or Session.game == null:
+		return null
+	var armies := MapArmies.in_tree(self)
+	return armies if armies != null and armies.has_stops() else null
 
 
 func _hide_move() -> void:
@@ -301,12 +339,19 @@ func _ensure_move() -> void:
 	if _move == null:
 		_move = MOVE_CARD_SCENE.instantiate() as MoveCard
 		_move.visible = false
+		_move.march_pressed.connect(_on_march_pressed)
+		_move.clear_pressed.connect(_on_clear_pressed)
 		add_child(_move)
 
 
 func _position_move() -> void:
 	if _move != null and _move.is_open():
-		_place_move_card(_move)
+		var staging := _staging()
+		if staging != null:
+			var to_local := get_global_transform_with_canvas().affine_inverse()
+			_move.pin(to_local * staging.staged_anchor(), _available_bounds())
+		else:
+			_place_move_card(_move)
 	if _odds != null and _odds.is_open():
 		_place_move_card(_odds)
 
@@ -336,7 +381,8 @@ func _points_hover(delta: float) -> bool:
 		_tip_elapsed = 0.0
 		_shown = false
 		_card.clear()
-	_hide_move()
+	if _staging() == null:
+		_hide_move()  # the pinned card of a staged march stays beside the points words
 	_tip_elapsed += maxf(SimClock.delta(delta), 0.0)
 	if _tip_elapsed >= hover_delay_sec:
 		if not _card.visible:
@@ -372,6 +418,18 @@ func _end_points_tip() -> void:
 	if _card != null:
 		_card.clear()
 	_refresh_move()
+
+
+func _on_march_pressed() -> void:
+	var armies := MapArmies.in_tree(self)
+	if armies != null:
+		armies.march_staged()
+
+
+func _on_clear_pressed() -> void:
+	var armies := MapArmies.in_tree(self)
+	if armies != null:
+		armies.clear_stops()
 
 
 func _on_army_selected(army_id: int) -> void:

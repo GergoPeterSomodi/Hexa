@@ -251,3 +251,36 @@ func test_p_a_leg_end_read_from_the_engines_leg_moves_with_an_unseen_army() -> v
 		if leaked > 0:
 			break
 	assert_gt(leaked, 0, "an unseen army moves the engine's leg end somewhere: the comparison can fail")
+
+
+## Multi-leg marches (MV19, R67): orders with stops on and round the hexes where copy B hides armies (one stop, then two) get
+## the same check and the same MovePreview.via (verdict, legs, total, leg, risks, lines) in both games, on duel() and thin().
+func test_orders_with_stops_get_the_same_answer() -> void:
+	for thin: bool in [false, true]:
+		var a := _scene(thin)
+		var b := _scene(thin)
+		_differ(b)
+		var home := MovesFixture.named(a, MovesFixture.NAME_HOME)
+		var stops := _unseen_near(a, home.hex).slice(0, 8)
+		var found: Array[String] = []
+		for army: Army in Armies.of_country(a, S):
+			var other := Armies.by_id(b, army.id)
+			for k: int in stops.size():
+				var plans: Array = [[stops[k]], [stops[k], stops[(k + 3) % stops.size()]]]
+				for raw: Array in plans:
+					var via: Array[Vector2i] = []
+					via.assign(raw)
+					for goal: Vector2i in _within(a, stops[k], 2):
+						var args := {"army": army.id, "goal": goal, "tag": S, "via": via}
+						var x := str(a.check("march", args))
+						var y := str(b.check("march", args))
+						if x != y:
+							found.append("march of %s by %s to %s: %s against %s" % [army.name, via, goal, x, y])
+						var px := MovePreview.via(a, S, army.id, via, goal)
+						var py := MovePreview.via(b, S, other.id, via, goal)
+						if str(px) != str(py):
+							for field: String in px:
+								if str(px[field]) != str(py.get(field)):
+									found.append("via.%s of %s by %s to %s: %s against %s" % [field, army.name, via, goal, px[field],
+										py.get(field)])
+		assert_eq(found.size(), 0, "thin %s: %s" % [thin, _first(found)])

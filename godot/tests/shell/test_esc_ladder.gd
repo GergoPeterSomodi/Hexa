@@ -45,6 +45,16 @@ func test_a_selected_army_clears_before_the_hex() -> void:
 	assert_eq(EscLadder.decide({"top_screen_id": &"help_overlay", "has_screen": true, "has_army": true}), EscLadder.STACK_BACK, "a screen first")
 
 
+## moves in the month (R61, D34): staged stops clear in one step before the army; a screen and a HUD list still come first.
+func test_staged_stops_clear_before_the_army() -> void:
+	var state := {"has_stops": true, "has_army": true, "has_selection": true, "dock_open": true}
+	assert_eq(EscLadder.decide(state), EscLadder.CLEAR_STOPS, "P: Esc that leaves stops staged and drops the army")
+	assert_eq(EscLadder.decide({"has_stops": false, "has_army": true}), EscLadder.CLEAR_SELECTION, "then the army")
+	assert_eq(EscLadder.decide({"has_stops": true, "hud_list_open": true}), EscLadder.CLOSE_HUD_LIST, "a HUD list first")
+	assert_eq(EscLadder.decide({"has_stops": true, "has_screen": true, "top_screen_id": &"confirm"}), EscLadder.STACK_BACK,
+		"a screen first")
+
+
 func test_esc_ladder_hud_and_map_cases() -> void:
 	var cases: Array[Dictionary] = [
 		{

@@ -7,7 +7,7 @@
 ## Moves in the month (moves-build-spec.md 8.4): I1 to I8, each with its planted fault (points over the full, a second walk on
 ## points given back, points that grow outside ready_units, a battle open after an act, two countries on a hex after an act, a
 ## game that does not load, a player's walk at once in a season's records, a standing march without points that moves), the
-## season of clean marches that breaks none, and the soak's `--plant=moves`.
+## season of clean marches that breaks none, and the soak's `--plant=moves`. MV19: I9 `stops` and I10 `staged` with their plants.
 extends GutTest
 
 
@@ -55,7 +55,7 @@ func test_a_clean_game_breaks_nothing_and_the_checks_change_nothing() -> void:
 		Season.run(g)
 		var lines := Invariants.check(g, before)
 		assert_eq(lines.size(), 0, "no invariant broken: %s" % str(lines))
-	assert_eq(Invariants.NAMES.size(), 23)
+	assert_eq(Invariants.NAMES.size(), 25)
 
 
 func test_p_turn() -> void:
@@ -393,3 +393,42 @@ func test_the_soaks_moves_plant_is_caught_by_grown_and_spent() -> void:
 	var lines := PackedStringArray(rec["failure"])
 	assert_true(_has(lines, "grown"), str(lines))
 	assert_true(_has(lines, "spent"), str(lines))
+
+
+# --- multi-leg marches (MV19, moves-build-spec.md 8.4): I9 and I10 ----------------------------------------------------------
+
+
+func test_p_stops_of_a_computer_army_without_a_goal_and_off_the_route() -> void:
+	var scene := _marching()
+	var g: Game = scene["g"]
+	var a: Army = scene["army"]
+	var goal: Vector2i = scene["goal"]
+	var first := g.map.hex_of(Movement.plan(g, a, goal).hexes[1])
+	var res := g.act("march", {"army": a.id, "goal": goal, "tag": a.tag, "via": [first]})
+	assert_true(bool(res["ok"]), str(res.get("reason", "")))
+	assert_false(_has(Invariants.act_lines(g), "stops"), "a player's march with stops breaks nothing: %s" % str(Invariants.act_lines(g)))
+	var clean := g.armies.filter(func(x: Army) -> bool: return x.via.is_empty())
+	var milan: Army = null
+	for x: Army in clean:
+		if x.tag == MovesFixture.MILAN:
+			milan = x
+	milan.via = PackedInt32Array([g.map.index_of(milan.hex)])  # the faults: planted by hand, the game never writes them
+	milan.goal = milan.hex
+	assert_true(_has(Invariants.act_lines(g), "stops"), "P: a computer army with a non-empty via")
+	milan.via = PackedInt32Array()
+	var player := MovesFixture.named(g, MovesFixture.NAME_HOME)
+	player.via = PackedInt32Array([g.map.hex_count() - 1])
+	assert_true(_has(Invariants.stop_lines(g), "stops"), "P: a stop not ahead on the route")
+	player.via = PackedInt32Array([g.map.index_of(player.hex)])
+	player.goal = Army.NO_HEX
+	assert_true(_has(Invariants.act_lines(g), "stops"), "P: stops with no goal")
+
+
+func test_p_staged_a_change_while_stops_are_staged() -> void:
+	var g := MovesFixture.duel()
+	var digest := g.digest()
+	var version := g.version
+	MovePreview.via(g, MovesFixture.SAVOY, MovesFixture.named(g, MovesFixture.NAME_HOME).id, [] as Array[Vector2i], g.armies[0].hex)
+	assert_eq(Invariants.staged_lines(g, digest, version), PackedStringArray(), "a preview changes nothing")
+	g.version += 1
+	assert_true(_has(Invariants.staged_lines(g, digest, version), "staged"), "P: the version moved")

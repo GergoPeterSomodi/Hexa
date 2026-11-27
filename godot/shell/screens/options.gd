@@ -22,6 +22,13 @@ const PAGES: Array[Dictionary] = [
 	{"id": &"about", "text": "About"},
 ]
 
+## The words of the row "Battles at End season" for the values of game/battles_at_end (moves-build-spec.md R74).
+const BATTLES_WORDS: Dictionary[String, String] = {
+	AutoBattlesAsk.ASK: "Ask me",
+	AutoBattlesAsk.AUTO: "Fight automatically",
+	AutoBattlesAsk.BOARD: "Play on the board",
+}
+
 const DISPLAY_CONFIRM_KEYS: Array[String] = [
 	"display/window_mode",
 	"display/window_preset",
@@ -504,6 +511,9 @@ func _choices_override_for(key: String, settings: Settings) -> Array:
 
 
 func _post_configure_row(key: String, row: OptionRow) -> void:
+	if key == AutoBattlesAsk.SETTING:
+		_configure_battles_row(row)
+		return
 	if key != "display/screen":
 		return
 	var opt := row.control() as OptionButton
@@ -519,6 +529,17 @@ func _post_configure_row(key: String, row: OptionRow) -> void:
 			opt.set_item_text(i, "Screen %d (%d × %d)" % [i, sz.x, sz.y])
 		else:
 			opt.set_item_text(i, "Screen %d" % i)
+
+
+## "Battles at End season" (moves-build-spec.md R74): hidden until there is a battle board, with the words of BATTLES_WORDS.
+func _configure_battles_row(row: OptionRow) -> void:
+	row.visible = BattlesAtEnd.available()
+	var opt := row.control() as OptionButton
+	if opt == null:
+		return
+	var choices := _live_settings.choices_for(AutoBattlesAsk.SETTING)
+	for i: int in mini(opt.item_count, choices.size()):
+		opt.set_item_text(i, BATTLES_WORDS[str(choices[i])])
 
 
 func _populate_accessibility_note() -> void:

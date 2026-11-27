@@ -9,6 +9,7 @@ const PATHS: Dictionary[StringName, String] = {
 	&"pause_menu": "res://shell/screens/pause_menu.tscn",
 	&"options": "res://shell/screens/options.tscn",
 	&"confirm": "res://shell/screens/confirm.tscn",
+	&"auto_battles_ask": "res://shell/screens/auto_battles_ask.tscn",
 	&"loading": "res://shell/screens/loading.tscn",
 	&"help": "res://shell/screens/help_overlay.tscn",
 	&"credits": "res://shell/screens/credits.tscn",

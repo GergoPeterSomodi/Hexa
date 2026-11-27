@@ -111,21 +111,36 @@ static func to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dict
 	return out
 
 
+## The march through staged stops (moves-build-spec.md R59, ViaPreview.via): to()'s keys plus the legs, the stops and the total.
+static func via(game: Game, tag: StringName, army_id: int, stops: Array[Vector2i], hex: Vector2i) -> Dictionary:
+	return ViaPreview.via.call(game, tag, army_id, stops, hex)  # by reference (A14): ViaPreview reads MovePreview
+
+
 static func _make_to(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Dictionary:
 	var verdict := Movement.march_check(game, {"army": army_id, "goal": hex, "tag": tag})
 	if not bool(verdict.ok):
-		if FairWarning.is_refusal(str(verdict.reason)):
-			return _warned_refusal(game, hex, str(verdict.reason))
-		var reason := _fog_safe(game, tag, hex, str(verdict.reason))
-		if reason.begins_with(NOT_YOUR_LAND):
-			reason = _foreign_reason(game, tag, hex)
-		return _refusal(game, hex, reason)
-	var a := Armies.by_id(game, army_id)
+		return refused(game, tag, hex, str(verdict.reason))
+	var a := MarchVia.with_stops(Armies.by_id(game, army_id), PackedInt32Array())  # a march with no stops: the army's kept stops are not this route's
 	var res := Movement.plan(game, a, hex)
 	if not bool(res.ok):
 		return _refusal(game, hex, _fog_safe(game, tag, hex, str(res.reason)))
-	var route: PackedInt32Array = res.hexes
-	var waits := str(res.waits) != ""
+	return route_words(game, tag, a, hex, verdict, res.hexes, str(res.waits) != "")
+
+
+## The refusal of a march to `hex` worded for the viewer: fair warning's words and hint, else fog-safe (R57).
+static func refused(game: Game, tag: StringName, hex: Vector2i, why: String) -> Dictionary:
+	if FairWarning.is_refusal(why):
+		return _warned_refusal(game, hex, why)
+	var reason := _fog_safe(game, tag, hex, why)
+	if reason.begins_with(NOT_YOUR_LAND):
+		reason = _foreign_reason(game, tag, hex)
+	return _refusal(game, hex, reason)
+
+
+## The words of an allowed march of `a` (the army, or ViaPreview's copy holding the stops) by `route` to `hex` (see to()).
+static func route_words(game: Game, tag: StringName, a: Army, hex: Vector2i, verdict: Dictionary, route: PackedInt32Array,
+		waits: bool) -> Dictionary:
+	var army_id := a.id
 	var walk := _season_walk(game, a, route)
 	var out := _shell(game, hex)
 	out["verdict"] = verdict
@@ -211,7 +226,7 @@ static func _enemy_name(game: Game, tag: StringName, hex: Vector2i) -> String:
 ## this season): {hexes, stops, crossings, arrives_turn, seasons}, the shape of `to` for the map's thin line (L16). Empty
 ## hexes when the army is not marching or has no route. Cached in the view cache by [&"stored_route", version, tag, army].
 static func stored(game: Game, tag: StringName, army_id: int) -> Dictionary:
-	var empty := {"hexes": [], "stops": [], "crossings": [], "arrives_turn": -1, "seasons": 0}
+	var empty := {"hexes": [], "stops": [], "crossings": [], "arrives_turn": -1, "seasons": 0, "via": []}
 	if game == null or game.map == null or game.defs == null or not game.has_countries():
 		return empty
 	var a := Armies.by_id(game, army_id)
@@ -226,6 +241,7 @@ static func _make_stored(game: Game, a: Army) -> Dictionary:
 	var walk := _season_walk(game, a, route)
 	return {
 		"hexes": _hexes(game, route),
+		"via": MarchVia.hexes_of(game, a.via),  # R68: the stops left
 		"stops": _stops(game, a, route, walk),
 		"crossings": _crossings(game, a, route, false).list,
 		"arrives_turn": int(walk.arrives_turn),
@@ -555,7 +571,7 @@ static func _walk(game: Game, tag: StringName, a: Army, goal: Vector2i, route: P
 		if w.status != &"":
 			out["status"] = w.status
 			break
-		if w.end == w.goal or w.walked.is_empty() or left <= 0:
+		if w.arrived() or w.walked.is_empty() or left <= 0:
 			break
 		var end_hex := m.hex_of(w.end)
 		if not Movement.zoc_halts(game, tag, end_hex):
@@ -582,7 +598,8 @@ static func _probe(a: Army, hex: Vector2i, goal: Vector2i, route: PackedInt32Arr
 	p.order = Army.ORDER_MARCH
 	p.goal = goal
 	p.route = route
-	return p
+	# R65: the stops still ahead on this part of the route (a copy holding them: Army.via is written only through Armies).
+	return p if a.via.is_empty() else p.copy_for(hex, p.order, goal, route, MarchVia.ahead(a.via, route), 0)
 
 
 ## The move points the steps onto `hexes` from `from` spend out of `points`: a wade, or a step dearer than what is left, spends

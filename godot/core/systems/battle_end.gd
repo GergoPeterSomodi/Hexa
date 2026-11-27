@@ -182,7 +182,7 @@ static func _retreat(game: Game, battle: Battle, loser: int, armies: Array[Army]
 	var witnessed := witnesses(game, spot, tag, tag)
 	for army: Army in armies:
 		Armies.set_hex(game, army, spot, army.hex)
-		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
+		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route, army.via)
 		Armies.set_halt(game, army, &"defeated", text)
 		(end["retreat"] as Dictionary)[army.id] = spot
 		game.emit({"kind": "unit_moved", "tag": tag, "army": army.id, "path": full, "ticks": ticks,
@@ -326,7 +326,7 @@ static func _events(game: Game, battle: Battle, rec: BattleRecord, retreat: Vect
 static func peace(game: Game, battle: Battle) -> void:
 	for side: int in 2:
 		for army: Army in _side_armies(game, battle, side):
-			Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
+			Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route, army.via)
 	var seen_by := witnesses(game, battle.hex, battle.attacker, battle.defender)
 	var none := {String(battle.attacker): 0, String(battle.defender): 0}
 	game.emit({"kind": "battle_ended", "tag": battle.attacker, "hex": battle.hex, "others": [battle.defender],

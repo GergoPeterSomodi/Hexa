@@ -258,6 +258,22 @@ func test_m7_rows_have_the_spec_keys_and_groups() -> void:
 	assert_true(InputMap.has_action(&"game_battle"))
 
 
+## moves in the month (R62): the stop key, its row and the Shift+left click line on every platform; V on no other action.
+func test_the_waypoint_key_and_gesture_line() -> void:
+	var entry := _entry_of(&"map_waypoint_key")
+	assert_eq([str(entry["since"]), str(entry["group"]), str(entry["label"])],
+		["8", "Map", "Add or remove a stop at the cursor"])
+	assert_eq(entry["events"], ["V"], "the default key")
+	for other: Dictionary in Bindings.DEFAULTS:
+		if other["action"] != &"map_waypoint_key":
+			assert_false((other["events"] as Array).has("V"), "P: V bound twice (%s)" % other["action"])
+	var line := "Shift+left click: add a stop to the selected army's march (V at the cursor)"
+	for platform: String in ["macOS", "Windows", "Linux", "default"]:
+		assert_true(Bindings.gestures_for(platform).has(line), "P: %s lacks the stop line" % platform)
+	Bindings.ensure()
+	assert_true(InputMap.has_action(&"map_waypoint_key"))
+
+
 func test_m7_shift_o_is_the_storm_and_plain_o_still_commands() -> void:
 	Bindings.ensure("7")
 	var shift_o := InputEventKey.new()

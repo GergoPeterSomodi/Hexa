@@ -285,7 +285,7 @@ static func _order(game: Game, a: Army) -> Dictionary:
 	elif a.halt_why != &"":
 		text = "Halted: " + a.halt_text
 	elif a.order == Army.ORDER_MARCH:
-		text = "Marching " + Words.at(game, a.goal, "to")
+		text = "Marching " + Words.at(game, a.goal, "to") + _by(game, a)
 		var walk := Movement.walk_plan(game, a, a.route, game.turn)
 		stops.assign(walk.stops)
 		if int(walk.arrives_turn) >= 0:
@@ -304,6 +304,16 @@ static func _order(game: Game, a: Army) -> Dictionary:
 		"waiting_text": waiting_text,
 		"halt_text": a.halt_text,
 	}
+
+
+## " by Vercelli (6, 9), Novara (8, 9)": the stops a march still passes (moves-build-spec.md R68; own armies only, fog D8); "".
+static func _by(game: Game, a: Army) -> String:
+	if a.via.is_empty():
+		return ""
+	var names := PackedStringArray()
+	for h: Vector2i in MarchVia.hexes_of(game, a.via):
+		names.append(Words.place(game, h))
+	return " by " + ", ".join(names)
 
 
 static func _supply(a: Army) -> Dictionary:

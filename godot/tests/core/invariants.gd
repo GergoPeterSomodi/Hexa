@@ -10,6 +10,9 @@
 ## army had), I3 `grown` (points grow only in ready_units), I4 `battles` (none open at idle or after an act), I5 `armies` (also
 ## after every act), I6 `saved` (save, load: the same digest), I7 `walks` (no walk at once of the player in a season's records),
 ## I8 `stood` (a standing march with no points does not move in the movement phase). I2, I3 and I8 need the watch.
+## Multi-leg marches (MV19): I9 `stops` (every army's `via`: at most GameDefs.max_stops hexes of the map, none without a goal,
+## none for a computer country, and a march's stops lie ahead on its route in order; after every season and every act), I10
+## `staged` (staged_lines: the shell's staging, hovering, removing and clearing of stops change neither the digest nor the version).
 ## The names: turn, money, goods, people, men, districts, armies, battles, garrisons, morale, wars, chronicle, stats, explored,
 ## controlled, contract, errors. `explored` (spec R4, the explored set only grows) and `controlled` (every land hex a country
 ## controls is explored by it) are the fog invariants of FG14; `Invariants.planted = "fog"` (tests only) breaks `explored`,
@@ -19,7 +22,7 @@ extends RefCounted
 
 const NAMES: Array[String] = ["turn", "money", "goods", "people", "men", "districts", "armies", "battles", "garrisons", "morale",
 	"wars", "chronicle", "stats", "explored", "controlled", "contract", "errors", "points", "spent", "grown", "saved", "walks",
-	"stood"]
+	"stood", "stops", "staged"]
 ## A war lives at most this many seasons (WarDef.war_timer_seasons, 40): the timer ends it in the war phase.
 const WAR_MAX := 40
 const MORALE_MAX := Unit.MAX_MORALE
@@ -65,6 +68,7 @@ static func check(game: Game, before_state: Dictionary, extra: Dictionary = {}) 
 	_chronicle(game, out)
 	_stats(game, out)
 	out.append_array(point_lines(game))
+	out.append_array(stop_lines(game))
 	_season_walks(game, before_state, out)
 	var moves := extra.get("moves", null) as Moves
 	if moves != null:
@@ -103,6 +107,43 @@ static func act_lines(game: Game) -> PackedStringArray:
 	if not game.battles.is_empty():
 		out.append("battles: %d battle(s) alive after an act" % game.battles.size())
 	_armies(game, out)
+	out.append_array(stop_lines(game))
+	return out
+
+
+## I9: the stops of every army (moves-build-spec.md 8.4): at most max_stops, each a hex of the map, none while the goal is NO_HEX,
+## none for an army of a computer country (every country but game.player), and a march's stops found on its route in order.
+static func stop_lines(game: Game) -> PackedStringArray:
+	var out := PackedStringArray()
+	for a: Army in game.armies:
+		if a.via.is_empty():
+			continue
+		var name := "stops: army %d of %s" % [a.id, a.tag]
+		if a.via.size() > game.defs.max_stops:
+			out.append("%s has %d stops, at most %d" % [name, a.via.size(), game.defs.max_stops])
+		if a.goal == Army.NO_HEX:
+			out.append("%s has stops and no goal" % name)
+		if a.tag != game.player:
+			out.append("%s is a computer army with stops" % name)
+		var k := 0
+		for h: int in a.route:
+			if k < a.via.size() and h == a.via[k]:
+				k += 1
+		for h: int in a.via:
+			if h < 0 or h >= game.map.hex_count():
+				out.append("%s has a stop off the map" % name)
+		if a.order == Army.ORDER_MARCH and k < a.via.size():
+			out.append("%s has a stop that is not ahead on its route" % name)
+	return out
+
+
+## I10: the shell's staged stops never touch the game: the digest and the version as they were before the staging.
+static func staged_lines(game: Game, digest: String, version: int) -> PackedStringArray:
+	var out := PackedStringArray()
+	if game.version != version:
+		out.append("staged: the version moved from %d to %d while stops were staged" % [version, game.version])
+	if game.digest() != digest:
+		out.append("staged: the digest changed while stops were staged")
 	return out
 
 

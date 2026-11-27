@@ -515,7 +515,8 @@ static func march_check(game: Game, args: Dictionary) -> Dictionary:
 
 
 ## Orders the army to march to `goal` (its route stored, the old order and halt replaced) and walks it now as far as its points
-## reach (moves-build-spec.md R17, WalkNow): {ok, reason, army, walk}. A refused march changes nothing.
+## reach (moves-build-spec.md R17, WalkNow): {ok, reason, army, walk}. A refused march changes nothing. `args["via"]`: the stops
+## the route passes (MarchVia, R63; none: today's march).
 static func march(game: Game, args: Dictionary) -> Dictionary:
 	var v := _march_verdict(game, args)
 	if not bool(v.ok):
@@ -523,7 +524,7 @@ static func march(game: Game, args: Dictionary) -> Dictionary:
 	var army: Army = v.army
 	var goal: Vector2i = args["goal"]
 	var res: Dictionary = v.plan
-	Armies.set_order(game, army, Army.ORDER_MARCH, goal, res.hexes)
+	Armies.set_order(game, army, Army.ORDER_MARCH, goal, res.hexes, v.via)
 	_clear_halt(game, army)
 	return _walk_now(game, army)
 
@@ -557,7 +558,7 @@ static func halt(game: Game, args: Dictionary) -> Dictionary:
 	var army := army_check(game, args).army as Army
 	var storming := army.order == Army.ORDER_STORM
 	if army.order == Army.ORDER_MARCH or storming:
-		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route)
+		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, army.route, army.via)
 	else:
 		Armies.set_order(game, army, Army.ORDER_HOLD, NO_HEX, PackedInt32Array())
 	_clear_halt(game, army)
@@ -586,7 +587,7 @@ static func continue_check(game: Game, args: Dictionary) -> Dictionary:
 	var warned := FairWarning.refusal(game, army.tag, army.goal)  # R73: no entry in the season of the declaration
 	if warned != "":
 		return {"ok": false, "reason": warned}
-	var g := goal_verdict(game, army, army.tag, army.goal)
+	var g: Dictionary = MarchVia.resume_verdict.call(game, army)  # R64: through the kept stops
 	return {"ok": bool(g.ok), "reason": str(g.reason)}
 
 
@@ -598,14 +599,16 @@ static func continue_march(game: Game, args: Dictionary) -> Dictionary:
 	var army := army_check(game, args).army as Army
 	if army.halt_why == WHY_STORM:
 		return storm(game, {"army": army.id, "goal": army.goal, "tag": army.tag})
-	var res: Dictionary = goal_verdict(game, army, army.tag, army.goal).plan
-	Armies.set_order(game, army, Army.ORDER_MARCH, army.goal, res.hexes)
+	var res: Dictionary = (MarchVia.resume_verdict.call(game, army) as Dictionary).plan
+	Armies.set_order(game, army, Army.ORDER_MARCH, army.goal, res.hexes, army.via)
 	_clear_halt(game, army)
 	return _walk_now(game, army)
 
 
-## The verdict of a goal for an army of `tag` (4.7 rows 4 to 9) and its plan: {ok, reason, plan}.
-static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i) -> Dictionary:
+## The verdict of a goal for an army of `tag` (4.7 rows 4 to 9) and its plan: {ok, reason, plan}. A leg of a multi-leg march
+## (MarchVia, R63) gives `from` (the stop before it; NO_HEX: the army's hex) and `stand` false for a stop (passed, no room check).
+static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i, from: Vector2i = NO_HEX,
+		stand_check: bool = true) -> Dictionary:
 	if game.map.index_of(goal) < 0:
 		return _verdict("that is off the map")
 	if not game.map.is_land(goal):
@@ -617,15 +620,15 @@ static func goal_verdict(game: Game, army: Army, tag: StringName, goal: Vector2i
 			return _verdict("not your land: the %s holds it, and your armies cross no border in peace" % country_name(game, Territory.owner_tag(game, goal)))
 		return _verdict("not your land: another country holds it, and your armies cross no border in peace")  # R32: not named
 	# R57: the goal's armies are read only where the country sees them (FogVerdict); the walk meets the others (R24, R28).
-	var stand := FogVerdict.stand(game, army, tag, goal, _adding(game, army, goal), _leaving(game, army, goal))
+	var stand := FogVerdict.stand(game, army, tag, goal, _adding(game, army, goal), _leaving(game, army, goal)) if stand_check else ""
 	if stand != "":
 		return _verdict(stand)
-	var res := plan(game, army, goal)
+	var res: Dictionary = plan(game, army, goal) if from == NO_HEX else MarchVia.plan_from.call(game, army, from, goal)
 	if not bool(res.ok):
 		if str(res.reason) == "too_far":
 			return _verdict(TOO_FAR_TEXT % game.defs.march_seasons_max)
 		return _verdict(NO_WAY_TEXT)
-	var w := walk_plan(game, army, res.hexes, game.turn)
+	var w: Dictionary = walk_plan(game, army, res.hexes, game.turn) if from == NO_HEX else MarchVia.walk_from.call(game, army, from, res.hexes)
 	if int(w.seasons) > game.defs.march_seasons_max:
 		return _verdict(TOO_FAR_TEXT % game.defs.march_seasons_max)
 	return {"ok": true, "reason": "", "plan": res}
@@ -752,8 +755,8 @@ static func _march_verdict(game: Game, args: Dictionary) -> Dictionary:
 	var warned := FairWarning.refusal(game, army.tag, goal as Vector2i)  # R73
 	if warned != "":
 		return {"ok": false, "reason": warned, "army": army, "plan": {}}
-	var g := goal_verdict(game, army, army.tag, goal as Vector2i)
-	return {"ok": bool(g.ok), "reason": str(g.reason), "army": army, "plan": g.plan}
+	var g: Dictionary = MarchVia.legs_verdict.call(game, army, army.tag, args.get("via", null), goal as Vector2i)  # R63
+	return {"ok": bool(g.ok), "reason": str(g.reason), "army": army, "plan": g.plan, "via": g.via}
 
 
 ## Rows 1 to 3 of 4.7 for an order: the army id given and existing, and the army of the country the args name.

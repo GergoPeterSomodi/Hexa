@@ -4,6 +4,7 @@
 ## is caught by the same contract (P).
 ## Moves in the month (moves-build-spec.md 8.2, MV4): march, Continue and storm now walk (and may fight) in their do half; the pair
 ## rule must still hold, so the picks weight Continue and storm up (RandomPlayer.next's `moves`). The contract is unchanged.
+## Multi-leg marches (MV19, R63): marches with random stops (RandomPlayer.next's `stops`) keep the pair rule too.
 extends GutTest
 
 const ACTIONS := 3000
@@ -113,3 +114,29 @@ static func _do_anyway(game: Game, _args: Dictionary) -> Dictionary:
 
 static func _do_refuse(_game: Game, _args: Dictionary) -> Dictionary:
 	return {"ok": false, "reason": "refused"}
+
+
+func test_marches_with_random_stops_keep_their_checks() -> void:
+	var g := ArmyFixture.game()
+	var town := ArmyFixture.find_town(g)
+	ArmyFixture.town(g, town)
+	for k: int in 3:
+		ArmyFixture.army(g, ArmyFixture.TAG, g.map.hex_of(Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG))[k]), 0, 2)
+	var with_via := {"ok": 0, "refused": 0}
+	var problems: Array[String] = []
+	for n: int in 600:
+		var pick: Dictionary = RandomPlayer.next(g, g.player, _luck, false, true)
+		var action := str(pick["action"])
+		var args: Dictionary = pick["args"]
+		var logged := g.action_log.size()
+		var problem := contract_problem(g, action, args)
+		if problem != "":
+			problems.append(problem)
+		if action == "march" and args.has("via"):
+			with_via["ok" if g.action_log.size() > logged else "refused"] += 1
+		if (n + 1) % EVERY == 0:
+			assert_true(bool(Season.run(g)["ok"]))
+	assert_eq(problems.size(), 0, "the contract holds with stops: %s" % str(problems.slice(0, 5)))
+	assert_gt(int(with_via["ok"]), 0, "a march with stops succeeded: %s" % str(with_via))
+	assert_gt(int(with_via["refused"]), 0, "a march with stops was refused: %s" % str(with_via))
+	assert_eq(Invariants.stop_lines(g), PackedStringArray(), "I9 holds after the marches")

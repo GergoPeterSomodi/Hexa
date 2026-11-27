@@ -18,7 +18,8 @@ const OWNS: Array[String] = []
 ## shaken, enemy, sighted: an enemy army it did not see when the walk began came into sight, the points kept, R32): the march
 ## halted; warned: the next hex is land of a country declared war on this season (FairWarning, R73): the points kept, the march
 ## stands. The seen set of the walk is MarchLeg.leg's (Sight.sees at the act's start), so Continue after a sighted halt walks
-## with a new one that holds the army seen (R35).
+## with a new one that holds the army seen (R35). A march through stops (MV19, R65) walks its whole route as one: the stops it
+## passes are popped by MarchLeg, and `via` gives the stops left after the act (MoveWords names them).
 const ARRIVED := &""
 const POINTS := &"points"
 const ROOM := &"room"
@@ -32,10 +33,11 @@ const SIGHTED := Movement.WHY_SIGHTED
 
 ## Walks the army's order now. {steps (taken), from, to (where the army stands after the act; its last hex when it is gone),
 ## stopped (see above), text (the halt's or the stop's words), points (left), full, standing (a march or storm order is left),
-## battle (the record id of a battle fought, -1)}.
+## battle (the record id of a battle fought, -1), via (the stops left, hex indices, R65)}.
 static func walk(game: Game, army: Army) -> Dictionary:
 	var out := {"steps": 0, "from": army.hex, "to": army.hex, "stopped": ARRIVED, "text": "", "points": army.points,
-		"full": Allowance.full(game, army), "standing": _standing(army), "battle": -1}
+		"full": Allowance.full(game, army), "standing": _standing(army), "battle": -1,
+		"via": army.via.duplicate()}
 	if army.mustering(game.turn):
 		out["stopped"] = MUSTERING
 		return out
@@ -83,7 +85,7 @@ static func _why(w: MarchLeg) -> StringName:
 		return w.status
 	if w.zoc_ended():
 		return ZOC
-	if w.end == w.goal:
+	if w.arrived():
 		return ARRIVED
 	if w.status == FogStep.WHY:
 		return FOG
@@ -105,6 +107,7 @@ static func _ended(game: Game, army: Army, out: Dictionary, last: Vector2i) -> D
 	out["to"] = alive.hex if alive != null else last
 	out["points"] = alive.points if alive != null else 0
 	out["standing"] = _standing(alive) if alive != null else false
+	out["via"] = alive.via.duplicate() if alive != null else PackedInt32Array()
 	return out
 
 

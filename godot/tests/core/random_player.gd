@@ -6,7 +6,8 @@
 ## The argument shapes are those of Actions: build {hex, family, tag}, upgrade and clear and cancel_work {hex, tag},
 ## choose_country {tag}, set_tax {level, tag}, raise {hex, kind, count, tag}, split_army {army, units, tag},
 ## merge_armies {army, into, tag}, disband {army, unit, tag}, march {army, goal, tag}, halt and continue_march {army, tag},
-## storm {army, goal, tag}, set_standing {army, standing, tag}.
+## storm {army, goal, tag}, set_standing {army, standing, tag}. MV19: with `stops`, a march now and then carries `via` (one to
+## three stops: near land, any land, the army's own hex or the stop before it again), so refusals and successes both occur.
 class_name RandomPlayer
 extends RefCounted
 
@@ -22,12 +23,15 @@ const MOVES: Array[String] = ["continue_march", "storm"]
 const MOVES_EVERY := 4
 
 
-## One random action for `tag`: {action, args}. Changes nothing. `moves` weights Continue and storm up (MOVES).
-static func next(game: Game, tag: StringName, luck: Rng, moves: bool = false) -> Dictionary:
+## One random action for `tag`: {action, args}. Changes nothing. `moves` weights Continue and storm up (MOVES); `stops` gives some
+## marches stops (MV19). Without them the stream is the one of before.
+static func next(game: Game, tag: StringName, luck: Rng, moves: bool = false, stops: bool = false) -> Dictionary:
 	var names := Actions.NAMES
 	var action := names[luck.randi_range(0, names.size() - 1)]
 	if moves and luck.randi_range(0, MOVES_EVERY - 1) == 0:
 		action = MOVES[luck.randi_range(0, MOVES.size() - 1)]
+	if stops and action == "march":
+		return {"action": action, "args": _via_args(game, tag, luck)}
 	return {"action": action, "args": _args(game, tag, action, luck)}
 
 
@@ -195,6 +199,27 @@ static func _march_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
 	elif luck.randi_range(0, 2) == 0:
 		goal = _enemy_hex(game, tag, luck)
 	return {"army": _army_id_of(army), "goal": goal, "tag": tag}
+
+
+## A march with stops (MV19, R63): the march of _march_args, half of the time with one to three stops.
+static func _via_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+	var args := _march_args(game, tag, luck)
+	var army := Armies.by_id(game, int(args["army"]))
+	if army == null or luck.randi_range(0, 1) == 0:
+		return args
+	var via: Array[Vector2i] = []
+	for _k: int in luck.randi_range(1, 3):
+		match luck.randi_range(0, 5):
+			0:
+				via.append(army.hex)
+			1:
+				via.append(via.back() if not via.is_empty() else _any_land(game, luck))
+			2:
+				via.append(_any_land(game, luck))
+			_:
+				via.append(_near_land(game, army.hex, luck))
+	args["via"] = via
+	return args
 
 
 ## A hex of a country at war with tag (its land, a district picked at random), or any land hex when it is at war with none.

@@ -3,6 +3,8 @@
 ## map/path_look). The legs that end out of supply are in MAP_PATH_WARN; a path_stop with the season's numeral at each stop and a
 ## crossing icon (bridge, ford, wade, pass) at each crossing. It draws what MovePreview.to says and only redraws on show_route,
 ## clear_route, set_look and set_zoom. A thin variant (show_route with thin) draws a stored route: the line only, in every look.
+## A march's stops (the preview's `via`, moves-build-spec.md R59, R68) are marked on both: a numbered diamond pin above each
+## staged stop, a small diamond on each stop a stored route still passes.
 ## The route's start is the army's own hex: the preview's `from` (MapArmies adds it); without one the route starts at its first hex.
 class_name PathMarks
 extends Node2D
@@ -11,6 +13,12 @@ const LAYER_Z := 84
 const STOP_SIZE := 20.0
 const CROSSING_ICON := 16.0
 const NUMERAL_SIZE := 12
+## The staged stop's pin: the diamond's half width, how far its centre stands above the hex's, and its ink edge (screen px at
+## the markers' scale); the stored stop's small diamond.
+const PIN_RADIUS := 11.0
+const PIN_LIFT := 22.0
+const PIN_EDGE := 2.0
+const STORED_PIN_RADIUS := 6.0
 const NO_HEX := Vector2i(-9999, -9999)
 const LOOK_RIBBON := &"ribbon"
 const LOOK_DASHES := &"dashed"
@@ -26,6 +34,7 @@ var _points: Array[Vector2] = []
 var _warn: PackedByteArray = PackedByteArray()  # one byte a point: 1 when the leg into it is out of supply
 var _stops: Array[Dictionary] = []  # {pos: Vector2, icon: Texture2D}, the numeral is the index + 1
 var _crossings: Array[Dictionary] = []  # {pos: Vector2, icon: Texture2D}
+var _pins: Array[Vector2] = []  # the march's stops, in order; the number is the index + 1
 var _curve: Dictionary = {}
 var _colours := PackedColorArray()
 var _thin := false
@@ -44,15 +53,20 @@ func setup(view: TileMapView) -> void:
 
 ## Draws MovePreview's preview of a march: {hexes, stops ([{hex}]), crossings ([{hex, to, kind}]), beyond, from} where `beyond` is
 ## one byte a hex, 1 when the hex is out of supply, and `from` is the army's own hex (the route's first point). `thin` draws the
-## stored route of a march in progress: the line only.
+## stored route of a march in progress: the line only. `via` ([Vector2i], optional) are the march's stops, marked even when
+## the route is empty (a refused target).
 func show_route(preview: Dictionary, thin: bool = false) -> void:
 	_thin = thin
 	_points.clear()
 	_warn = PackedByteArray()
 	_stops.clear()
 	_crossings.clear()
+	_pins.clear()
 	var hexes: Array[Vector2i] = []
 	hexes.assign(preview.get("hexes", []) as Array)
+	if _view != null:
+		for hex: Variant in preview.get("via", []) as Array:
+			_pins.append(_view.centre_of(hex as Vector2i))
 	if _view != null and not hexes.is_empty():
 		var beyond := preview.get("beyond", PackedByteArray()) as PackedByteArray
 		var from := preview.get("from", NO_HEX) as Vector2i
@@ -71,6 +85,7 @@ func clear_route() -> void:
 	_points.clear()
 	_stops.clear()
 	_crossings.clear()
+	_pins.clear()
 	_warn = PackedByteArray()
 	_rebuild()
 
@@ -109,6 +124,16 @@ func crossing_count() -> int:
 	return _crossings.size()
 
 
+## The map points of the march's stops marked, in order.
+func pins() -> Array[Vector2]:
+	return _pins.duplicate()
+
+
+## True when the route drawn is the thin stored one.
+func is_thin() -> bool:
+	return _thin
+
+
 func _add_point(hex: Vector2i, warn: int) -> void:
 	_points.append(_view.centre_of(hex))
 	_warn.append(warn)
@@ -144,10 +169,15 @@ func _rebuild() -> void:
 
 
 func _draw() -> void:
-	if _curve.is_empty():
-		return
 	var px := 1.0 / _zoom  # map units of one screen pixel
 	var mark := maxf(1.0, 0.6 / _zoom)  # the markers' scale, as the army tokens'
+	if not _curve.is_empty():
+		_draw_line(px)
+		_draw_markers(px, mark)
+	_draw_pins(mark)
+
+
+func _draw_line(px: float) -> void:
 	if _thin:
 		PathLooks.legs(self, _curve, _colours, PathLooks.THIN_WIDTH * px)
 	elif _look == LOOK_DASHES:
@@ -156,7 +186,6 @@ func _draw() -> void:
 		PathLooks.footprints(self, _curve, _colours, px)
 	else:
 		PathLooks.ribbon(self, _curve, _colours, px)
-	_draw_markers(px, mark)
 
 
 func _draw_markers(px: float, mark: float) -> void:
@@ -179,3 +208,29 @@ func _draw_markers(px: float, mark: float) -> void:
 			var size_text := roundi(NUMERAL_SIZE * mark)
 			draw_string(font, at + Vector2(-STOP_SIZE * mark * 0.5, size_text * 0.35), str(n + 1),
 				HORIZONTAL_ALIGNMENT_CENTER, STOP_SIZE * mark, size_text, Tokens.MAP_PATH_INK)
+
+
+## The stops: a numbered diamond pin on a short stalk above each staged stop; a small diamond on each stored stop.
+func _draw_pins(mark: float) -> void:
+	var font := ThemeDB.fallback_font
+	for n: int in range(_pins.size()):
+		var at := _pins[n]
+		if _thin:
+			_draw_diamond(at, STORED_PIN_RADIUS * mark, Tokens.MAP_PATH, PIN_EDGE * mark)
+			continue
+		var head := at + Vector2(0.0, -PIN_LIFT * mark)
+		draw_line(at, head, Tokens.MAP_PATH_INK, PIN_EDGE * 2.0 * mark)
+		_draw_diamond(head, PIN_RADIUS * mark, Tokens.MAP_PATH, PIN_EDGE * mark)
+		if font != null:
+			var size_text := roundi(NUMERAL_SIZE * mark)
+			draw_string(font, head + Vector2(-PIN_RADIUS * mark, size_text * 0.35), str(n + 1),
+				HORIZONTAL_ALIGNMENT_CENTER, PIN_RADIUS * 2.0 * mark, size_text, Tokens.MAP_PATH_INK)
+
+
+## A diamond of half width `radius` round `at`, filled, with an ink edge.
+func _draw_diamond(at: Vector2, radius: float, fill: Color, edge: float) -> void:
+	var corners := PackedVector2Array([at + Vector2(0.0, -radius), at + Vector2(radius, 0.0), at + Vector2(0.0, radius),
+		at + Vector2(-radius, 0.0)])
+	draw_colored_polygon(corners, fill)
+	corners.append(corners[0])
+	draw_polyline(corners, Tokens.MAP_PATH_INK, edge, true)

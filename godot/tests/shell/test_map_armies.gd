@@ -1,5 +1,5 @@
 ## The map's armies (docs/architecture/m6-build-spec.md 6.1 and 6.3; L16): selection by click (a second click on the same token
-## takes the next army, Shift+click selects the hex), by Tab, the right click that orders a march through Session.act, R,
+## takes the next army; Shift+click selects the hex with no army and stages a stop with one, moves-build-spec.md R58), by Tab, the right click that orders a march through Session.act, R,
 ## the order cursor that clamps to the map, and the route and reach data the map draws.
 extends GutTest
 
@@ -94,11 +94,16 @@ func test_shift_click_selects_the_hex_and_a_click_elsewhere_clears_the_army() ->
 	var hex := ArmyFixture.find_town(_game)
 	var id := _army(hex, 2).id
 	_armies().sync()
-	assert_true(_armies().select_army(id))
 	_click(_token_screen(hex), true)
 	assert_eq(_armies().selected_army(), -1, "Shift+click on the token does not pick the army")
 	assert_eq(_scene.selected, hex, "and selects the hex")
 	assert_true(_armies().select_army(id))
+	# moves in the month: with an army selected Shift+click is a stop of its march (here its own hex, which is refused)
+	_click(_token_screen(hex), true)
+	assert_eq(_armies().selected_army(), id, "the army stays")
+	assert_eq(_scene.selected, MapScene.NO_HEX, "no hex is selected")
+	assert_eq(_reasons, [MarchVia.SAME_AS_ARMY_TEXT])
+	assert_false(_armies().has_stops())
 	var beside := ImproveRules.neighbour(hex, 0)
 	_click(_hex_screen(beside))
 	assert_eq(_armies().selected_army(), -1, "a click on a hex with none of your tokens clears the army")

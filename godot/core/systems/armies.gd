@@ -205,11 +205,14 @@ static func set_points(game: Game, army: Army, points: int) -> void:
 	army.points = clampi(points, 0, Allowance.full(game, army))
 
 
-## The order, its goal (NO_HEX for hold and none) and its stored route (copied).
-static func set_order(_game: Game, army: Army, order: StringName, goal: Vector2i, route: PackedInt32Array) -> void:
+## The order, its goal (NO_HEX for hold and none), its stored route and its stops (copied). The only writer of `via` (moves-build-spec
+## R64): the stops not yet reached, the next first; a call that gives none clears them (a plain march, a storm, a hold, an arrival).
+static func set_order(_game: Game, army: Army, order: StringName, goal: Vector2i, route: PackedInt32Array,
+		via: PackedInt32Array = PackedInt32Array()) -> void:
 	army.order = order
 	army.goal = goal
 	army.route = route.duplicate()
+	army.via = via.duplicate() if goal != Army.NO_HEX else PackedInt32Array()
 
 
 ## The stored route alone (copied): the next step first, the goal last.
@@ -335,7 +338,7 @@ static func to_dict(game: Game) -> Dictionary:
 ## counter, a tag that is no country of the game, a hex off the map or at sea, move points above the army's full, a
 ## season_from off the map (NO_HEX allowed), a company whose kind is no UnitDef or whose
 ## men are outside 1 to its full strength, an empty army, a route index off the map, a march whose goal is off the map,
-## and a coordinate outside the 32-bit range.
+## a stop (via, R64) off the map or more than GameDefs.max_stops of them, and a coordinate outside the 32-bit range.
 static func from_dict(d: Dictionary, game: Game) -> String:
 	if game == null or game.map == null or game.defs == null:
 		return PROBLEM_BODY
@@ -406,12 +409,13 @@ static func _raw_ok(item: Dictionary, game: Game) -> bool:
 	for key: String in ["hex", "goal", "moved_from", "season_from"]:
 		if not _raw_cell_ok(item.get(key, null)):
 			return false
-	var route: Variant = item.get("route", null)
-	if route is Array:
-		for value: Variant in route as Array:
-			var n: Variant = Unit.whole(value)
-			if n == null or int(n) < 0 or int(n) >= game.map.hex_count():
-				return false
+	for key: String in ["route", "via"]:
+		var route: Variant = item.get(key, null)
+		if route is Array:
+			for value: Variant in route as Array:
+				var n: Variant = Unit.whole(value)
+				if n == null or int(n) < 0 or int(n) >= game.map.hex_count():
+					return false
 	var units: Variant = item.get("units", null)
 	if units is Array:
 		for raw_unit: Variant in units as Array:
@@ -450,9 +454,11 @@ static func _army_ok(game: Game, a: Army, unit_ids: Dictionary, next_unit: int) 
 		return false
 	if a.season_from != Army.NO_HEX and game.map.index_of(a.season_from) < 0:
 		return false
-	for index: int in a.route:
+	for index: int in a.route + a.via:
 		if index < 0 or index >= game.map.hex_count():
 			return false
+	if a.via.size() > game.defs.max_stops:
+		return false
 	if (a.order == Army.ORDER_MARCH or a.order == Army.ORDER_STORM) and game.map.index_of(a.goal) < 0:
 		return false
 	return true

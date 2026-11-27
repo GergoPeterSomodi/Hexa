@@ -9,6 +9,9 @@
 ## when the walk began, and a step after which one stands within the army's sight ends the walk (halt sighted, points kept).
 ## MV20: fair warning (FairWarning, R73) is a rule of the ticks too: a step onto the land of a country the walker's country declared
 ## war on this season is not taken (&"warned": no halt, the points kept, the march stands and goes on next season).
+## MV19: multi-leg marches (MarchVia, R65): the stops left (`via`) pass as the steps land on them; a walk arrives only on its goal
+## with no stop left; a re-plan or a winter detour goes through the next stop, never straight to the goal; apply writes the stops
+## left (Armies.set_order, the only writer of Army.via).
 ## The stack limit (room, and issue #466): room sends a walk back along its path, so a hex keeps a place for every army that
 ## started on it and walked off: a step onto a battle there counts them, a battle opening there first sends back the walks its
 ## holder has no room for, a walk sent back never stops on a battle hex it left, and one sent back to its start, where its
@@ -54,6 +57,8 @@ var now: bool = false
 ## is every other army at war: Sight.sees at the leg's start, the phase's start for the phase), and the walking army's sight.
 var unseen: Array[Army] = []
 var sight: int = 1
+## Multi-leg marches (R65): the stops not yet reached after the walked steps, the next first (Army.via at the start).
+var stops_left := PackedInt32Array()
 
 
 ## The leg: the steps the army takes this season by its own rules (no other army counted), a detour or a wait at a closed
@@ -74,6 +79,7 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 	w.goal_hex = army.goal
 	w.goal = m.index_of(army.goal)
 	w.rem = army.route.duplicate()
+	w.stops_left = army.via.duplicate()
 	var full := Movement.mp_of(game, army)
 	var mp := points if points >= 0 else full
 	w.points_start = mp
@@ -82,7 +88,7 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 	var mapped := FogStep.mapped(game, w.tag)
 	if watch:
 		_watch(game, w)
-	while mp > 0 and w.goal >= 0 and w.end != w.goal:
+	while mp > 0 and w.goal >= 0 and not w.arrived():
 		var nxt := w.rem[0] if not w.rem.is_empty() else -1
 		var d := Movement.direction(m, w.end, nxt) if nxt >= 0 else -1
 		var c: int = steps.cost(w.end, d, winter) if d >= 0 else StepCosts.BLOCKED
@@ -92,7 +98,7 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 				return _sized(w)
 			continue
 		if c == StepCosts.CLOSED:
-			var ww := Movement.winter_at(game, w.tag, m.hex_of(w.end), w.goal_hex, full)
+			var ww := MarchVia.winter_through(game, w.tag, m.hex_of(w.end), w.stops_left, w.goal_hex, full)
 			if not bool(ww.ok):
 				_no_way(game, w)
 				return _sized(w)
@@ -120,13 +126,15 @@ static func leg(game: Game, steps: StepCosts, army: Army, winter: bool, points: 
 		w.spent.append(mp - pts)
 		w.end = nxt
 		w.rem = w.rem.slice(1)
+		if not w.stops_left.is_empty() and nxt == w.stops_left[0]:
+			w.stops_left = w.stops_left.slice(1)  # R65: the stop is passed, the walk goes on
 		first = false
 		if pts <= 0:
 			if foggy:
 				w.status = FogStep.WHY
 			break
 		# D21, D40: a zone of control ends the leg (no halt: the march goes on next season, M6's rule); R25: and the season.
-		if nxt != w.goal and Movement.zoc_halts(game, w.tag, m.hex_of(nxt)):
+		if not w.arrived() and Movement.zoc_halts(game, w.tag, m.hex_of(nxt)):
 			w.zoc = true
 			break
 	return _sized(w)
@@ -166,18 +174,24 @@ func points_left() -> int:
 	return points_start - (spent[walked.size() - 1] if not walked.is_empty() else 0)
 
 
+## True when the walk stands on its goal with no stop left to pass (R65).
+func arrived() -> bool:
+	return goal >= 0 and end == goal and stops_left.is_empty()
+
+
 ## True when the walk's last kept step is the leg's step beside an enemy (R25): its season is over.
 func zoc_ended() -> bool:
 	return zoc and not walked.is_empty() and walked.size() == leg_size
 
 
-## Re-plans a walk from its end toward its goal with the season's rules; false (and halted) when there is no way.
+## Re-plans a walk from its end toward its goal through the stops left (R65) with the season's rules; false (and halted, naming
+## the point no leg reaches) when there is no way.
 static func _reroute(game: Game, w: MarchLeg, mp: int) -> bool:
 	if not _count_replan(game, w):
 		return false
-	var res := Movement.replan(game, w.tag, game.map.hex_of(w.end), w.goal_hex, mp)
+	var res := MarchVia.route_through(game, w.tag, game.map.hex_of(w.end), w.stops_left, w.goal_hex, mp)
 	if not bool(res.ok):
-		_no_way(game, w)
+		_no_way(game, w, res.to as Vector2i)
 		return false
 	w.rem = res.hexes as PackedInt32Array
 	return true
@@ -192,9 +206,9 @@ static func _count_replan(game: Game, w: MarchLeg) -> bool:
 	return true
 
 
-static func _no_way(game: Game, w: MarchLeg) -> void:
+static func _no_way(game: Game, w: MarchLeg, to: Vector2i = Army.NO_HEX) -> void:
 	w.status = Movement.WHY_NO_WAY
-	w.text = "no way to %s" % Military.hex_text(game, w.goal_hex)
+	w.text = "no way to %s" % Military.hex_text(game, w.goal_hex if to == Army.NO_HEX else to)
 
 
 
@@ -237,12 +251,18 @@ static func step(game: Game, w: MarchLeg, k: int, occ: Dictionary, walks: Array 
 	var from := w.army.hex
 	Armies.set_hex(game, w.army, hex, game.map.hex_of(w.start))
 	Movement.index_move(game, w.army, from, hex)
-	# R33: a step onto the goal arrives, and a zone of control on the leg's last step wins (points 0, D8).
-	if w.unseen.is_empty() or h == w.goal or (w.zoc and k == w.leg_size - 1):
+	# R33: a step that arrives ends the walk as arrived (a goal passed with a stop still ahead is no arrival, R65), and a zone
+	# of control on the leg's last step wins (points 0, D8).
+	if w.unseen.is_empty() or _arrives_on(w, k) or (w.zoc and k == w.leg_size - 1):
 		return
 	var seen := spotted(game, w, hex)
 	if seen != null:
 		_sighted(game, w, k, sighted_text(game, seen))
+
+
+## True when the walk's step k arrives: onto the goal, with every stop passed by then (R65).
+static func _arrives_on(w: MarchLeg, k: int) -> bool:
+	return w.walked[k] == w.goal and MarchVia.left(w.army.via, w.walked.slice(0, k + 1)).is_empty()
 
 
 ## The first army of the walk's unseen set that stands within its sight of `here` now (in the order the set was made), or null.
@@ -513,7 +533,8 @@ static func apply(game: Game, walks: Array, memo: Dictionary) -> void:
 	for w: MarchLeg in walks:
 		var army := w.army
 		var moved := not w.walked.is_empty()
-		var arrived := w.end == w.goal
+		w.stops_left = MarchVia.left(army.via, w.walked)  # the steps kept after the ticks and the room cut (R65)
+		var arrived := w.arrived()
 		var waiting_before := army.waiting
 		if moved:
 			Armies.set_hex(game, army, game.map.hex_of(w.end), game.map.hex_of(w.start))
@@ -524,6 +545,8 @@ static func apply(game: Game, walks: Array, memo: Dictionary) -> void:
 			Armies.set_route(game, army, w.rem)
 		else:
 			_apply_orders(game, w, arrived)
+		if army.via != w.stops_left and army.goal != Movement.NO_HEX:
+			Armies.set_order(game, army, army.order, army.goal, army.route, w.stops_left)  # R65: the stops passed are popped
 		# R19, R25, R27: the points its kept steps left; none after a step beside an enemy or into a battle.
 		Armies.set_points(game, army, 0 if w.engaged or w.zoc_ended() else w.points_left())
 		if moved:
@@ -542,7 +565,7 @@ static func _apply_orders(game: Game, w: MarchLeg, arrived: bool) -> void:
 		Armies.set_halt(game, army, &"", "")
 		Armies.set_waiting(game, army, &"")
 	elif Movement.HALT_WHYS.has(w.status):
-		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, PackedInt32Array())
+		Armies.set_order(game, army, Army.ORDER_NONE, army.goal, PackedInt32Array(), w.stops_left)  # R65: a halt keeps the stops left
 		Armies.set_halt(game, army, w.status, w.text)
 		Armies.set_waiting(game, army, &"")
 	elif w.status == Movement.WHY_WINTER:

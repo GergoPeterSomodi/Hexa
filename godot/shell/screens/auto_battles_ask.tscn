@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://shell/screens/confirm.tscn" id="1_confirm"]
+[ext_resource type="Script" path="res://shell/screens/auto_battles_ask.gd" id="2_ask"]
+
+[node name="AutoBattlesAsk" instance=ExtResource("1_confirm")]
+script = ExtResource("2_ask")
+screen_id = &"auto_battles_ask"

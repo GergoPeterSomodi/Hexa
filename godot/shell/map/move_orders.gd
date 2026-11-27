@@ -56,10 +56,11 @@ static func question(army_name: String, risks: Array[Dictionary], order: Callabl
 	return screen
 
 
-## The risks of a march of the army to `hex` (R46: MovePreview.to's); none for a refused march (the order then says why).
-static func march_risks(game: Game, tag: StringName, army_id: int, hex: Vector2i) -> Array[Dictionary]:
+## The risks of a march of the army to `hex` through the stops `via` (R46, R60: MovePreview.to's, or MovePreview.via's on the
+## whole route); none for a refused march (the order then says why).
+static func march_risks(game: Game, tag: StringName, army_id: int, hex: Vector2i, via: Array[Vector2i] = []) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	var preview := MovePreview.to(game, tag, army_id, hex)
+	var preview := MovePreview.to(game, tag, army_id, hex) if via.is_empty() else MovePreview.via(game, tag, army_id, via, hex)
 	if bool((preview["verdict"] as Dictionary).get("ok", false)):
 		out.assign(preview["risks"] as Array)
 	return out
@@ -81,7 +82,7 @@ static func storm_risks(game: Game, tag: StringName, army_id: int, hex: Vector2i
 	return out
 
 
-## The risks of Continue: those of the kept march, or of the halted storm it resumes.
+## The risks of Continue: those of the kept march through its kept stops, or of the halted storm it resumes.
 static func continue_risks(game: Game, tag: StringName, army_id: int) -> Array[Dictionary]:
 	var army := Armies.by_id(game, army_id)
 	if army == null:
@@ -89,7 +90,7 @@ static func continue_risks(game: Game, tag: StringName, army_id: int) -> Array[D
 		return none
 	if army.halt_why == Movement.WHY_STORM:
 		return storm_risks(game, tag, army_id, army.goal)
-	return march_risks(game, tag, army_id, army.goal)
+	return march_risks(game, tag, army_id, army.goal, MarchVia.hexes_of(game, army.via))
 
 
 ## The toast of an order's walk ({text, tone}, R52): MoveWords' words, read after the walk. `army_name` is the army's name

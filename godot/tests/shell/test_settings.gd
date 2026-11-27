@@ -408,6 +408,30 @@ func test_confirm_moves_default_validate_and_fall_back() -> void:
 	assert_true(bool(Settings.load_from(bad, "macOS", false).get_value("game/confirm_moves")), "a bad value falls back to on")
 
 
+## moves in the month: what End season asks about the player's battles (R74): ask by default, on the Game page.
+func test_battles_at_end_default_choices_and_fall_back() -> void:
+	var s := Settings.new("macOS", false)
+	assert_true(Settings.SCHEMA.has("game/battles_at_end"))
+	assert_eq(str(s.get_value("game/battles_at_end")), "ask", "the question is asked by default")
+	assert_eq(s.choices_for("game/battles_at_end"), ["ask", "auto", "board"])
+	assert_eq(str(Settings.SCHEMA["game/battles_at_end"]["since"]), "6")
+	assert_eq(str(Settings.SCHEMA["game/battles_at_end"]["page"]), "game")
+	assert_eq(str(Settings.SCHEMA["game/battles_at_end"]["label"]), "Battles at End season")
+	assert_false(s.set_value("game/battles_at_end", "never"), "an unknown answer is refused")
+	assert_false(s.set_value("game/battles_at_end", true), "a bool is not an answer")
+	var path := _tmp_file("battles_at_end")
+	for value: String in ["auto", "board", "ask"]:
+		assert_true(s.set_value("game/battles_at_end", value))
+		assert_true(s.save_to(path))
+		assert_eq(str(Settings.load_from(path, "macOS", false).get_value("game/battles_at_end")), value, "%s round-trips" % value)
+	# planted fault: a bad value in a file falls back to ask
+	var bad := _tmp_file("battles_at_end_bad")
+	var f := FileAccess.open(bad, FileAccess.WRITE)
+	f.store_string("[game]\nbattles_at_end = \"never\"\n")
+	f.close()
+	assert_eq(str(Settings.load_from(bad, "macOS", false).get_value("game/battles_at_end")), "ask", "a bad value falls back to ask")
+
+
 func test_m7_castle_areas_default_validate_and_fall_back() -> void:
 	var s := Settings.new("macOS", false)
 	assert_true(Settings.SCHEMA.has("map/castle_areas"))

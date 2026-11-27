@@ -3,11 +3,18 @@
 ## and calls show_move with MovePreview.to's preview: the title (the place), its lines in their tones, and the way out of a
 ## refusal. The lines keep the preview's order (the war line, this season's walk and its risks, the arrival, the crossings, the
 ## supply; moves-build-spec.md R47); a line the preview says twice (a risk that is also the supply line) shows once, in its
-## first place and in the stronger tone. It only shows: no buttons, it ignores the mouse and never takes the focus. Ordering is
-## MapArmies' right click and O.
+## first place and in the stronger tone. It only shows: it ignores the mouse and never takes the focus. Ordering is
+## MapArmies' right click and O. While stops are staged (R62) it is pinned by the last stop instead of following the pointer,
+## and a row of two buttons on its top, the only part that takes the mouse, says "March" and "Clear stops" (MapHover gives them
+## to MapArmies).
 class_name MoveCard
 extends PanelContainer
 
+signal march_pressed
+signal clear_pressed
+
+const MARCH_LABEL := "March"
+const CLEAR_LABEL := "Clear stops"
 const CARD_W: float = 300.0
 ## The width the words wrap to: the card less its frame's margins. A label's height is measured at this width, so the card
 ## is as tall as its words and no taller (a label measured at width 0 wraps one letter a line).
@@ -32,6 +39,12 @@ var _open: bool = false
 var _anchor: Vector2 = Vector2.ZERO
 var _bounds: Rect2 = Rect2()
 var _settle_queued: bool = false
+## True while the card is pinned by a staged stop (pin) and not following an anchor (place).
+var _pinned: bool = false
+## The staged march's row of buttons, made on first use.
+var _buttons: HBoxContainer = null
+var _march: KitButton = null
+var _clear: KitButton = null
 
 
 func _ready() -> void:
@@ -52,17 +65,75 @@ func show_move(preview: Dictionary) -> void:
 
 ## Places the card by `anchor` (the pointer, or the order cursor's hex centre), kept inside `bounds` (MapHover's clamp).
 func place(anchor: Vector2, bounds: Rect2) -> void:
+	_pinned = false
 	_anchor = anchor
 	_bounds = bounds
 	_fit()
 	_reposition()
 
 
+## Pins the card by `anchor` (the last staged stop on the screen): its place does not hang on its height, so the buttons stay
+## put while the words change (MapHover.pinned_card_position).
+func pin(anchor: Vector2, bounds: Rect2) -> void:
+	_pinned = true
+	_anchor = anchor
+	_bounds = bounds
+	_fit()
+	_reposition()
+
+
+## Shows or hides the staged march's buttons.
+func set_staged(on: bool) -> void:
+	if on and _buttons == null:
+		_make_buttons()
+	if _buttons != null:
+		_buttons.visible = on
+
+
+func is_staged() -> bool:
+	return _buttons != null and _buttons.visible
+
+
+## The "March" and "Clear stops" buttons (null until a staged march was shown).
+func march_button() -> KitButton:
+	return _march
+
+
+func clear_button() -> KitButton:
+	return _clear
+
+
 func _reposition() -> void:
+	if _pinned:
+		position = MapHover.pinned_card_position(_anchor, _bounds)
+		return
 	position = MapHover.clamp_card_position(_anchor, size, _bounds)
 
 
+func _make_buttons() -> void:
+	_buttons = HBoxContainer.new()
+	_buttons.name = &"Buttons"
+	_buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_march = _button(MARCH_LABEL, &"map_command_key", march_pressed)
+	_clear = _button(CLEAR_LABEL, &"app_back", clear_pressed)
+	var box := _title.get_parent()
+	box.add_child(_buttons)
+	box.move_child(_buttons, 0)
+
+
+func _button(text: String, hotkey: StringName, sends: Signal) -> KitButton:
+	var button := KitButton.new()
+	button.kind = KitButton.Kind.SMALL
+	button.text = text
+	button.hotkey_action = hotkey
+	button.focus_mode = Control.FOCUS_NONE
+	button.pressed.connect(func() -> void: sends.emit())
+	_buttons.add_child(button)
+	return button
+
+
 func hide_card() -> void:
+	set_staged(false)
 	_open = false
 	visible = false
 

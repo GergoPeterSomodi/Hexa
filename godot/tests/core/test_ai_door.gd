@@ -12,6 +12,8 @@ const TOKENS: Array[String] = ["game.state", "game.armies", "game.countries", "g
 ## The walk engines no file of core/ai/ may name (moves-build-spec.md R9).
 const ENGINES: Array[String] = ["WalkNow", "MarchLeg", "MovementPhase"]
 const CALLS := "(?<!AiKnow)\\.(act|check)\\("
+## Multi-leg marches (MV19, R69, D35): the computer never gives stops, so no file of core/ai/ names `via` (the door included).
+const STOPS := "\\bvia\\b"
 
 
 ## The problems of one file's text: [] when it keeps the rule.
@@ -28,6 +30,8 @@ func _problems(text: String, file: String) -> Array[String]:
 	for engine: String in ENGINES:
 		if text.contains(engine):
 			out.append("%s: %s" % [file, engine])
+	if RegEx.create_from_string(STOPS).search(text) != null:
+		out.append("%s: via" % file)
 	return out
 
 
@@ -85,3 +89,11 @@ func test_p_sight_and_discovery_read_outside_the_door_are_reported() -> void:
 func test_p_a_step_module_that_reads_the_armies_is_reported() -> void:
 	var text := FileAccess.get_file_as_string("%s/ai_forces.gd" % ROOT) + "\nvar leak := game.armies\n"
 	assert_eq(_problems(text, "ai_forces.gd"), ["ai_forces.gd: game.armies"] as Array[String])
+
+
+## MV19 (R69): a file of the AI that names the stops of a march is reported, the door too; MarchVia's name alone is no word "via".
+func test_p_via_named_in_any_ai_file_is_reported() -> void:
+	for file: String in ["ai_war.gd", "ai_know.gd", "ai_turn.gd"]:
+		assert_eq(_problems("var args := {'army': 1, 'goal': hex, 'via': [hex]}", file), ["%s: via" % file] as Array[String])
+		assert_eq(_problems("if army.via.is_empty():", file), ["%s: via" % file] as Array[String])
+	assert_eq(_problems("# MarchVia is not named here either", "ai_war.gd"), [] as Array[String])

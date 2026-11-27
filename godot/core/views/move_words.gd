@@ -4,7 +4,10 @@
 ## walked, walked with a standing rest, stored, stopped on sight, a battle, a zone of control, and the other stops (a closed pass,
 ## a way blocked, a shaken army, unmapped land, the border of a country declared war on this season). Fog (R57): only the viewer's own army has words; a country, an army or a place is
 ## named only where the viewer sees it or has discovered it, and the words of a blocked way and of a zone of control are made here
-## from what the viewer sees, never taken from the engine's text. Pure core/views/ code: no nodes, no engine calls, no luck.
+## from what the viewer sees, never taken from the engine's text. A march through stops (MV19, R72) names the stops still ahead
+## (the walk's `via`): "... walks to Cerano (7, 9) on its way to Pavia (10, 9) by Novara (8, 9): 8 of 12 move points left." and
+## "... sets out for Pavia (10, 9) by Novara (8, 9) at the end of next season.", each place named only where the viewer has
+## discovered it. Pure core/views/ code: no nodes, no engine calls, no luck.
 class_name MoveWords
 extends RefCounted
 
@@ -30,7 +33,7 @@ static func of(game: Game, viewer: StringName, army_id: int, walk: Dictionary) -
 		&"points":
 			return _points(game, viewer, a, who, walk)
 		&"mustering", &"no_points":
-			return _plain("%s sets out for %s%s" % [who, _named(game, viewer, a.goal), STORED_TAIL])
+			return _plain("%s sets out for %s%s%s" % [who, _named(game, viewer, a.goal), _by(game, viewer, walk), STORED_TAIL])
 		&"winter":
 			return _winter(game, who, walk)
 		&"sighted":
@@ -76,9 +79,23 @@ static func _named(game: Game, viewer: StringName, hex: Vector2i) -> String:
 ## end of next season."
 static func _points(game: Game, viewer: StringName, a: Army, who: String, walk: Dictionary) -> Dictionary:
 	var head := "%s walks to %s" % [who, Words.place(game, walk.get("to", a.hex))]
+	var by := _by(game, viewer, walk)
+	if by != "" and bool(walk.get("standing", false)) and a.goal != Army.NO_HEX:
+		return _plain("%s on its way to %s%s: %s." % [head, _named(game, viewer, a.goal), by, _left(walk)])
 	if bool(walk.get("standing", false)) and a.goal != Army.NO_HEX:
 		return _plain("%s; it marches on to %s%s" % [head, _named(game, viewer, a.goal), STORED_TAIL])
 	return _plain("%s: %s." % [head, _left(walk)])
+
+
+## " by Vercelli (6, 9), Novara (8, 9)": the stops the march still passes after the walk (R72); "" for none.
+static func _by(game: Game, viewer: StringName, walk: Dictionary) -> String:
+	var stops: Variant = walk.get("via", PackedInt32Array())
+	if not (stops is PackedInt32Array) or (stops as PackedInt32Array).is_empty():
+		return ""
+	var names := PackedStringArray()
+	for i: int in stops as PackedInt32Array:
+		names.append(_named(game, viewer, game.map.hex_of(i)))
+	return " by " + ", ".join(names)
 
 
 ## " of the Duchy of Milan": the country whose land the army's next step enters, declared war on this season (the viewer's own

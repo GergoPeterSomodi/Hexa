@@ -25,7 +25,7 @@ const CONTAINERS: Array[String] = ["stock", "flows_open", "ledger_open", "goods_
 ## declarations and the snapshot's restore, which assign the whole list through Armies.from_dict); the unit and army fields
 ## are written only by the state classes and armies.gd. MV2 (moves-build R12): `points` (Armies.set_points) and `season_from`.
 const ARMY_FIELDS: Array[String] = ["armies", "next_army_id", "next_unit_id", "moved_from", "lost_last", "halt_why",
-		"halt_text", "raised_turn", "created_turn", "points", "season_from"]
+		"halt_text", "raised_turn", "created_turn", "points", "season_from", "via"]
 const ROOTS: Array[String] = ["res://core", "res://shell"]
 ## M6 (4.11, 5.0 R4): the explored bitset has three writers, all in vision.gd (setup, see_path, season); country.gd reads
 ## a save into it.
@@ -338,11 +338,12 @@ func test_the_scan_sees_each_kind_of_army_writer() -> void:
 		"game.armies = []", "g.next_army_id += 1", "game.next_unit_id = 5", "game.armies.append(a)", "a.moved_from = Vector2i(1, 1)",
 		"u.raised_turn = 3", "army.halt_why = &\"blocked\"", "army.lost_last -= 3",
 		"a.points = 12", "army.points -= 4", "Armies.by_id(g, 1).points = 0", "a.season_from = Vector2i(2, 2)",
+		"a.via = PackedInt32Array()", "army.via.append(3)",
 	]
 	for line: String in bad:
 		assert_eq(_writers(line, ARMY_FIELDS).size(), 1, line)
 	var fine: Array[String] = ["var n := g.next_army_id", "if a.raised_turn == turn:", "# a.waiting = &\"winter\"",
-		"var p := a.points", "if a.points == top:", "Armies.set_points(g, a, 3)", "var o := a.season_from"]
+		"var p := a.points", "if a.points == top:", "Armies.set_points(g, a, 3)", "var o := a.season_from", "var s := a.via.size()"]
 	for line: String in fine:
 		assert_eq(_writers(line, ARMY_FIELDS).size(), 0, line)
 

@@ -61,6 +61,7 @@ func setup() -> void:
 	ai_turn = AiTurnUI.new(_app, flow)
 	flow.show_season = _show_season
 	flow.push_report = _push_report
+	flow.push_ask = func(screen: Screen) -> void: _app.stack().push(screen)
 	flow.toast = _flow_toast
 	flow.autosave = _autosave
 	_app.add_child(flow)
