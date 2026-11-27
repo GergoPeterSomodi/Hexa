@@ -73,7 +73,7 @@ func test_hex_card_has_the_armies_and_supply_lines_on_own_land() -> void:
 func test_map_modes_has_the_supply_mode_and_its_legend() -> void:
 	assert_true(MapModes.modes(_g).has(MapModes.Mode.SUPPLY))
 	assert_eq(MapModes.mode_of(&"supply"), MapModes.Mode.SUPPLY)
-	assert_eq(MapModes.MODE_KEYS.size(), 6)
+	assert_eq(MapModes.MODE_KEYS.size(), 7)
 	var rows := MapModes.legend(MapModes.Mode.SUPPLY)
 	assert_eq(rows.size(), 7, "five bands (2 to 6), starving, not your land")
 	assert_eq(rows[0].text, "A depot (a village or larger, a port)")

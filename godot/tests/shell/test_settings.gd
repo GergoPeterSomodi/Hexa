@@ -334,7 +334,7 @@ func test_m2_keys_have_the_spec_defaults_and_choices() -> void:
 	assert_eq(s.get_value("accessibility/country_colours"), "standard")
 	assert_eq(s.choices_for("accessibility/country_colours"), ["standard", "colour_blind"])
 	assert_eq(s.get_value("state/map_mode"), "terrain")
-	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields", "food", "supply"])
+	assert_eq(s.choices_for("state/map_mode"), ["terrain", "owner", "relief", "yields", "food", "supply", "goods"])
 	assert_eq(str(Settings.SCHEMA["state/map_mode"]["page"]), "", "remembered, no row")
 
 

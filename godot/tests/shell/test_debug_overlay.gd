@@ -247,6 +247,7 @@ func test_the_study_line_shows_the_last_page_built_and_the_warm_queue() -> void:
 func test_the_f3_mode_word_names_yields() -> void:
 	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.YIELDS)], "Yields")
 	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.FOOD)], "Food", "F3 names the Food mode, not Yields")
+	assert_eq(DebugOverlay.MODE_WORDS[int(MapModes.Mode.GOODS)], "Goods", "and the seventh, Goods")
 	assert_eq(DebugOverlay.MODE_WORDS.size(), MapModes.MODE_KEYS.size(), "a word for every mode")
 
 

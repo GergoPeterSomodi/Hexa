@@ -310,10 +310,10 @@ func test_events_gain_the_army_signals_of_m6() -> void:
 	var want: Array[String] = ["army_changed", "army_cleared", "army_disbanded", "army_raised", "army_selected", "army_starved",
 		"battle_ended", "battle_fought", "battle_joined", "battle_mark_clicked", "battle_started", "chronicled", "controllers_changed",
 		"country_chosen", "district_captured", "district_declined", "game_ended", "game_started", "goods_short", "hex_changed",
-		"march_halted", "owners_changed", "peace_made", "season_ended", "siege_lifted", "siege_progress", "siege_started",
+		"map_parchment", "march_halted", "owners_changed", "peace_made", "season_ended", "siege_lifted", "siege_progress", "siege_started",
 		"tax_set", "town_grew", "unit_lost", "unit_moved", "war_declared", "work_cancelled", "work_finished", "work_started"]
 	assert_eq(names, want)
-	assert_eq(want.size(), 35, "the M6 list, the eleven war signals of 5.5 and battle_mark_clicked")
+	assert_eq(want.size(), 36, "the M6 list, the eleven war signals of 5.5, battle_mark_clicked and map_parchment")
 
 
 func test_the_save_body_and_the_digest_are_unchanged() -> void:

@@ -4,9 +4,13 @@
 class_name MapModes
 extends RefCounted
 
-enum Mode { TERRAIN, OWNER, RELIEF, YIELDS, FOOD, SUPPLY }  # keys 1 to 6
+enum Mode { TERRAIN, OWNER, RELIEF, YIELDS, FOOD, SUPPLY, GOODS }  # keys 1 to 7
 ## The values of the setting state/map_mode, by Mode.
-const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields", &"food", &"supply"]
+const MODE_KEYS: Array[StringName] = [&"terrain", &"owner", &"relief", &"yields", &"food", &"supply", &"goods"]
+
+## The Goods mode's card title (docs/architecture/map-overview-build-spec.md R7, R20). Its colours and legend rows are the
+## parchment's (ParchmentView, ParchmentTokens), which draws that mode; this file paints nothing in it.
+const GOODS_TITLE := "Goods produced"
 
 ## The Supply mode (docs/architecture/m6-build-spec.md 6.6, SupplyView's bytes): bytes 1 to 6 in SUPPLY_COLOURS, 0 the veil.
 const SUPPLY_ALPHA := 0.70
@@ -312,6 +316,8 @@ static func legend_title(mode: int) -> String:
 			return "Food: made less eaten, a year"
 		Mode.SUPPLY:
 			return SUPPLY_TITLE
+		Mode.GOODS:
+			return GOODS_TITLE
 	return ""
 
 

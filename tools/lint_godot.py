@@ -80,7 +80,7 @@ GODOT3_FORBIDDEN = [
 # UI style rules (Studiolo): ui-style-and-feedback-spec.md section 2, ui-and-controls-spec.md section 3.4.
 THEME_OVERRIDE_ALLOWLIST: set[str] = set()
 UI_STYLE_DIRS = ("shell/ui/", "shell/hud/", "shell/screens/", "shell/panels/", "shell/app/")
-UI_STYLE_ALLOWLIST = {"shell/ui/tokens.gd", "shell/ui/kit_theme.gd"}
+UI_STYLE_ALLOWLIST = {"shell/ui/tokens.gd", "shell/ui/kit_theme.gd", "shell/ui/parchment_tokens.gd"}
 UI_STYLE_FORBIDDEN = [
     (r"\bColor\s*\(", "raw Color( literal in UI script (read Tokens instead)"),
     (r"\bStyleBoxFlat\.new\b", "StyleBoxFlat.new outside shell/ui/kit_theme.gd (use the generated Theme)"),

@@ -193,11 +193,14 @@ func test_yield_band_edges() -> void:
 
 
 func test_mode_keys_and_mode_of() -> void:
-	assert_eq(MapModes.MODE_KEYS, [&"terrain", &"owner", &"relief", &"yields", &"food", &"supply"] as Array[StringName])
+	assert_eq(MapModes.MODE_KEYS,
+		[&"terrain", &"owner", &"relief", &"yields", &"food", &"supply", &"goods"] as Array[StringName])
 	assert_eq(MapModes.mode_of(&"terrain"), MapModes.Mode.TERRAIN)
 	assert_eq(MapModes.mode_of(&"yields"), MapModes.Mode.YIELDS)
 	assert_eq(MapModes.mode_of(&"food"), MapModes.Mode.FOOD)
 	assert_eq(MapModes.mode_of(&"supply"), MapModes.Mode.SUPPLY)
+	assert_eq(MapModes.mode_of(&"goods"), MapModes.Mode.GOODS)
+	assert_eq(int(MapModes.Mode.GOODS), 6, "Goods is the seventh mode (map-overview D5)")
 	assert_eq(MapModes.mode_of(&""), -1)
 
 
@@ -397,6 +400,9 @@ func test_food_legend_and_titles() -> void:
 	assert_eq(MapModes.legend_title(MapModes.Mode.FOOD), "Food: made less eaten, a year")
 	assert_eq(MapModes.legend_title(MapModes.Mode.YIELDS), "Yields: worth a year")
 	assert_eq(MapModes.legend_title(MapModes.Mode.TERRAIN), "")
+	assert_eq(MapModes.legend_title(MapModes.Mode.GOODS), "Goods produced")
+	assert_eq(MapModes.legend(MapModes.Mode.GOODS), [] as Array[Dictionary], "the rows of Goods are ParchmentView's")
+	assert_false(MapModes.modes(EconomyFixture.game(&"GEN")).has(MapModes.Mode.GOODS), "Goods is not offered yet")
 
 
 func test_food_year_of_genoa_and_savona() -> void:

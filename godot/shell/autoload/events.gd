@@ -77,6 +77,9 @@ signal army_selected(army_id: int)
 ## The army selection was cleared on the map (MapArmies.clear_army): the army panel closes. Emitted only when an army was
 ## selected.
 signal army_cleared
+## The parchment map became solid (true: it covers the tiles) or stopped being solid (false), once a change, never every
+## frame (docs/architecture/map-overview-build-spec.md D13): MapHover picks its card by it. The game is unchanged.
+signal map_parchment(solid: bool)
 ## A battle's mark on the map was clicked (WarMarks, M7 6.3): the battle dock opens on that record. `record` is the
 ## BattleRecord id; the map says nothing else.
 signal battle_mark_clicked(record: int)
