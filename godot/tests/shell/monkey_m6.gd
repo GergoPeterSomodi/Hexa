@@ -97,6 +97,16 @@ func _m6_map_armies(app: App) -> MapArmies:
 	return scene.get_node_or_null("MapArmies") as MapArmies
 
 
+## The monkey's app does not pause the tree (its viewport is not the root window), so a live walk would play on under a screen
+## that pauses the game and its end would close the study for the battle's dock (R53). In the game the paused tree stops
+## MoveReplay; the monkey stops it the same way. A season replay already running is left to the replay steps.
+func _m6_pause_like_the_tree(app: App) -> void:
+	app.stack().changed.connect(func() -> void:
+		var replay := app.requests().replay
+		var held := app.wants_pause() and not replay.active()
+		replay.process_mode = Node.PROCESS_MODE_DISABLED if held else Node.PROCESS_MODE_PAUSABLE)
+
+
 ## True while the movement replay runs (the season's moves are played; no order may be given).
 func _m6_replaying(app: App) -> bool:
 	return app.requests().flow.state() == SeasonFlow.State.REPLAY

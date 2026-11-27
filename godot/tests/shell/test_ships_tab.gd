@@ -1,5 +1,6 @@
-## The Ships tab (tile-window spec R23, D5; TW13): shown only on the player's own port settlements, an empty bordered box
-## ("No ships yet" and the later-milestone line), never dimmed. Genoa (own port), Savona (own inland), Asti (foreign),
+## The Navy tab (tile-window spec R23, D5; TW13; the Ships tab until the 540 banner design): shown only on the player's own port
+## settlements, an empty bordered box ("No ships in port" and the age-of-sail line) and under it the placeholders of the navy to
+## come (ship cards with greyed Build buttons, six boxes, each "Example only" on hover), never dimmed. Genoa (own port), Savona (own inland), Asti (foreign),
 ## and a foreign port found by Improve.is_port. Planted fault: the tab shown on a foreign port.
 extends GutTest
 
@@ -91,7 +92,7 @@ func test_never_dimmed() -> void:
 func test_constants() -> void:
 	assert_eq(ShipsScript.ID, &"ships")
 	assert_eq(ShipsScript.ORDER, 40)
-	assert_eq(ShipsScript.LABEL, "Ships")
+	assert_eq(ShipsScript.LABEL, "Navy", "the owner's 540 banner design names the tab Navy")
 
 
 func test_fill_writes_the_empty_box() -> void:
@@ -105,10 +106,20 @@ func test_fill_writes_the_empty_box() -> void:
 		texts.append(label.text)
 	assert_true(texts.has(HEADING), "the bold heading reads No ships in port")
 	assert_true(texts.has(NOTE), "the note says when shipyards come")
-	assert_eq(texts.size(), 2, "one box: a heading and one line, no list")
 	var box := tab.get_node("EmptyBox") as PanelContainer
 	assert_eq(box.theme_type_variation, &"PanelSlot", "the bordered box is the PanelSlot variation")
-	assert_eq(tab.get_child_count(), 1, "one box only")
+	assert_eq(tab.get_child(0), box, "the empty box comes first")
+	for title: String in ["Cog", "Galley", "Carrack"]:
+		assert_true(texts.has(title), "the %s card (a placeholder)" % title)
+		var build := tab.find_child("Ship" + title, true, false).find_child("Build", true, false) as Button
+		assert_true(build.disabled, "its Build is greyed")
+		assert_eq(build.tooltip_text, SoonTag.EXAMPLE_TIP, "and says it is an example")
+	for title: String in ["HARBOUR", "FLEETS NEARBY", "CREWS", "ROUTES", "SHIPYARD", "NAVAL LOG"]:
+		var found := false
+		for label: Label in _labels(tab, []):
+			found = found or (label.text.to_upper() == title and label.uppercase)
+		assert_true(found, "the %s box" % title)
+	assert_gt(tab.find_children("Soon", "SoonTag", true, false).size(), 6, "every placeholder carries its soon tag")
 
 
 func test_fill_twice_leaves_one_box() -> void:
@@ -123,3 +134,4 @@ func test_fill_twice_leaves_one_box() -> void:
 		if child.name == &"EmptyBox":
 			boxes += 1
 	assert_eq(boxes, 1, "a second fill replaces the box, never adds one")
+	assert_eq(tab.get_child_count(), 1, "with no view of an own port, no placeholder: the box alone")

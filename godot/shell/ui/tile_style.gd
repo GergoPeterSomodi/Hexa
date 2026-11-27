@@ -7,9 +7,9 @@ extends RefCounted
 
 ## name -> [ground, border, border widths [l, t, r, b] (or one width), corner radius, content margins [l, t, r, b]].
 const BOXES: Dictionary[String, Array] = {
-	"PanelTileTitle": ["TILE_TITLE", "TILE_WOOD_LINE", [0, 0, 0, 1], 0, [8, 5, 8, 5]],
+	"PanelTileTitle": ["TILE_TITLE", "TILE_WOOD_LINE", [0, 0, 0, 1], 0, [8, 3, 8, 3]],
 	"PanelTileSub": ["TILE_SUB", "TILE_WOOD_LINE", [0, 0, 0, 1], 0, [12, 4, 12, 4]],
-	"PanelTileChips": ["TILE_CHIPS", "", 0, 0, [8, 6, 8, 6]],
+	"PanelTileChips": ["TILE_CHIPS", "", 0, 0, [8, 4, 8, 4]],
 	"PanelTileChip": ["TILE_CHIP", "TILE_CHIP_LINE", 1, 14, [3, 2, 8, 2]],
 	"PanelTileChipIcon": ["TILE_CHIP_DOT", "BRASS", 1, 12, [4, 4, 4, 4]],
 	"PanelTileChipMuted": ["TILE_CHIPS", "TILE_SEP", 1, 14, [3, 2, 8, 2]],
@@ -30,12 +30,15 @@ const BOXES: Dictionary[String, Array] = {
 	"PanelTileCardHead": ["TILE_TITLE", "TILE_WOOD_LINE", [0, 0, 0, 1], 0, [12, 7, 12, 7]],
 	"PanelTileCardBody": ["", "", 0, 0, [12, 6, 12, 0]],
 	"PanelTileIcon": ["TILE_TILE", "TILE_WOOD_LINE", 1, 4, [5, 5, 5, 5]],
-	"PanelTileQueue": ["", "", 0, 0, [8, 2, 8, 8]],
+	"PanelTileQueue": ["", "", 0, 0, [8, 2, 8, 4]],
 	"PanelTileQueueRow": ["TILE_WOOD_DARK", "TILE_WOOD_LINE", 1, 3, [8, 4, 6, 4]],
-	"PanelTileLine": ["", "TILE_LINE", [0, 0, 0, 1], 0, [6, 6, 6, 6]],
-	"PanelTileUnit": ["TILE_WOOD", "TILE_WOOD_LINE", 1, 3, [8, 6, 8, 6]],
+	"PanelTileLine": ["", "TILE_LINE", [0, 0, 0, 1], 0, [6, 3, 6, 3]],
+	"PanelTileUnit": ["TILE_WOOD", "TILE_WOOD_LINE", 1, 3, [8, 4, 8, 4]],
 	"PanelTileNote": ["TILE_INSET", "TILE_SEP", 1, 4, [12, 10, 12, 10]],
 	"PanelTileSiege": ["TILE_SIEGE", "TILE_SIEGE_LINE", 1, 3, [10, 8, 10, 8]],
+	# The 540 banner design (2026-11-26): the dark inset box of a tab (TileBoxes.box) and its key and value lines.
+	"PanelTileBox": ["TILE_INSET", "TILE_WOOD_LINE", 1, 3, [9, 4, 9, 5]],
+	"PanelTileBoxLine": ["", "TILE_LINE", [0, 0, 0, 1], 0, [0, 1, 0, 1]],
 }
 
 ## name -> {size, font: [normal, hover, pressed, disabled] tokens, and a BOXES-style box for each state}. ButtonTileTab is the

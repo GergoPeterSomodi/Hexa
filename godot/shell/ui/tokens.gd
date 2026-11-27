@@ -150,10 +150,10 @@ const BUTTON_MENU_H := 42
 const MEDAL := 64
 const MEDAL_SM := 30
 const PANEL_W := 296
-## The tile window's width and tallest height (issue 436, mockup v4: about a third of a 1280 x 720 screen); a shorter viewport
-## shrinks the height to the room below its top (1024 x 600: 528). One size for every case and tab.
-const TILE_WINDOW_W := 440
-const TILE_WINDOW_H := 640
+## The tile window's width and the height of its banner picture (the owner's 540 banner design of 2026-11-26). The window is as
+## tall as the room from its top (under the top bar) to the foot of the screen, the same for every case and tab.
+const TILE_WINDOW_W := 540
+const TILE_BANNER_H := 80
 const TARGET_MIN := 24
 const MENU_COLUMN_X := 270
 

@@ -5,6 +5,10 @@
 ##   the model gives arms (absent until M9.5), one compact CompanyRow per kind, and "Show all", which asks the App for the
 ##   Raise companies window. A refusal every row shares word for word (the season's cap: "Genoa (8, 13) has raised its 3
 ##   companies this season") is said once, under the head line, and the rows keep their own small line (issue 436).
+## The 540 banner design (2026-11-26): on your own land, under the raise rows, two pairs of placeholder boxes (TileBoxes): Garrison
+## and Muster log, Orders and Supply lines. Their rows are examples (muted, "soon"), except where the game already knows the value:
+## the walls and the men of the garrison (the view's Fortress row) and the move points of your army here (TileArmy). The window's
+## fit hides them first (Orders and Supply lines before the others); the armies and the raise rows never hide.
 ## The tab changes the game only through Session.act (the hammer: the old raise list's rule and toasts, unchanged) and
 ## requests the App for the rest (app_requested). The company hover card is CompanyCard.of, given through row_hovered.
 ## Only the open tab exists and the window rebuilds it on each refresh, so fill builds everything once.
@@ -18,6 +22,10 @@ const FIGURE_ARMY := &"army"
 const SELECT_TEXT := "Select"
 const HEAD := &"TileHead"
 const LAND_NOT := [&"sea", &"unexplored", &"sandbox"]
+const LAND_FACTS := preload("res://shell/panels/tile_tabs/land_facts.gd")
+## The example rows of the placeholder boxes (key, value).
+const MUSTER_ROWS: Array = [["Last season", "Pikemen raised"], ["A year ago", "Levy of 500"], ["Two years ago", "none"]]
+const SUPPLY_ROWS: Array = [["Depot", "this town"], ["Reach", "3 hexes"], ["Foraging", "poor in winter"], ["Stores", "4 seasons"]]
 
 var _game: Game = null
 var _viewer: StringName = &""
@@ -40,7 +48,7 @@ static func dimmed(view: Dictionary) -> String:
 	return str(army.get("reason", ""))
 
 
-func fill(game: Game, viewer: StringName, hex: Vector2i, _view: Dictionary) -> void:
+func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> void:
 	_game = game
 	_viewer = viewer
 	_hex = hex
@@ -51,6 +59,40 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, _view: Dictionary) -> v
 		_build_raise(raise)
 	if _show_all != null:
 		_show_all.theme_type_variation = &"ButtonTileSmall"  # after its _ready, which sets the kind's variation
+	if TileBoxes.allowed(view):
+		_placeholders(game, view, data.get("armies", []))
+
+
+## The placeholder pairs of your own land (see the module comment): real rows where the game knows the value.
+func _placeholders(game: Game, view: Dictionary, armies: Array) -> void:
+	var garrison := garrison_of(game, view)
+	var walls: Array = ["Walls", "none", true] if garrison.is_empty() else ["Walls", garrison[0], false]
+	var men: Array = ["Men", "none", true] if garrison.is_empty() else ["Men", garrison[1], false]
+	var garrison_box := TileBoxes.box("Garrison", [walls, men, ["Captain", "none", true]], true)
+	var points := ""
+	for row: Dictionary in armies:
+		if bool(row.get("own", false)) and str(row.get("points_text", "")) != "":
+			points = str(row["points_text"])
+			break
+	var orders := TileBoxes.box("Orders", [["Standing order", "Hold", true], ["Destination", "none", true],
+		["Move points", points, false] if points != "" else ["Move points", "-", true], ["Stance", "Attack", true]], true)
+	add_child(TileBoxes.pair(garrison_box, TileBoxes.box("Muster log", MUSTER_ROWS, true), TileBoxes.RANK_PAIR_LOW))
+	add_child(TileBoxes.pair(orders, TileBoxes.box("Supply lines", SUPPLY_ROWS, true), TileBoxes.RANK_PAIR_HIGH))
+
+
+## The garrison as the view's Fortress row tells it: [walls, men] ("Town walls", "800 of 800"), or [] with no fortress here.
+static func garrison_of(game: Game, view: Dictionary) -> Array:
+	for raw: Variant in (view.get("land", {}) as Dictionary).get("war_rows", []) as Array:
+		var cells := raw as Array
+		if str(cells[0]) != LAND_FACTS.FORTRESS_ROW:
+			continue
+		var per := game.defs.war.garrison_per_level if game != null and game.defs != null and game.defs.war != null else 0
+		var words := LAND_FACTS.fortress_words(str(cells[2]), per)
+		var at := words.find(", garrison ")
+		if at < 0:
+			return [words, "-"]
+		return [words.substr(0, at), words.substr(at + 11)]
+	return []
 
 
 ## The rows of the armies here, for the tests: each army's row node (its open arrow sits on it, own armies only).
@@ -94,7 +136,7 @@ static func raised_text(game: Game, kind: int, hex: Vector2i) -> String:
 
 
 func _build_armies(rows: Array) -> void:
-	add_theme_constant_override(&"separation", Tokens.S1 + 1)
+	add_theme_constant_override(&"separation", Tokens.S1)  # the 540 banner design: a short window keeps its raise rows
 	add_child(_head("Armies here", false))
 	if rows.is_empty():
 		add_child(PanelKit.label("No armies here", &"TileHint"))
@@ -136,7 +178,9 @@ func _army_row(row: Dictionary) -> Control:
 	var small := PanelKit.label(" · ".join(parts), &"TileHint")
 	card.tooltip_text = "%s: %s%s" % [title, small.text, "" if own else "
 Not yours: seen, not commanded."]
-	small.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# One line (the 540 banner design: a short window keeps its raise rows); the whole line is the card's tooltip.
+	small.clip_text = true
+	small.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	text.add_child(small)
 	line.add_child(text)
 	if own:
@@ -166,7 +210,14 @@ func _on_open_pressed(army_id: int) -> void:
 ## The raise block of an own settlement: the head, the counts on their own muted line under it (M4: green is for gains only), the
 ## shared refusal said once with a stop sign, the arms banner (only when the model has arms), one compact row a kind and Show all.
 func _build_raise(raise: Dictionary) -> void:
-	add_child(_head("Raise a company here", true))
+	# The 540 banner design: Show all stands at the right of the head line, so the rows keep their room in a short window.
+	var head_line := HBoxContainer.new()
+	head_line.name = &"RaiseHead"
+	head_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var title := _head("Raise a company here", true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_line.add_child(title)
+	add_child(head_line)
 	var head := PanelKit.label(str(raise.get("head", "")), &"TileHint")
 	head.name = &"RaiseCounts"
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -194,10 +245,11 @@ func _build_raise(raise: Dictionary) -> void:
 	_show_all.kind = KitButton.Kind.SMALL
 	_show_all.text = "Show all"
 	_show_all.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_show_all.size_flags_vertical = Control.SIZE_SHRINK_END
 	_show_all.focus_mode = Control.FOCUS_ALL
 	_show_all.mouse_filter = Control.MOUSE_FILTER_STOP
 	_show_all.pressed.connect(_on_show_all_pressed)
-	add_child(_show_all)
+	head_line.add_child(_show_all)
 
 
 ## The shared refusal's words (M4): the season's cap reads "All 3 companies raised this season" (the town and the hex are the

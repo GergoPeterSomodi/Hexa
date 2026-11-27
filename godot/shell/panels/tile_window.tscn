@@ -7,7 +7,7 @@
 [ext_resource type="Script" path="res://shell/panels/tile_header.gd" id="5_header"]
 
 [node name="TileWindow" type="PanelContainer"]
-custom_minimum_size = Vector2(440, 640)
+custom_minimum_size = Vector2(540, 0)
 size_flags_vertical = 0
 mouse_filter = 0
 theme_type_variation = &"PanelTileFrame"
@@ -91,8 +91,6 @@ custom_minimum_size = Vector2(24, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_type_variation = &"TileSub"
-clip_text = true
-text_overrun_behavior = 3
 
 [node name="Place" type="Button" parent="Content/Frame/Header/SubBand/SubRow"]
 unique_name_in_owner = true
@@ -104,9 +102,11 @@ theme_type_variation = &"ButtonTileLink"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="HexCell" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
+[node name="Food" type="Label" parent="Content/Frame/Header/SubBand/SubRow"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 0)
 layout_mode = 2
+size_flags_horizontal = 3
 theme_type_variation = &"TileSub"
 horizontal_alignment = 2
 
@@ -125,14 +125,14 @@ script = ExtResource("3_strip")
 [node name="Postcard" type="MarginContainer" parent="Content/Frame/Header"]
 unique_name_in_owner = true
 clip_contents = true
-custom_minimum_size = Vector2(0, 150)
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="Picture" type="Control" parent="Content/Frame/Header/Postcard"]
 unique_name_in_owner = true
 clip_contents = true
-custom_minimum_size = Vector2(0, 150)
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("2_picture")
@@ -165,6 +165,7 @@ layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 1
 horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
 
 [node name="BodyPad" type="MarginContainer" parent="Content/Frame/Scroll"]
 unique_name_in_owner = true

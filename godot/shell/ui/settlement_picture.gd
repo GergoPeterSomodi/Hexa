@@ -6,8 +6,11 @@
 ## at scale 2. Flat two-tone faces (lit left, shaded right), ink outlines, and colours only from `Tokens`. The box is scaled by
 ## the Control's WIDTH, the same on both axes, and stands on the Control's foot: the whole scene shows, and the room above it is
 ## the sky (issue 436 round 3: the tile window's 434 x 150 picture is the 296 x 72 scene at about 1.5 times, with sky over it;
-## a Control too short for that falls back to the height, centred). Three more kinds have no settlement: LAND (the bare land),
-## SEA (open water) and FOG (a hatched terra incognita on a never discovered hex, stretched to the whole Control).
+## a Control too short for that falls back to the height, centred). In a short wide banner (the owner's 540 banner design of
+## 2026-11-26: 80 tall) the whole town shows at the height's scale and its backdrop (the sky, the far hills and the ground) is
+## stretched to the Control's width under it, so the land runs on to both edges; a harbour's water runs on to the right edge.
+## Three more kinds have no settlement: LAND (the bare land), SEA (open water) and FOG (a hatched terra incognita on a never
+## discovered hex); they are landscapes, stretched to the whole Control.
 class_name SettlementPicture
 extends Control
 
@@ -26,6 +29,9 @@ const LAND := &"land"
 const SEA := &"sea"
 const FOG := &"fog"
 const PENNANT_PARTS: Array[StringName] = [&"tower", &"keep", &"spire", &"roof"]
+## The parts of the backdrop, stretched to the Control's width (drawn first); the foot fade, stretched last.
+const BACKDROP_PARTS: Array[StringName] = [&"sky", &"hill", &"ground"]
+const FADE_PART := &"fade"
 const SNOW_PARTS: Array[StringName] = [&"roof", &"spire"]
 const TOKEN_NAMES: Array[StringName] = [
 	&"OWNER", &"INK", &"SHADE",
@@ -133,6 +139,7 @@ static func token_colour(token: StringName, owner_colour: Color) -> Color:
 
 ## The picture to show; `show_picture` builds the recipe once and redraws.
 var _recipe: Array[Dictionary] = []
+var _landscape := false
 
 
 func _init() -> void:
@@ -144,6 +151,7 @@ func _init() -> void:
 ## level (watchtower, castle, fortress); `harbour` 0 to 3 adds the port; `snow` puts snow on the roofs.
 func show_picture(kind: StringName, level: int, harbour: int, snow: bool, owner_colour: Color) -> void:
 	_recipe = recipe(kind, level, harbour, snow, owner_colour)
+	_landscape = kind == LAND or kind == SEA or kind == FOG
 	queue_redraw()
 
 
@@ -156,18 +164,37 @@ func _draw() -> void:
 	if _recipe.is_empty():
 		return
 	var k := scene_scale(size)
-	if _recipe[0]["part"] == &"parchment":
-		k = size / LOGICAL_SIZE  # terra incognita fills the whole Control
 	var origin := Vector2((size.x - LOGICAL_SIZE.x * k.x) * 0.5, size.y - LOGICAL_SIZE.y * k.y)
-	# The sky over the scene, and the bands at its sides where the Control is wider than the scene.
-	if origin.y > 0.0 or origin.x > 0.0:
-		draw_rect(Rect2(0.0, 0.0, size.x, origin.y + 1.0), _recipe[0]["colour"] as Color)
-		if origin.x > 0.0:
-			draw_rect(Rect2(0.0, origin.y, size.x, size.y - origin.y), Tokens.PIC_GROUND)
-	draw_set_transform(origin)
+	# The backdrop stretched to the whole width (the landscape of a bare kind: all of it), the sky above it.
+	var wide := Vector2(size.x / LOGICAL_SIZE.x, k.y)
+	if _landscape:
+		wide = size / LOGICAL_SIZE if _recipe[0]["part"] == &"parchment" else Vector2(size.x / LOGICAL_SIZE.x, k.y)
+	var low := Vector2(0.0, size.y - LOGICAL_SIZE.y * wide.y)
+	if low.y > 0.0:
+		draw_rect(Rect2(0.0, 0.0, size.x, low.y + 1.0), _recipe[0]["colour"] as Color)
+	draw_set_transform(low)
 	for shape: Dictionary in _recipe:
-		_paint(shape, k)
+		if _landscape or BACKDROP_PARTS.has(shape["part"]):
+			_paint(shape, wide)
 	draw_set_transform(Vector2.ZERO)
+	if not _landscape:
+		draw_set_transform(origin)
+		var water_right := -1.0
+		for shape: Dictionary in _recipe:
+			if not BACKDROP_PARTS.has(shape["part"]) and shape["part"] != FADE_PART:
+				_paint(shape, k)
+				if shape["part"] == &"water":
+					water_right = LOGICAL_SIZE.x * k.x
+		draw_set_transform(Vector2.ZERO)
+		if water_right > 0.0 and origin.x + water_right < size.x:
+			# The harbour's water runs on to the right edge (its foot band, under the boats).
+			var top := origin.y + 66.0 * k.y
+			draw_rect(Rect2(origin.x + water_right - 1.0, top, size.x - origin.x - water_right + 1.0, size.y - top), Tokens.PIC_WATER)
+		draw_set_transform(low)
+		for shape: Dictionary in _recipe:
+			if shape["part"] == FADE_PART:
+				_paint(shape, wide)
+		draw_set_transform(Vector2.ZERO)
 
 
 ## The scale of the 296 x 72 scene in a Control of `area`: by the width, unless the scene would then be taller than the Control

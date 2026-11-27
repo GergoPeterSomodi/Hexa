@@ -436,7 +436,7 @@ func _window_inside(size: Vector2i, ui_scale: float) -> bool:
 	for i: int in 4:
 		await get_tree().process_frame
 	var bottom := win.position.y + win.size.y
-	return bottom <= float(size.y) - float(Tokens.S2) + 0.5
+	return bottom <= float(size.y) + 0.5
 
 
 func _long_tabs() -> Array[GDScript]:
@@ -461,7 +461,7 @@ func _real_window(high_contrast: bool) -> TileWindow:
 	var win := (load(WINDOW) as PackedScene).instantiate() as TileWindow
 	sub.add_child(win)
 	win.theme = KitTheme.load_for(1.0, &"auto", high_contrast)
-	win.position = Vector2(984.0, 64.0)
+	win.position = Vector2(float(1280 - Tokens.TILE_WINDOW_W), 64.0)
 	return win
 
 
@@ -492,12 +492,12 @@ func test_the_window_is_one_size_for_every_case_and_tab() -> void:
 			sizes["%s %s" % [hex, id]] = win.size
 	assert_gt(sizes.size(), 4, "several cases and tabs were shown")
 	for key: String in sizes:
-		assert_eq(sizes[key], Vector2(Tokens.TILE_WINDOW_W, Tokens.TILE_WINDOW_H), "the window's size on %s" % key)
+		assert_eq(sizes[key], Vector2(Tokens.TILE_WINDOW_W, 720.0 - 64.0), "the window's size on %s: full height" % key)
 
 
 ## Issue 436 (mockup v4): at UI scale 1.0, 1.25 and 1.5 (the App's content scale: a 1920 x 1080 window seen as 1920 x 1080,
 ## 1536 x 864 and 1280 x 720 logical pixels, its kit theme for that scale), the window is the same size on every case and tab,
-## TILE_WINDOW_W wide, as tall as the room under a 64 px top bar allows up to TILE_WINDOW_H, and inside the viewport.
+## TILE_WINDOW_W wide, as tall as the room under a 64 px top bar (the 540 banner design: full height), and inside the viewport.
 func test_the_window_is_one_size_for_every_case_and_tab_at_each_ui_scale() -> void:
 	var physical := Vector2i(1920, 1080)
 	for ui_scale: float in [1.0, 1.25, 1.5]:
@@ -526,7 +526,7 @@ func test_the_window_is_one_size_for_every_case_and_tab_at_each_ui_scale() -> vo
 				for i: int in 3:
 					await get_tree().process_frame
 				sizes["%s %s" % [hex, id]] = win.size
-		var want := Vector2(Tokens.TILE_WINDOW_W, minf(float(Tokens.TILE_WINDOW_H), float(logical.y) - 64.0 - float(Tokens.S2)))
+		var want := Vector2(Tokens.TILE_WINDOW_W, float(logical.y) - 64.0)
 		assert_gt(sizes.size(), 4, "several cases and tabs were shown at scale %s" % ui_scale)
 		for key: String in sizes:
 			assert_eq(sizes[key], want, "the window's size on %s at scale %s" % [key, ui_scale])

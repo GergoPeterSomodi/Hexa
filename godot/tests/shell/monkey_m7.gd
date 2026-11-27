@@ -515,6 +515,10 @@ func _m7_badge(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	var mark := shown[rng.randi_range(0, shown.size() - 1)]
 	var hex := mark.hex
+	var newest := mark.record  # two battles of one hex share the spot: a click there opens the newest (WarMarks.click_hex)
+	for other: WarMark in shown:
+		if other.kind == WarMark.KIND_BATTLE and other.hex == hex:
+			newest = maxi(newest, other.record)
 	app.map_scene().frame_at(app.map_scene().view().centre_of(hex), 1.0)
 	await _wait_frames(3)
 	var pos := mark.get_global_transform_with_canvas().origin
@@ -527,7 +531,7 @@ func _m7_badge(rng: Rng, vp: SubViewport, app: App) -> void:
 	var dock := app.requests().war.dock()
 	if dock != null:
 		if mark.kind == WarMark.KIND_BATTLE:
-			assert_eq(dock.shown_record(), mark.record, "%s: a badge opens its battle" % _tag)
+			assert_eq(dock.shown_record(), newest, "%s: a badge opens its hex's newest battle" % _tag)
 		await _m7_close_dock(vp, app)
 		_bump("m7_checks")
 

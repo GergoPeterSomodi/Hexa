@@ -1,17 +1,20 @@
 ## The tile window (tile-window spec R11 to R17, R32 its part, R33, R34; build plan TW9): the dock panel of one tile that
-## replaced the old hex panel in the swap (TW16), behind the same HexPanelContract. Its parts, top to bottom, as the owner's mockup
-## v4 draws them: the header (TileHeader: the title bar, the sub line, the chips, the wide picture with its emblem and badges), the
-## tab strip (a dimmed tab shows a lock), the open tab's body (a fade under its last visible row while more lies below, L1), and
+## replaced the old hex panel in the swap (TW16), behind the same HexPanelContract. Its parts, top to bottom, as the owner's 540
+## banner design of 2026-11-26 draws them: the header (TileHeader: the title bar with the emblem, the sub line, the chips, the short
+## banner picture with its badges), the flat tab strip Town / Army / Navy (a dimmed tab shows a lock), the open tab's body, and
 ## the queue at the foot (issue 436 round 3, H2: on your own land and the sandbox always there, "No work under way" when idle;
 ## JobLine: the work under way, Cancel on your own; not shown on foreign land, at sea or on a never discovered hex). Only the open
 ## tab has children: the tabs are scripts of shell/panels/tile_tabs/ found by TileTabs, and a switch frees the old one (R17). On the
 ## Town tab, the reasons of the dimmed tabs are written before the facts (mockup v4, tab 5; on foreign land at the top, L6).
 ##
-## One size for every tile and tab (issue 436): Tokens.TILE_WINDOW_W wide and, at most, Tokens.TILE_WINDOW_H tall (440 x 640 at
-## 1280 x 720); a shorter viewport shrinks it to the room below its top (R33), the same for every tile and tab, so the window never
-## jumps when another tile or tab is picked. The header, the tab strip and the queue are pinned; only the tab body scrolls. The
-## frame is the kit's gold panel_frame; the parts are TileStyle's flat boxes and the Tile* type variations. The parts are found by
-## their unique names (%Title, %Strip, %TabBody...).
+## One size for every tile and tab: Tokens.TILE_WINDOW_W wide and as tall as the room from its top (under the top bar) to the
+## foot of the screen (the owner's decision: full height, no fixed 640, the UI not scaled up), so the window never jumps when
+## another tile or tab is picked. The header, the tab strip and the queue are pinned. No scrollbar (the owner's rule): the tab body
+## fits the room, and when it is short the boxes and sections a tab ranked (TileBoxes.rank) hide, the highest rank first (the
+## placeholders, then the real facts; never the strips, the siege block or the raise rows: TileBoxes.fit). Only when what is left
+## still does not fit does the body scroll (a fallback; the fade under its last visible row, L1, shows then). The frame is the
+## kit's gold panel_frame; the parts are TileStyle's flat boxes and the Tile* type variations. The parts are found by their unique
+## names (%Title, %Strip, %TabBody...).
 ##
 ## Which tab opens (R16, D7): the last tab the player picked when it is live on the tile, else Buildings if live, else Land.
 ## A refresh where the open tab turns dimmed or gone falls back the same way, with no toast. A dimmed tab is drawn dimmed with
@@ -42,8 +45,8 @@ const TAB_ARMY := &"army"
 ## ids stay in the list for windows given other tabs (the tests' stubs): Buildings first, then Land.
 const FALLBACK_ORDER: Array[StringName] = [&"town", &"buildings", &"land"]
 ## The tab strip's height and the tab body's inner margins (left, top, right, bottom), in logical pixels.
-const TAB_H := 36.0
-const BODY_PAD: Array[int] = [8, 8, 8, 6]
+const TAB_H := 34.0
+const BODY_PAD: Array[int] = [8, 6, 8, 4]
 ## The fade under the tab body's last visible row (L1), in logical pixels.
 const FADE_H := 14.0
 ## The queue's words (H2): its note while a work is under way, and the idle line.
@@ -87,11 +90,14 @@ var _tab_buttons: Dictionary = {}
 var _retired: Array[Node] = []
 var _queued := false
 var _fit_queued := false
+var _body_fit_queued := false
+## Ranked parts the last body fit hid (tests and tools).
+var _fit_hidden := 0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	custom_minimum_size = Vector2(float(Tokens.TILE_WINDOW_W), float(Tokens.TILE_WINDOW_H))
+	custom_minimum_size = Vector2(float(Tokens.TILE_WINDOW_W), 0.0)
 	visible = false
 	_header.retired = _retired
 	_header.owner_pressed.connect(_on_owner_pressed)
@@ -115,7 +121,12 @@ func _ready() -> void:
 	bar.value_changed.connect(func(_v: float) -> void: _place_fade())
 	bar.changed.connect(_place_fade)
 	_scroll.resized.connect(_place_fade)
+	_scroll.resized.connect(_queue_body_fit)
 	visibility_changed.connect(_fit_later)
+	item_rect_changed.connect(_fit_later)
+	# The top bar grew or shrank: only the window's parents move (item_rect_changed does not fire), so the window watches its
+	# place on the screen and keeps reaching the foot of it (_notification).
+	set_notify_transform(true)
 	get_viewport().size_changed.connect(_fit_later)
 	for pair: Array in _wiring():
 		var sig: Signal = pair[0]
@@ -462,6 +473,7 @@ func _open_tab() -> void:
 		if _open == TAB_TOWN:
 			_closed_note(tab)
 		_place_fade.call_deferred()
+		_queue_body_fit()
 	elif _shown != NO_HEX and StringName(str(_view.get("case", ""))) == &"unexplored":
 		_tab_body.add_child(_note(FOG_NOTE[0], [FOG_NOTE[1]]))
 	_sync_buttons()
@@ -652,8 +664,12 @@ func _draw_fade() -> void:
 # --- fit ---------------------------------------------------------------------------------------------------------------
 
 
-## The window is one size (TILE_WINDOW_W x TILE_WINDOW_H) and the tab body scrolls inside it; only a viewport too short for that
-## height shrinks it to the room below its top edge less S2 (R33).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and is_node_ready():
+		_fit_later()
+
+
+## The window is TILE_WINDOW_W wide and as tall as the room from its top edge to the foot of the viewport.
 func _fit_later() -> void:
 	if not _fit_queued:
 		_fit_queued = true
@@ -665,8 +681,44 @@ func _fit() -> void:
 	if not is_inside_tree():
 		return
 	var top := global_position.y if visible else float(Tokens.BAR_H)
-	var room := maxf(0.0, get_viewport_rect().size.y - top - float(Tokens.S2))
-	var want := minf(float(Tokens.TILE_WINDOW_H), room)
+	var want := maxf(0.0, get_viewport_rect().size.y - top)
 	if not is_equal_approx(custom_minimum_size.y, want):
 		custom_minimum_size.y = want
 		size.y = want
+
+
+## Fits the open tab's body to its room at the start of the next frame (after the layout of this one).
+func _queue_body_fit() -> void:
+	if _body_fit_queued or not is_inside_tree():
+		return
+	_body_fit_queued = true
+	get_tree().process_frame.connect(_fit_body, CONNECT_ONE_SHOT)
+
+
+func _fit_body() -> void:
+	_body_fit_queued = false
+	fit_now()
+
+
+## Fits the tab body to the room now (TileBoxes.fit): the ranked parts hide, highest first, until the body fits; the body
+## scrolls only when it still does not (tests and tools call it after a layout; the window calls it a frame after a change).
+func fit_now() -> void:
+	if _shown == NO_HEX or not is_inside_tree():
+		return
+	var room := _scroll.size.y
+	_fit_hidden = TileBoxes.fit(_tab_body, _body_pad, room)
+	var over := _body_pad.get_combined_minimum_size().y > room + 0.5
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO if over else ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	if not over:
+		_scroll.scroll_vertical = 0
+	_place_fade.call_deferred()
+
+
+## The ranked parts the last fit hid (tests and tools).
+func fit_hidden() -> int:
+	return _fit_hidden
+
+
+## Whether the body's scrollbar shows (the fallback when the real content alone does not fit).
+func scrollbar_shown() -> bool:
+	return _scroll.get_v_scroll_bar().visible and _scroll.get_v_scroll_bar().is_visible_in_tree()

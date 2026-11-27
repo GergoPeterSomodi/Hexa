@@ -443,13 +443,23 @@ class TestTownTab:
 					"never dimmed on %s" % case_id)
 		assert_false(TownTab.applies({"case": "unexplored"}), "not on an undiscovered hex")
 
-	func test_own_land_has_the_strips_on_top_and_the_facts_under_them() -> void:
+	## The 540 banner design (2026-11-26): the facts in two columns on top, the strips under them, then the placeholder pairs.
+	func test_own_land_has_the_facts_on_top_the_strips_and_the_placeholder_pairs_under_them() -> void:
 		var hex := _hex_where(func(v: Dictionary) -> bool: return str(v.get("case", "")) == "own" and TownTab.buildable(v))
 		assert_ne(hex, HexPanelContract.NO_HEX, "Genoa has land to build on")
 		var tab := _town_on(hex)
 		assert_not_null(tab.strips(), "the strips show where building is offered")
-		assert_not_null(tab.facts(), "the facts show under them")
-		assert_lt(tab.strips().get_index(), tab.facts().get_index(), "strips first, then the facts")
+		assert_not_null(tab.facts(), "the facts show above them")
+		assert_lt(tab.facts().get_index(), tab.strips().get_index(), "facts first, then the strips")
+		assert_not_null(tab.facts().find_child("Columns", false, false), "the facts stand in two columns")
+		var pairs := tab.find_children("Pair*", "HBoxContainer", false, false)
+		assert_eq(pairs.size(), 2, "two placeholder pairs: People and Needed a year, Trade and Happenings")
+		for pair: Node in pairs:
+			assert_gt(pair.get_index(), tab.strips().get_index(), "under the strips")
+			assert_gt(int(pair.get_meta(TileBoxes.RANK)), TileBoxes.RANK_FACT_EXAMPLE, "a pair hides before any facts row")
+			for box: Node in pair.get_children():
+				assert_eq((box as Control).tooltip_text, SoonTag.EXAMPLE_TIP, "%s says it is an example" % box.name)
+		assert_false(tab.strips().has_meta(TileBoxes.RANK), "the strips never hide")
 		assert_false(tab.row_nodes().is_empty(), "the tab answers the strips' tiles")
 		tab.finish_now()
 		assert_true(tab.is_done(), "finish_now fills the strips' gains through the tab")
@@ -463,6 +473,8 @@ class TestTownTab:
 		var tab := _town_on(hex)
 		assert_null(tab.strips(), "no strips where nothing can be built")
 		assert_not_null(tab.facts(), "the exact facts")
+		assert_eq(tab.find_children("Soon", "SoonTag", true, false).size(), 0, "no placeholder on foreign land")
+		assert_eq(tab.find_children("Pair*", "HBoxContainer", false, false).size(), 0, "no placeholder boxes on foreign land")
 		assert_true(tab.row_nodes().is_empty(), "no tiles")
 		assert_true(tab.is_done(), "nothing to fill")
 

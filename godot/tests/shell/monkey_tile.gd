@@ -114,6 +114,8 @@ func _tile_step(rng: Rng, vp: SubViewport, app: App) -> void:
 		return
 	_bump("tile_opens")
 	_tile_assert(app, vp, "the window opened")
+	if app.stack().count() != 0:  # the click on the hex ended a live walk that fought: its dock is up and the tab keys are the screen's (R32)
+		return
 	var roll := rng.randi_range(0, 9)
 	if roll < 4:
 		await _tile_tab_click(rng, vp, app)

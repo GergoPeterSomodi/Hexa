@@ -61,7 +61,7 @@ func test_strips_wrap_their_tiles_and_grow_while_the_window_keeps_its_size() -> 
 	var win := (load(WINDOW) as PackedScene).instantiate() as TileWindow
 	sub.add_child(win)
 	win.theme = KitTheme.load_for(1.0)
-	win.position = Vector2(840.0, 64.0)
+	win.position = Vector2(740.0, 64.0)
 	var stub := GDScript.new()
 	stub.source_code = STUB
 	assert_eq(stub.reload(), OK, "the fixture tab parses")
@@ -79,9 +79,9 @@ func test_strips_wrap_their_tiles_and_grow_while_the_window_keeps_its_size() -> 
 	var tab := win.tab_node()
 	var scroll := win.get_node("%Scroll") as ScrollContainer
 	var body := win.get_node("%TabBody") as Control
-	assert_eq(win.size, Vector2(Tokens.TILE_WINDOW_W, Tokens.TILE_WINDOW_H), "the window keeps its one size")
+	assert_eq(win.size, Vector2(Tokens.TILE_WINDOW_W, 720.0 - 64.0), "the window keeps its one size: full height under the bar")
 	assert_lte(body.size.x, scroll.size.x + 0.5, "no horizontal overflow: the body is no wider than the scroll area")
-	assert_gt(scroll.get_v_scroll_bar().max_value, scroll.size.y, "the body's scroll range grows past the window")
+	assert_gt((tab as Control).size.y, 3.0 * 60.0, "the strips grow taller as their tiles wrap (three strips, more rows)")
 	var tiles := tab.find_children("*", "BuildingRow", true, false)
 	assert_eq(tiles.size(), 26, "every fixture tile is laid out")
 	var rows_seen := {}

@@ -1,10 +1,13 @@
 ## The Town tab of the tile window (issue 436, the owner's decision of 2026-11-25: Land and Buildings are one tab, as EU5's
-## Infrastructure tab). Top to bottom: the siege block when the tile is besieged (the owner's decision: a siege is a state of the
-## tile, so it sits here and not on the Army tab; SiegeView.at for the viewer: the besieger and men where the viewer may know
-## them, the meter, the forecast, Show siege), the building strips (building_strips.gd: one wooden strip per group with its icon tiles,
-## on land the viewer may build on: own land and the sandbox), then the land facts (land_facts.gd: people and food, made here a
-## year, the buildings of foreign land, ground and defence, armies out of sight, the Show buttons). Foreign and unowned land has
-## no strips (nothing to build there): the facts alone. The work under way is the window's queue at its foot.
+## Infrastructure tab). Top to bottom, as the owner's 540 banner design of 2026-11-26 draws it: the siege block when the tile is
+## besieged (the owner's decision: a siege is a state of the tile, so it sits here and not on the Army tab; SiegeView.at for the
+## viewer: the besieger and men where the viewer may know them, the meter, the forecast, Show siege), the land facts in two
+## columns (land_facts.gd: people and food, made here a year, the buildings of foreign land, ground and defence, armies out of
+## sight), the building strips (building_strips.gd: one wooden strip per group with its icon tiles, on land the viewer may build
+## on: own land and the sandbox), then on your own land two pairs of placeholder boxes (TileBoxes): People (the classes as bars)
+## and Needed a year, Trade and Happenings. Foreign and unowned land has no strips and no placeholders: the facts alone. The work
+## under way is the window's queue at its foot. The window's fit hides the placeholder pairs first, then the facts' sections;
+## never the strips or the siege block.
 ##
 ## The parts keep their own rules and tests (each is a TileTab, so its signals and fill are the same as when they were tabs);
 ## this tab only stacks them, forwards their signals, and answers the Buildings part's accessors for the window, the App and the
@@ -22,6 +25,12 @@ const PART_GAP := 10
 const SIEGE_TITLE := "Under siege"
 const SIEGE_BY := "Under siege by %s"
 const SIEGE_BUTTON := "Show siege"
+## The placeholder boxes' example rows (TileBoxes; your own land only).
+const PEOPLE_CLASSES: Array = [["Peasants", 0.72], ["Craftsmen", 0.18], ["Merchants", 0.07], ["Clergy", 0.03]]
+const NEEDED_ROWS: Array = [["Hemp", "short 1"], ["Timber", "met"], ["Salt", "met"], ["Wine", "met"]]
+const TRADE_ROWS: Array = [["Market", "local fair"], ["Sells", "grain, cloth"], ["Buys", "hemp, salt"], ["Roads", "2 paved"]]
+const HAPPENINGS_ROWS: Array = [["Spring", "Fair held"], ["Winter", "Hard frost"], ["Autumn", "Mill built"],
+	["Summer", "Levy raised"]]
 
 ## The Settings the strips' hammer reads (game/confirm_works); the window passes App.settings(). Null: the shipped default.
 var settings: Settings = null:
@@ -54,12 +63,25 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> vo
 	var siege := SiegeView.at(game, viewer, hex)
 	if not siege.is_empty():
 		add_child(_siege_block(siege, hex))
+	_facts = _part(FACTS)
+	_facts.fill(game, viewer, hex, view)
 	if buildable(view):
 		_strips = _part(STRIPS)
 		_strips.set("settings", settings)
 		_strips.fill(game, viewer, hex, view)
-	_facts = _part(FACTS)
-	_facts.fill(game, viewer, hex, view)
+	if TileBoxes.allowed(view):
+		_placeholders()
+
+
+## The placeholder pairs of your own land: People and Needed a year, then Trade and Happenings (hidden first by the fit).
+func _placeholders() -> void:
+	var classes: Array = []
+	for spec: Array in PEOPLE_CLASSES:
+		classes.append(TileBoxes.bar(str(spec[0]), float(spec[1])))
+	add_child(TileBoxes.pair(TileBoxes.box("People", classes, true), TileBoxes.box("Needed a year", NEEDED_ROWS, true),
+		TileBoxes.RANK_PAIR_LOW))
+	add_child(TileBoxes.pair(TileBoxes.box("Trade", TRADE_ROWS, true), TileBoxes.box("Happenings", HAPPENINGS_ROWS, true),
+		TileBoxes.RANK_PAIR_HIGH))
 
 
 ## The strips part (null where nothing can be built) and the facts part (tests and tools read them).

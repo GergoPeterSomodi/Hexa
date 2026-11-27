@@ -131,7 +131,7 @@ func before_each() -> void:
 	_old_save_dir = Session.save_dir
 	Session.ai_enabled = false  # the AI would play in the background and move the digest mid-season (M8 D47); K29 adds an AI-on monkey
 	_old_lock_path = RunLock.path
-	var apart := OS.get_environment("HEXA_MONKEY_APART")  # a name: this run keeps its own saves and lock, so seeds can run side by side
+	var apart := OS.get_environment("HEXA_MONKEY_APART") if OS.has_environment("HEXA_MONKEY_APART") else str(OS.get_process_id())  # own saves and lock per run: side by side, one never loads or removes another's
 	Session.save_dir = "user://test_monkey_saves" + apart
 	RunLock.path = "user://test_monkey_running%s.lock" % apart
 	_clean_disk()
@@ -471,12 +471,12 @@ func _seed_app(vp: SubViewport, seed_value: int, new_game: bool, m3: bool, repla
 		s.set_value("game/season_report", "full")
 		s.set_value("graphics/season_change", "instant")
 	if replay:
-		# The replay is on: the M6 monkey skips it, watches it and refuses orders in it. (Settings.new(.., true) makes reduce
-		# motion the default, and reduce motion plays every walk instant.)
+		# The replay is on: the M6 monkey skips it, watches it and refuses orders in it. (Settings.new(.., true) makes reduce motion the default, which plays every walk instant.)
 		s.set_value("game/movement", "normal")
 		s.set_value("accessibility/reduce_motion", false)
 	app.set_settings_override(s)
 	vp.add_child(app)
+	_m6_pause_like_the_tree(app)
 	await _wait_frames(2)
 	return app
 

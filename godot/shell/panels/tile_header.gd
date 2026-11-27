@@ -1,10 +1,11 @@
-## The tile window's pinned header (issue 436; split out of tile_window.gd in round 3): the title bar (the name centred, a drawn round
-## close button), the sub line in three cells (H1: the ground word at the left, the place and owner link in the middle, which
-## takes the room left and ends in an ellipsis but is never hidden, the hex at the right; M2: no food here, the chip says it), the
-## chips (StripCells, TileView.strip_cells), and the wide picture (SettlementPicture: the whole scene scaled to the width with
-## sky above, the bare land, the sea, or terra incognita on a never discovered hex) with the settlement-type emblem at its top
-## left (the owner's decision: the size stars left the title bar) and the badge row at its foot: the round badges (port,
-## occupied, besieged, battle, armies) and the small icon buttons Show supply and Show the castle area (L3).
+## The tile window's pinned header (issue 436; split out of tile_window.gd in round 3; the owner's 540 banner design of
+## 2026-11-26): the title bar (the settlement-type emblem at the left, the name centred, a drawn round close button), the sub line
+## in three cells (the ground word and the hex at the left; the place and owner link in the middle, which takes the room left and
+## ends in an ellipsis but is never hidden (H1); the tile's food a year at the right where the view has it), the chips (StripCells,
+## TileView.strip_cells), and the short banner (SettlementPicture, Tokens.TILE_BANNER_H tall: the whole town scaled to the
+## height, its sky and ground carried on to the width; the bare land, the sea, or terra incognita on a never discovered hex)
+## with the badge row at its foot: the round badges (port, occupied, besieged, battle, armies) and the small icon buttons Show
+## supply and Show the castle area (L3).
 ## It reads the view it is given and the game's colours; it changes nothing: the owner link, the close button and the two icon
 ## buttons are signals the window forwards.
 class_name TileHeader
@@ -44,7 +45,7 @@ var _title: Label
 var _close: Button
 var _ground: Label
 var _place: Button
-var _hex_label: Label
+var _food: Label
 var _strip: StripCells
 var _strip_band: PanelContainer
 var _picture: SettlementPicture
@@ -58,7 +59,7 @@ func _ready() -> void:
 	_close = %Close
 	_ground = %Subtitle
 	_place = %Place
-	_hex_label = %HexCell
+	_food = %Food
 	_strip = %Strip
 	_strip_band = %StripBand
 	_picture = %Picture
@@ -66,16 +67,10 @@ func _ready() -> void:
 	_badge_band = %BadgeBand
 	_emblem = SettlementEmblem.new()
 	_emblem.name = &"Emblem"
-	var pad := MarginContainer.new()
-	pad.name = &"EmblemPad"
-	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pad.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	pad.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_emblem.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	(%Left as Control).add_child(_emblem)
 	for side: StringName in [&"margin_left", &"margin_top", &"margin_right", &"margin_bottom"]:
-		pad.add_theme_constant_override(side, BADGE_INSET)
 		(_badge_band.get_parent() as MarginContainer).add_theme_constant_override(side, BADGE_INSET)
-	pad.add_child(_emblem)
-	_picture.get_parent().add_child(pad)
 	add_theme_constant_override(&"separation", 0)
 	_badges.add_theme_constant_override(&"separation", Tokens.S1 + 1)
 	_place.pressed.connect(func() -> void:
@@ -84,7 +79,7 @@ func _ready() -> void:
 	_close.pressed.connect(func() -> void: close_pressed.emit())
 	_close.draw.connect(_draw_close)
 	_close.accessibility_name = "Close the tile window"
-	for cell: Control in [_ground, _hex_label]:
+	for cell: Control in [_ground, _food]:
 		cell.mouse_filter = Control.MOUSE_FILTER_PASS
 
 
@@ -96,11 +91,13 @@ func show_view(game: Game, view: Dictionary, cells: Array) -> void:
 	_title.text = str(head.get("title", ""))
 	_title.tooltip_text = _title.text
 	var parts := str(head.get("subtitle", "")).split(" · ")
-	# The left cell is the ground word; at sea the depth chip says it already, so the cell stays empty (M2: no word twice).
-	_ground.text = parts[0].capitalize() if parts.size() > 1 and case_id != &"sea" else ""
-	_ground.tooltip_text = "The ground here: %s." % parts[0] if parts.size() > 1 else ""
-	_hex_label.text = parts[parts.size() - 1]
-	_hex_label.tooltip_text = "Where this tile lies on the map (column, row)."
+	# The left cell is the ground word and the hex ("Plain, (8, 10)"); at sea the depth chip says the water, so the hex alone (M2).
+	var hex_words := parts[parts.size() - 1]
+	var ground := parts[0].capitalize() if parts.size() > 1 and case_id != &"sea" else ""
+	_ground.text = "%s, %s" % [ground, hex_words] if ground != "" else hex_words
+	_ground.tooltip_text = ("The ground here: %s.
+" % parts[0] if ground != "" else "") 		+ "Where this tile lies on the map (column, row)."
+	_show_food(view.get("land", {}) as Dictionary)
 	var owner: Dictionary = head.get("owner", {})
 	_owner_tag = StringName(str(owner.get("tag", "")))
 	var place := str(head.get("place", ""))
@@ -130,6 +127,22 @@ func show_view(game: Game, view: Dictionary, cells: Array) -> void:
 			bare = SettlementPicture.FOG
 		_picture.show_picture(bare, 1, 0, snow, colour)
 		_emblem.show_kind(&"", 0)
+
+
+## The right cell of the sub line: the tile's food a year, made less eaten, in its tone ("Food +11"); empty where the view has
+## no food (foreign land, the sea, an undiscovered hex).
+func _show_food(land: Dictionary) -> void:
+	var food: Dictionary = land.get("food", {})
+	if food.is_empty():
+		_food.text = ""
+		_food.tooltip_text = "No food is made or eaten here."
+		return
+	var made := int(food.get("made", 0))
+	var eaten := int(food.get("eaten", 0))
+	var net := made - eaten
+	_food.text = "Food %s" % Words.signed(net)
+	_food.add_theme_color_override(&"font_color", Tokens.GOOD if net >= 0 else Tokens.BAD)
+	_food.tooltip_text = "Food a year here: %s made, %s eaten." % [Words.number(made), Words.number(eaten)]
 
 
 ## The badges as round icons at the foot of the picture, each with its words as tooltip (a bad one rimmed in red); a port shows

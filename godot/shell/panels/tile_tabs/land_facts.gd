@@ -11,6 +11,10 @@
 ## an optional quiet note, its value at the right and a hairline under it (PanelTileLine). Round 3 (M8): each section folds under
 ## its head (a click on the head; the open state is kept in memory for the session, `folded`); a note that belongs to a row
 ## (the outlook under Room) sits in that row's box, at the label column, muted, before its hairline (M1).
+## The 540 banner design (2026-11-26): on land the sections stand in two columns (the first ones at the left, split where the
+## taller column is shortest); each section is ranked for the window's fit (TileBoxes: the later sections hide first, after every
+## placeholder); on your own land the placeholder rows Faith and Prosperity (under People and food) and Culture and Unrest (under
+## Ground and defence) show muted example values with the "soon" tag (TileBoxes.allowed: never on other land or at sea).
 extends TileTab
 
 const ID := &"land"
@@ -44,12 +48,22 @@ const ICON_FOOD := &"food"
 const ICON_ROOM := &"settlement"
 const FOLD_TIP := "Click to fold this section away."
 const UNFOLD_TIP := "Click to show this section."
+## The placeholder rows (key, example value) and the section each goes under.
+const EXAMPLE_ROWS: Array = [["Faith", "Catholic", HEAD_PEOPLE], ["Prosperity", "62 of 100", HEAD_PEOPLE],
+	["Culture", "Italian", HEAD_GROUND], ["Unrest", "none", HEAD_GROUND]]
+## The gap between the two columns, and a head's height first in its column and after another section.
+const COLUMN_GAP := 14
+const HEAD_FIRST_H := 24.0
+const HEAD_NEXT_H := 32.0
 
 ## The sections folded away, by head (M8): kept for the session, so another tile opens with the same sections folded.
 static var folded: Dictionary = {}
 
 ## The section the next rows go into (the body under the last head), or null before the first head.
 var _into: VBoxContainer = null
+## The sections in order (each a VBox of its head and its body), and the bodies by head.
+var _sections: Array[VBoxContainer] = []
+var _bodies: Dictionary = {}
 
 
 ## Shown for every land case and the sea; never for an undiscovered hex (the view has no case there).
@@ -73,16 +87,90 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, view: Dictionary) -> vo
 	_buildings(case_id, land)
 	_ground(game, land)
 	_armies(land)
+	if TileBoxes.allowed(view):
+		_examples()
+	_columns()
 	_restyle(self)
 
 
 ## The fold heads of the sections shown (tests and tools), by head text.
 func fold_heads() -> Dictionary:
 	var out := {}
-	for child: Node in get_children():
-		if child.has_meta("head"):
-			out[str(child.get_meta("head"))] = child
+	for section: VBoxContainer in _sections:
+		var head := section.get_child(0)
+		out[str(head.get_meta("head"))] = head
 	return out
+
+
+## The sections shown, in order (tests and the window's fit).
+func sections() -> Array[VBoxContainer]:
+	return _sections.duplicate()
+
+
+## The placeholder rows on your own land (EXAMPLE_ROWS), each under its section when that shows, ranked above the real rows.
+func _examples() -> void:
+	for i: int in EXAMPLE_ROWS.size():
+		var spec: Array = EXAMPLE_ROWS[i]
+		var body := _bodies.get(str(spec[2])) as VBoxContainer
+		if body == null:
+			continue
+		var card := PanelContainer.new()
+		card.name = StringName("Example" + str(spec[0]))
+		card.theme_type_variation = &"PanelTileLine"
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
+		card.tooltip_text = SoonTag.EXAMPLE_TIP
+		card.set_meta(&"example", true)
+		var line := HBoxContainer.new()
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.add_theme_constant_override(&"separation", Tokens.S2)
+		card.add_child(line)
+		var key := PanelKit.label(str(spec[0]), &"TileKey")
+		key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(key)
+		line.add_child(PanelKit.label(str(spec[1]), &"TileValueMuted"))
+		line.add_child(SoonTag.new())
+		body.add_child(TileBoxes.rank(card, TileBoxes.RANK_FACT_EXAMPLE + i))
+
+
+## The sections in two columns side by side: the first ones at the left, the rest at the right, split where the taller column is
+## shortest (by rows); each ranked for the window's fit (the later ones hide first). One section stays in one column.
+func _columns() -> void:
+	for i: int in _sections.size():
+		TileBoxes.rank(_sections[i], TileBoxes.RANK_FACTS + i)
+	if _sections.size() < 2:
+		return
+	var total := 0
+	var prefix: Array[int] = []
+	for section: VBoxContainer in _sections:
+		total += 1 + (section.get_child(1) as Node).get_child_count()
+		prefix.append(total)
+	# The split that keeps the taller column shortest: the first `split` sections at the left.
+	var split := 1
+	for k: int in range(1, _sections.size()):
+		if maxi(prefix[k - 1], total - prefix[k - 1]) < maxi(prefix[split - 1], total - prefix[split - 1]):
+			split = k
+	var row := HBoxContainer.new()
+	row.name = &"Columns"
+	row.add_theme_constant_override(&"separation", COLUMN_GAP)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var columns: Array[VBoxContainer] = []
+	for i: int in 2:
+		var column := VBoxContainer.new()
+		column.name = StringName("Column%d" % i)
+		column.add_theme_constant_override(&"separation", 0)
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(column)
+		columns.append(column)
+	for i: int in _sections.size():
+		var section := _sections[i]
+		remove_child(section)
+		(columns[0] if i < split else columns[1]).add_child(section)
+	add_child(row)
+	for column: VBoxContainer in columns:
+		for at: int in column.get_child_count():
+			var head := column.get_child(at).get_child(0) as Control
+			head.custom_minimum_size.y = HEAD_FIRST_H if at == 0 else HEAD_NEXT_H
 
 
 ## Folds or opens a section by its head (the head's click does the same) and remembers it.
@@ -280,7 +368,7 @@ func _section(text: String) -> void:
 	head.focus_mode = Control.FOCUS_ALL
 	head.mouse_filter = Control.MOUSE_FILTER_STOP
 	head.accessibility_name = text
-	head.custom_minimum_size.y = 34.0 if get_child_count() > 0 else 24.0
+	head.custom_minimum_size.y = HEAD_NEXT_H if not _sections.is_empty() else HEAD_FIRST_H
 	var line := HBoxContainer.new()
 	line.name = &"Line"
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -297,10 +385,17 @@ func _section(text: String) -> void:
 	line.add_child(label)
 	line.add_child(arrow)
 	head.add_child(line)
-	add_child(head)
+	var section := VBoxContainer.new()
+	section.name = StringName("Section" + text.replace(" ", ""))
+	section.add_theme_constant_override(&"separation", 0)
+	section.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	section.add_child(head)
+	add_child(section)
+	_sections.append(section)
 	_into = VBoxContainer.new()
 	_into.add_theme_constant_override(&"separation", 0)
-	add_child(_into)
+	section.add_child(_into)
+	_bodies[text] = _into
 	head.set_meta("body", _into)
 	head.pressed.connect(func() -> void: set_folded(text, not bool(folded.get(text, false))))
 	set_folded(text, bool(folded.get(text, false)))
