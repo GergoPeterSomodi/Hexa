@@ -302,8 +302,8 @@ class TestBakeUI(unittest.TestCase):
         kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
         doc = json.loads(KIT_JSON.read_text(encoding="utf-8"))
         names = doc["pieces"]["icons"]["icons"]
-        self.assertEqual(len(names), 48)
-        self.assertEqual(len(set(names)), 48)
+        self.assertEqual(len(names), 49)
+        self.assertEqual(len(set(names)), 49)
         self.assertEqual(names[:16], [f"good_{g}" for g in (
             "grain", "fish", "oil", "wine", "salt", "hemp", "silk", "dyes", "wool", "cattle", "horses", "timber",
             "stone", "iron", "copper", "silver")])
@@ -321,8 +321,8 @@ class TestBakeUI(unittest.TestCase):
             c2 = sheets[2][y * 2 : (y + 24) * 2, x * 2 : (x + 24) * 2, 3].astype(np.int16)
             down = c2.reshape(24, 2, 24, 2).mean(axis=(1, 3))
             self.assertLess(float(np.abs(down - c1).mean()), 14.0, f"{name} 2x is the same drawing as 1x")
-        # The two spare cells stay empty.
-        self.assertTrue(np.all(sheets[1][96:120, 192:240, 3] == 0))
+        # The one spare cell stays empty.
+        self.assertTrue(np.all(sheets[1][96:120, 216:240, 3] == 0))
         self.assertTrue(np.all(sheets[1][:, 240:, 3] == 0))
 
         # Frames: vellum luminance and amplitude hold in the content rect; the field repeats every 64 px.
