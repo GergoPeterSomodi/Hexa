@@ -322,7 +322,7 @@ func test_the_save_body_and_the_digest_are_unchanged() -> void:
 	var body := Snapshot.of(g, {})
 	var keys: Array = body.keys()
 	keys.sort()
-	assert_eq(keys, ["action_log", "armies", "chronicle", "countries", "format", "game", "log_from", "luck", "map_state", "stats", "ui", "war"])
+	assert_eq(keys, ["action_log", "armies", "chronicle", "countries", "format", "game", "log_from", "luck", "map_state", "musters", "stats", "ui", "war"])
 	var with_ui := Snapshot.of(g, {"map_mode": "yields"})
 	assert_eq(str((with_ui["ui"] as Dictionary)["map_mode"]), "yields", "the ui block may hold the yields mode")
 	var restored := Snapshot.restore(bytes_to_var(var_to_bytes(with_ui)) as Dictionary, g.map, g.defs)

@@ -18,6 +18,7 @@ const LOG_SEASONS := 40
 
 ## The body of 4.10: `ui` is the shell's block (bookmarks, camera, map mode, look), kept as given. M6: `armies` (5.0 R11).
 ## M7: `war` (4.20). M8: `game.ai_only`, the log trimmed to its last LOG_SEASONS seasons and `log_from` (4.15).
+## `musters`: the queued companies and the next entry id (recruitment-queue.md 6).
 static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 	var countries: Array = []
 	for c: Country in game.countries:
@@ -48,6 +49,7 @@ static func of(game: Game, ui: Dictionary = {}) -> Dictionary:
 		"map_state": game.state.to_dict(),
 		"countries": countries,
 		"armies": armies,
+		"musters": Recruiting.to_dict.call(game),
 		"war": _war_of(game),
 		"stats": game.stats.to_dict() if game.stats != null else {},
 		"chronicle": game.chronicle.to_dict(),
@@ -151,6 +153,9 @@ static func _format_problem(body: Dictionary) -> String:
 		return PROBLEM_UNREADABLE
 	# M7 (4.20): a format-5 body carries the war state.
 	if not (body.get("war") is Dictionary):
+		return PROBLEM_UNREADABLE
+	# RQ5: a format-9 body carries the queue.
+	if not (body.get("musters") is Dictionary):
 		return PROBLEM_UNREADABLE
 	return ""
 
@@ -258,6 +263,9 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 	game.action_log.assign(log as Array)
 	# The armies after the countries (their tags are checked against them); a refused body changes nothing (5.0 R11).
 	if str(Armies.from_dict.call(body["armies"] as Dictionary, game)) != "":
+		return {"problem": "body"}
+	# The queue after the countries and the turn (its tags and queued turns are checked against them).
+	if str(Recruiting.from_dict.call(body["musters"] as Dictionary, game)) != "":
 		return {"problem": "body"}
 	# M7 (4.20): the wars, battles and sieges after the armies (their cross-checks read the living armies and countries).
 	if _war_from(body["war"] as Dictionary, game) != "":

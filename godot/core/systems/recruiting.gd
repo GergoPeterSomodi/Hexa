@@ -1,11 +1,16 @@
-## Recruiting (docs/design/recruitment-queue.md sections 4 and 5): where companies are raised. So far the barracks
-## alone: which settlements a new game gives one, where one may be built (Works runs the work), the finished and the
-## developer's one, and its upkeep. Raising does not read it yet. Writes `state.barracks` and nothing else. No change of
-## owner writes it: a barracks stands through capture and passes with ceded land (section 13, question 4).
+## Recruiting (docs/design/recruitment-queue.md sections 4 to 6): where companies are raised. The barracks: which
+## settlements a new game gives one, where one may be built (Works runs the work), the finished and the developer's one,
+## and its upkeep. The queue: so far only the saved form and the digest of its entries (game.musters, RQ5); no rule makes
+## or reads one yet, and raising reads neither. Writes `state.barracks`, `musters` and `next_muster_id` and nothing else.
+## No change of owner writes the barracks: it stands through capture and passes with ceded land (section 13, question 4).
 class_name Recruiting
 extends RefCounted
 
-const OWNS: Array[String] = ["barracks"]
+const OWNS: Array[String] = ["barracks", "musters", "next_muster_id"]
+## The queue's saved body.
+const SCHEMA := "hexa-godot/musters/1"
+## The problem a refused body reports (Snapshot's word for an unreadable body).
+const PROBLEM_BODY := "body"
 const NO_SETTLEMENT := "no settlement here: a barracks is built in one"
 const ALREADY := "a barracks stands here already"
 
@@ -116,6 +121,78 @@ static func put(game: Game, hex: Vector2i) -> bool:
 		return false
 	game.state.barracks[i] = 1
 	return true
+
+
+# --- the queue's save and digest -------------------------------------------------------------------------------------
+
+
+## {schema, next_muster_id, list: [Muster.to_dict] in id order}.
+static func to_dict(game: Game) -> Dictionary:
+	var list: Array = []
+	for m: Muster in game.musters:
+		list.append(m.to_dict())
+	return {"schema": SCHEMA, "next_muster_id": game.next_muster_id, "list": list}
+
+
+## Fills game.musters and next_muster_id from a saved body, or refuses with PROBLEM_BODY and changes nothing. It refuses a
+## wrong schema, a next id out of int32 or below 1, an entry that fails Muster.from_dict, an id not ascending from 1 or not
+## below the next id, a tag that is no country of the game, a hex off the map or at sea, a kind that is no UnitDef, a
+## queued_turn before the first season or after this one, and a levy that is not the company's full men taken, each source
+## once, from land on the hex and its ring. Who holds the hex and what stands on it are not asked here.
+static func from_dict(d: Dictionary, game: Game) -> String:
+	if game == null or game.map == null or game.defs == null or str(d.get("schema", "")) != SCHEMA:
+		return PROBLEM_BODY
+	var next_id: Variant = Unit.int32(d.get("next_muster_id", null))
+	var raw: Variant = d.get("list", null)
+	if next_id == null or int(next_id) < 1 or not (raw is Array):
+		return PROBLEM_BODY
+	var list: Array[Muster] = []
+	var last_id := 0
+	for item: Variant in raw as Array:
+		if not (item is Dictionary):
+			return PROBLEM_BODY
+		var m := Muster.from_dict(item as Dictionary)
+		if m == null or m.id <= last_id or m.id >= int(next_id) or not _muster_ok(game, m):
+			return PROBLEM_BODY
+		last_id = m.id
+		list.append(m)
+	game.musters = list
+	game.next_muster_id = int(next_id)
+	return ""
+
+
+## "next_muster_id" then each entry's digest text in id order, one per line.
+static func digest(game: Game) -> String:
+	var lines := PackedStringArray()
+	for m: Muster in game.musters:
+		lines.append(m.digest_text())
+	return "%d\n%s" % [game.next_muster_id, "\n".join(lines)]
+
+
+## One saved entry against the game: its tag, its hex on land, its kind, its turn and its levy.
+static func _muster_ok(game: Game, m: Muster) -> bool:
+	var ud := game.defs.unit_def(m.kind)
+	if Countries.by_tag(game, m.tag) == null or not game.map.is_land(m.hex) or ud == null:
+		return false
+	if m.queued_turn < Calendar.FIRST_TURN or m.queued_turn > game.turn:
+		return false
+	return _levy_ok(game, m, ud.men)
+
+
+## The levy of a saved entry: every source land on the entry's hex or beside it, none twice, `men` in all.
+static func _levy_ok(game: Game, m: Muster, men: int) -> bool:
+	var ring: Array[Vector2i] = [m.hex]
+	for d: int in 6:
+		ring.append(ImproveRules.neighbour(m.hex, d))
+	var seen := {}
+	var total := 0
+	for source: Array in m.levy:
+		var spot: Vector2i = source[0]
+		if not ring.has(spot) or not game.map.is_land(spot) or seen.has(spot):
+			return false
+		seen[spot] = true
+		total += int(source[1])
+	return total == men
 
 
 static func _refusal(reason: String) -> Dictionary:

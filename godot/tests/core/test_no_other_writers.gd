@@ -20,7 +20,7 @@ const MUTATORS := "append|append_array|push_back|push_front|insert|set|fill|resi
 ## Containers: a local that holds one of these is an alias of it (the storage is shared).
 const CONTAINERS: Array[String] = ["stock", "flows_open", "ledger_open", "goods_closed", "ledger_closed", "people",
 		"people_start", "people_end", "people_flows", "people_closed", "explored", "garrison", "occupier", "unsupported",
-		"armies", "wars", "battles", "battle_records", "sieges", "battle_names", "siege_names", "barracks"]
+		"armies", "wars", "battles", "battle_records", "sieges", "battle_names", "siege_names", "barracks", "musters", "levy"]
 ## M6 (L4): the armies' door. game.armies, next_army_id and next_unit_id are written only by armies.gd (and game.gd's
 ## declarations and the snapshot's restore, which assign the whole list through Armies.from_dict); the unit and army fields
 ## are written only by the state classes and armies.gd. MV2 (moves-build R12): `points` (Armies.set_points) and `season_from`.
@@ -47,6 +47,10 @@ const STANDING_FIELDS: Array[String] = ["standing"]
 const WORK_FIELDS: Array[String] = ["seasons", "started_turn"]
 ## RQ1 (recruitment-queue.md 6): the barracks bytes of the map state, written by Recruiting.
 const BARRACKS_FIELDS: Array[String] = ["barracks"]
+## RQ5: the queue's fields, written by Recruiting, and the fields only an entry has, which its state class reads from a save.
+## (An entry's other names, kind, paid, seasons_left, are shared with units and works.)
+const MUSTER_FIELDS: Array[String] = ["musters", "next_muster_id"]
+const MUSTER_VALUE_FIELDS: Array[String] = ["queued_turn", "levy"]
 
 
 ## The doors of a field: the systems and state files named by their base names.
@@ -79,6 +83,8 @@ func _guards() -> Array:
 		[STANDING_FIELDS, _door("armies", "army")],
 		[WORK_FIELDS, _door("sieges works", "siege work")],
 		[BARRACKS_FIELDS, _door("recruiting", "map_state")],
+		[MUSTER_FIELDS, _door("recruiting", "")],
+		[MUSTER_VALUE_FIELDS, _door("recruiting", "muster")],
 	]
 
 
@@ -506,6 +512,11 @@ func test_each_planted_write_is_caught() -> void:
 		["work.seasons = 4", "seasons"],
 		["game.state.barracks[3] = 1", "barracks"],
 		["var held := game.state.barracks\nheld[3] = 1", "barracks"],
+		["game.musters.append(m)", "musters"],
+		["var queue := game.musters\nqueue.erase(m)", "musters"],
+		["game.next_muster_id += 1", "next_muster_id"],
+		["entry.queued_turn = 3", "queued_turn"],
+		["game.musters[0].levy.clear()", "levy"],
 	]
 	for case: Array in planted:
 		var names: Array[String] = []

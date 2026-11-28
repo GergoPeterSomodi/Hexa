@@ -38,7 +38,7 @@ const PHASE_OWNERS := {
 const HOME := Vector2i(0, 2)
 const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
 	"countries", "armies", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id",
-	"wars", "battles", "sieges", "occupier", "garrison", "unsupported", "barracks"]
+	"wars", "battles", "sieges", "occupier", "garrison", "unsupported", "barracks", "musters"]
 
 var _fx: Dictionary = {}
 
@@ -76,6 +76,7 @@ func _fields(game: Game) -> Dictionary:
 		"sieges": var_to_bytes([war["sieges"], war["siege_names"]]),
 		"occupier": state["occupier"], "garrison": state["garrison"], "unsupported": state["unsupported"],
 		"barracks": state["barracks"],
+		"musters": var_to_bytes(body["musters"]),
 		"weather": game.weather, "purse": purse, "stores": stores, "food": food,
 		"people": var_to_bytes(state["people"]), "people_flows": people_flows, "people_close": closes,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
@@ -264,7 +265,7 @@ func test_dev_people_writes_people_through_the_door() -> void:
 
 func test_dev_barracks_writes_the_barracks_and_the_door() -> void:
 	# RQ1: the fixture's capitals have theirs from the start, so Beta's is taken off first.
-	assert_eq(Recruiting.OWNS, ["barracks"])
+	assert_eq(Recruiting.OWNS, ["barracks", "musters", "next_muster_id"])
 	var g := _game()
 	g.state.barracks[g.map.index_of(ScenarioFixture.BETA_CAPITAL)] = 0
 	var before := _fields(g)

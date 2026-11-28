@@ -5,8 +5,10 @@
 class_name SaveFile
 extends RefCounted
 
-## 9: recruitment (recruitment-queue.md 6): map-state/6 adds `barracks`, in the digest, and an old `raise` record will mean
-## something else; a format-8 file is refused as older, quietly ("Made by an older test build"). No upgrade step.
+## 9: recruitment (recruitment-queue.md 6): map-state/6 adds `barracks` and the body `musters` (the queued companies), both
+## in the digest, and an old `raise` record will mean something else; a format-8 file is refused as older, quietly ("Made by
+## an older test build"). No upgrade step. One number for the whole feature: no build is handed out while it is being built,
+## so a format-9 body that lacks a later part of it is a damaged one.
 ## 8: moves in the month (moves-build-spec.md R55, D22): army/3 adds `points` and `season_from`, both in the digest; a format-7
 ## file is refused as older, quietly ("Made by an older test build").
 ## 7: the fog build (fog-build-spec R38, D16): a format-6 (M8) file is refused as older, quietly ("Made by an older

@@ -23,6 +23,10 @@ var armies: Array[Army] = []
 ## The next army id and the next unit id (from 1, never reused); written only by Armies.
 var next_army_id: int = 1
 var next_unit_id: int = 1
+## The queued companies in id order, one entry each (docs/design/recruitment-queue.md 5 and 6), and the next entry's id
+## (from 1, never reused); written only by Recruiting.
+var musters: Array[Muster] = []
+var next_muster_id: int = 1
 ## The war state (docs/architecture/m7-build-spec.md 5.2); the writers are named beside each field.
 var wars: Array[War] = []                     # Wars; id order
 var next_war_id: int = 1                      # Wars
@@ -271,7 +275,7 @@ func act(action: String, args: Dictionary) -> Dictionary:
 
 
 ## SHA-256 (hex text) of the game: map id, seed, scenario id, player and ai_only (M8), start year, turn, state digest, each country's
-## digest_text, the armies (M6), the war state (M7: wars, battles and records, sieges), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
+## digest_text, the armies (M6), the queued companies (RQ5), the war state (M7: wars, battles and records, sieges), stats (R5), chronicle and luck; the weather (as "s,f,m") follows the turn.
 func digest() -> String:
 	var map_id := map.id if map != null else ""
 	var scen_id := scenario.id if scenario != null else ""
@@ -282,6 +286,7 @@ func digest() -> String:
 		parts.append(c.digest_text() if c != null else "")
 	# Called by reference (A14): the armies' digest is "next_army|next_unit" and one line per army (4.17).
 	parts.append(str(Armies.digest.call(self)))
+	parts.append(str(Recruiting.digest.call(self)))
 	# M7 (4.20): the war state, each system's digest by reference (the wars, the battles and records, the sieges).
 	parts.append(str(Wars.digest.call(self)))
 	parts.append(str(Battles.digest.call(self)))

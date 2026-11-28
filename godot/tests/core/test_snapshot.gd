@@ -2,7 +2,7 @@
 ## before the pick and a scenario after 12 seasons with works; every key of 4.10; the M2 5.9 fields; the planted faults.
 extends GutTest
 
-const KEYS: Array[String] = ["format", "game", "map_state", "countries", "armies", "war", "stats", "chronicle", "luck", "action_log", "log_from", "ui"]
+const KEYS: Array[String] = ["format", "game", "map_state", "countries", "armies", "musters", "war", "stats", "chronicle", "luck", "action_log", "log_from", "ui"]
 
 var _fx: Dictionary = {}
 
