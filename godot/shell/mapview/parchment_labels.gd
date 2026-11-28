@@ -530,8 +530,8 @@ func _put_clear(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: 
 		tried = size_px
 		var shape := _name_shape(name, size_px)
 		var screen := Rect2(Vector2.ZERO, _viewport)
-		for spots: Array[Vector2] in [ParchmentNameSpots.near(centre, shape), ParchmentNameSpots.far(centre, shape),
-				ParchmentNameSpots.past(centre, shape, _avoid, screen)]:
+		for stage: int in ParchmentNameSpots.STAGES:
+			var spots := ParchmentNameSpots.stage(stage, centre, shape, _avoid, screen)
 			var with_moves: Array[Vector2] = []  # the middles that need capitals' names moved
 			for at: Vector2 in spots:
 				if ParchmentNameSpots.hits(_avoid, at, shape[0], shape[1]):
@@ -565,7 +565,13 @@ func _taken_by(near: Array[Dictionary]) -> Array[Array]:
 ## other side of their dots, or more than can be done (it meets a dot, or a name with nowhere to go).
 func _need_at(taken: Array[Array], at: Vector2, axis: Vector2, half: Vector2) -> Need:
 	var need := Need.NOTHING
+	var bounds := Rect2(at, Vector2.ZERO).grow_individual(absf(axis.x) * half.x + absf(axis.y) * half.y,
+		absf(axis.y) * half.x + absf(axis.x) * half.y, absf(axis.x) * half.x + absf(axis.y) * half.y,
+		absf(axis.y) * half.x + absf(axis.x) * half.y)
 	for boxes: Array in taken:
+		# Most capitals are far from the spot: the engine's level test of their boxes spares the turned ones.
+		if not bounds.intersects(boxes[0]) and not bounds.intersects(boxes[1]):
+			continue
 		if ParchmentLabelSpace.turned_hits(boxes[0], at, axis, half):
 			return Need.TOO_MUCH
 		var shown: Rect2 = boxes[1]

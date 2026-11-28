@@ -36,8 +36,8 @@ countries (pass `--seed` too); an unknown name opens the country chooser and the
 
 ## Armies in the Godot version
 
-The game is moving to Godot ([`godot/`](godot/README.md)). This section is how armies move **there**; the rest of this page
-describes the Python game, frozen at v0.2.2.
+The game is moving to Godot ([`godot/`](godot/README.md)). This section is how armies move **there** and the next one is
+its drawn map; the rest of this page describes the Python game, frozen at v0.2.2.
 
 **Move points.** An army has move points each season, set by its slowest company: knights 16, pikemen and crossbowmen 12,
 bombards 8. Every step costs points by the ground, the road, the river and the season. The mark on the army's token and its
@@ -102,6 +102,53 @@ season. The country that was declared on is not held back.
 | **Space**, **Enter** or **Esc** while your walk is shown | skip it |
 | **Esc** | clear the selection (the army keeps its orders) |
 | **Space** or **Enter** | end the season |
+
+## The drawn map in the Godot version
+
+This section, too, is about the [Godot version](godot/README.md). Zoom far enough out and the tiles give way to a
+**parchment map**: a sand-coloured sea, pale land, a dark hand-drawn coast with hatched water, dashed country borders,
+marks on the mountains, large country names that follow the shape of each country, and dots and names for capitals and
+towns (where a district is large on screen, as in Goods mode zoomed in, dotted lines part the districts too). Only the
+map changes; the top bar, panels and cards stay as they are.
+
+**When it appears.** In the **Terrain** and **Owner** map modes, by the zoom:
+
+- The whole-map view (**Fit**, or **F** / **Home**) and everything closer show the tiles, and so does one wheel notch
+  farther out.
+- A second wheel notch out brings the parchment, with a short cross-fade (at once with **Reduce motion**). One press of
+  **-** or of the minus button is two notches. A third notch is about as far out as the map goes.
+- Zooming back in, two notches from the farthest view (or **Fit**) bring the tiles back. These counts are for the
+  default zoom speed; a slower speed takes more notches, a faster one fewer.
+
+The **Relief**, **Yields**, **Food** and **Supply** modes keep the tiles at every zoom, and so does the map while you
+are choosing your country.
+
+**Reading it.** Owner mode colours each country; Terrain mode only tints them lightly (the **Country tint** switch).
+The **Borders** switch hides the parchment's borders too. Hovering a district shows one line: its place name if it has
+one, its owner, and the good it makes; land nobody holds reads "Unclaimed land". Land your country has never
+discovered is plain darker paper that reads "Unexplored", with no coast, border, name or icon on it; discovered land
+out of your sight looks like land in sight. Armies, their reach and paths, and the war marks are drawn over the
+parchment, and you give orders on it as on the tiles.
+
+**Goods mode** (key **7**, or **Goods** in the top bar, once you play a country) is the parchment at every zoom, showing
+one good at a time:
+
+- The **Goods produced** card, bottom left, has a button for each good; its tooltip says how many of the districts you
+  know make it ("none you know" if none does). The chosen good's button is filled gold and ticked.
+- Each district that makes the good is shaded by its stage, light for the first to dark for the third, and carries the
+  good's icon with one to three pips. The legend, top left, names the stages and counts the districts. The hover line
+  names the good only on a district that makes the chosen one, with its stage ("Wine, second stage").
+- **[** and **]** step to the previous and the next good.
+- Press **7** again to move the keyboard to the card: the arrows move between the buttons, **Enter** or **Space** picks,
+  and **Esc** or a click on the map gives the keyboard back to the map.
+- The greyed **Population** and **Unrest** rows are map modes still to come.
+
+**Return to default map**, the button at the bottom of the map in every mode but Terrain, goes back to Terrain, as key
+**1** does. The game remembers your map mode and chosen good when you come back.
+
+**Turning it off.** Switch off **Parchment map when zoomed out** (Options, Map; or **Parchment map** under **Layers**)
+and Terrain and Owner show the tiles at every zoom. Goods mode is still drawn on the parchment. The keys **7**, **[**
+and **]** can be changed in Options, Controls.
 
 ## Conquest
 

@@ -24,6 +24,8 @@
 ## with the People and Food cards, the hex panel People section for a hex of yours, a known and an unknown country, the
 ## country panel people row, the Food mode with its legend, the report People section, the hunger notification and flag line,
 ## and the village near Turin before and after it grew. Genoa on seed 1480, calm weather, on a temporary save folder.
+## Parchment map pictures (map-overview-build-plan.md section 3, names pm_*; the scenes are in shot_ui_parchment.gd): the
+## only ones here with map/parchment on. Genoa on seed 1480, on a temporary save folder.
 ## Headless (dummy renderer): exercises all screens at 1x and 2x without writing empty PNGs and exits 0.
 extends SceneTree
 
@@ -85,6 +87,7 @@ const M4_SCENES: Array[String] = [
 ]
 const M45 := preload("res://tools/ui/shot_ui_m45.gd")
 const M5 := preload("res://tools/ui/shot_ui_m5.gd")
+const PM := preload("res://tools/ui/shot_ui_parchment.gd")
 const M3_SAVE_DIR := "user://shot_ui_saves"
 const M3_LOCK := "user://shot_ui_running.lock"
 const M3_SAVES: Array[Dictionary] = [
@@ -168,7 +171,8 @@ func _capture_one(
 	scale_dir: String,
 	headless: bool
 ) -> bool:
-	var m3 := scene_name.begins_with("m3_") or scene_name.begins_with("m4_") or scene_name.begins_with("m45_") or scene_name.begins_with("m5_")
+	var m3 := (scene_name.begins_with("m3_") or scene_name.begins_with("m4_") or scene_name.begins_with("m45_")
+		or scene_name.begins_with("m5_") or scene_name.begins_with("pm_"))
 	if m3:
 		_m3_disk_begin()
 	var vp := SubViewport.new()
@@ -191,7 +195,7 @@ func _capture_one(
 		app.set("cli_args_override", cli)
 	var s := Settings.new("macOS", true)
 	s.set_value("state/help_seen", true)
-	s.set_value("map/parchment", false)  # these pictures show the tiles, framed whole too (map-overview PM5)
+	s.set_value("map/parchment", false)  # these pictures show the tiles, framed whole too (map-overview PM5; pm_ turns it on)
 	s.set_value("graphics/preload_next_season", false)
 	s.set_value("accessibility/reduce_motion", true)
 	s.set_value("display/ui_scale", "100" if scale_mult == 1 else "200")
@@ -245,6 +249,8 @@ func _prepare_scene(app: Node, scene_name: String) -> bool:
 		return await M45.prepare(self, app, scene_name)
 	if scene_name.begins_with("m5_"):
 		return await M5.prepare(self, app, scene_name)
+	if scene_name.begins_with("pm_"):
+		return await PM.prepare(self, app, scene_name)
 	match scene_name:
 		"main_menu":
 			var top_m := stack.call("top") as Node
@@ -299,6 +305,7 @@ func _all_scenes() -> Array[String]:
 	out.append_array(M4_SCENES)
 	out.append_array(M45.SCENES)
 	out.append_array(M5.SCENES)
+	out.append_array(PM.SCENES)
 	return out
 
 
@@ -308,7 +315,8 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 		return PackedStringArray()
 	if scene_name == "m2_pick":
 		return PackedStringArray(["--new-game", "--seed=1480"])
-	if scene_name.begins_with("m2_") or scene_name.begins_with("m3_") or scene_name.begins_with("m4_") or scene_name.begins_with("m45_") or scene_name.begins_with("m5_"):
+	if (scene_name.begins_with("m2_") or scene_name.begins_with("m3_") or scene_name.begins_with("m4_")
+			or scene_name.begins_with("m45_") or scene_name.begins_with("m5_") or scene_name.begins_with("pm_")):
 		return PackedStringArray(["--new-game", "--country=GEN", "--seed=1480"])
 	if scene_name in ["hud", "pause_menu", "options", "about", "help", "confirm"]:
 		return PackedStringArray(["--sandbox", "--seed=1480"])
@@ -318,6 +326,8 @@ func _cli_for(scene_name: String) -> PackedStringArray:
 ## Settings of a scene: the map mode and the palette of the M2 map pictures.
 func _settings_for(scene_name: String) -> Dictionary:
 	var out := {}
+	if scene_name.begins_with("pm_"):
+		return PM.settings_for(scene_name)
 	if scene_name.begins_with("m3_") or scene_name.begins_with("m4_") or scene_name.begins_with("m45_") or scene_name.begins_with("m5_"):
 		out["game/season_report"] = "full"
 		out["game/autosave"] = "off"

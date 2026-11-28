@@ -194,6 +194,38 @@ addons/gut/             GUT 9.7.1, copied unchanged from its release (MIT, see a
   `assets/ui/kit` paths in `shell/{ui,hud,screens,panels,app}/` outside `tokens.gd` and `kit_theme.gd` (`tools/lint_godot.py`).
 - **A refactor never rides with a behaviour change.**
 
+## The map's layers
+
+Bottom to top, in `shell/map/map_scene.tscn` (the numbers are the z index):
+
+| Layer | z | What it draws |
+|---|---|---|
+| `TileMapView` | 0 to 70 | the tile ground, grid, shadows and standing pieces |
+| `TileMapView` lines, castle areas, borders | 50, 82, 85 | rivers and roads, an enemy castle's land, country borders |
+| `FarMap` | 75 | the one-picture far view: solid at zoom 0.20 and below, gone at 0.25 |
+| `ModeOverlay` | 80 | the colours of the map modes, the sight veil and the deep fog |
+| `Parchment` (`ParchmentMap`) | 81 | the parchment: sea, hatched water, land, district lines, mountain marks, borders, coast |
+| `ParchmentLabels` (after `Parchment`, at its z) | 81 | the parchment's names, town dots and goods icons, laid out in screen px |
+| `PreviewMarks` | 82 | the works card's ghost, tint and labels (the ghost is raised over a parchment) |
+| reach | 83 | where the selected army can march |
+| `PathMarks` | 84 | marching paths |
+| `CapitalMarks`, `WorkMarks`, `ArmyTokens`, `WarMarks` | 86 to 89 | capital pennants (Owner mode and the pick), works, army tokens, sieges and battles |
+| marks | 90 | the selection, the order cursor and the build marks |
+| `Names` (a `CanvasLayer`) | over the map | place plates (`MapLabels`), the tile view's country names (`CountryLabels`), floaters |
+
+- **The parchment** (`docs/architecture/map-overview-build-spec.md`) shows in Terrain and Owner when the camera is under
+  0.80 of the fit zoom and until it is back at 0.84 of it (`ParchmentSwitch`, a 0.25 s cross-fade; the zoom-out limit is
+  0.65 of the fit), and in Goods at every zoom. It never shows in Relief, Yields, Food or Supply, nor during the pick.
+  With `map/parchment` off only Goods shows it.
+- **Under a solid parchment** the tile ground, lines, castle areas, borders, `FarMap`, `CapitalMarks`, the country names
+  and the place plates are hidden; reach, marks, paths, previews, tokens and war marks stay on top (`MapSceneParchment`).
+- **Its parts:** the geometry and facts are pure views (`core/views/parchment_shape.gd`, `parchment_view.gd`, which apply
+  the fog); `shell/map/parchment_map.gd` and its four shaders draw the map from one texel a hex;
+  `shell/mapview/parchment_labels.gd` places the names and icons; the colours are `shell/ui/parchment_tokens.gd`.
+- **Pictures:** the `pm_*` scenes of `tools/ui/shot_ui.gd` (they are in `tools/ui/shot_ui_parchment.gd`;
+  `--only=pm_fit_terrain,...` for some of them). The older picture scenes set
+  `map/parchment` off; `tools/ui/shot_zoom_out.gd` pictures the switch itself.
+
 ## Fog (two levels)
 
 - **Deep fog** is a hex the country has never discovered: nothing of it is shown, and the hex card says "Unexplored".
@@ -280,7 +312,7 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
   `user://settings.cfg` (`Settings`), with a 10 s `Confirm` revert for display/window/UI-scale changes.
 - **Default bindings** (`shell/input/bindings.gd`, `Bindings.DEFAULTS`):
   - **Camera:** `WASD` / arrows (pan; hold `Shift` for fast pan), `=` / `+` / `Kp+` (zoom in), `-` / `Kp-` (zoom out), `F` / `Home` (fit whole map).
-  - **Map & View:** left click (select hex; a click on one of your unit tokens selects that unit instead, and each further click on a stack takes its next army; a hex with a unit on it still selects the hex), right click (clear selection), `1`–`6` (map modes Terrain / Owner / Relief / Yields / Food / Supply; Owner, Yields, Food and Supply are refused with a toast in a map-only game, and Yields, Food and Supply while picking), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
+  - **Map & View:** left click (select hex; a click on one of your unit tokens selects that unit instead, and each further click on a stack takes its next army; a hex with a unit on it still selects the hex), right click (clear selection), `1`–`7` (map modes Terrain / Owner / Relief / Yields / Food / Supply / Goods; Owner, Yields, Food, Supply and Goods are refused with a toast in a map-only game, and Yields, Food, Supply and Goods while picking), `7` again in Goods (the keyboard goes to the goods card), `[` `]` in Goods (the previous or next good), `G` (hex grid), `N` (place names), `C` (your country's panel; while picking, focus to the country list), `Ctrl+F` / `Cmd+F` (find a place or country), `H` (hide HUD / photo mode), `U` (the works card for the selected hex's upgrade, or its first build on wild land; with Confirm works Off, or Expensive only for a cheap work, it begins the work at once).
   - **The pick:** click a country's land or choose it in the list (`Up` / `Down`, `Enter` shows it, `Enter` again plays it), or `Play as` in its panel; `Esc` closes the panel, then asks for the pause menu (the pick cannot be skipped).
   - **Time & saves (M3):** `Space` / `Enter` (end the season; a second one inside 400 ms of the report closing is refused), `J` (the last season report), `F5` / `Ctrl+S` / `Cmd+S` (quicksave), `F9` / `Ctrl+L` / `Cmd+L` (quickload; asks first when actions are unsaved), `Ctrl+Z` / `Cmd+Z` (cancel the work begun last this season), `Ctrl+Shift+1..9` (set camera bookmark), `Ctrl+1..9` (go to it), `F2` (the developer console at the foot of F3, developer tools on).
   - **Economy (M4):** `I` (the Statesman's Study on its last page), `L` (the study's Economy page), `[` `]` (study pages: Economy, Rankings, History), `Ctrl+[` `Ctrl+]` (`Cmd` on a Mac: the tabs of the page, as Economy's four), `Enter` or `U` on a works card (begin the work), `Esc` (close the card or the study), `Shift` (keep a hovered card while the pointer is away).

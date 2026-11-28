@@ -171,6 +171,8 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   Amendment (2026-11-27): a change of sight alone writes no texel (R14).
 - **R29** On an ownership change only the touched texels are written and the names are laid out again; at most the
   existing `owner_change_frame_ms` (16 ms) with the parchment on.
+  Amendment (2026-11-28): the parchment's speed rows are measured where it shows under D2, at zooms taken from the fit
+  zoom, and the fade-band row during the cross-fade (plan section 4, the amendment of this date).
 
 ---
 

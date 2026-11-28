@@ -13,6 +13,8 @@ const FAR_ALONG: Array[float] = [0.0, -0.2, 0.2, -0.4, 0.4]
 const FAR_LINES: Array[float] = [0.0, -0.5, 0.5, -1.0, 1.0, -1.25, 1.25, -1.75, 1.75, -2.25, 2.25]
 ## The room left between a name put past a box and the box (screen px).
 const PAST_PX := 1.0
+## The stages of a search for a clear spot (see stage).
+const STAGES := 3
 
 static var _far: Array[Vector2] = []  # the farther places (share along, lines across), nearest first
 
@@ -32,6 +34,14 @@ static func sizes(px: int, plain: int, shares: Array[float], least: int) -> Arra
 static func spot(centre: Vector2, shape: Array[Vector2], place: Vector2) -> Vector2:
 	var axis := shape[0]
 	return centre + axis * (place.x * shape[1].x * 2.0) + Vector2(-axis.y, axis.x) * (place.y * shape[1].y * 2.0)
+
+
+## The middles of one stage (0 to STAGES - 1) of the search for a clear spot: R10's slides, the farther places, the
+## places past one of `boxes`. A stage is made only when the search gets to it: most names stop at the first.
+static func stage(n: int, centre: Vector2, shape: Array[Vector2], boxes: Array[Rect2], screen: Rect2) -> Array[Vector2]:
+	if n == 0:
+		return near(centre, shape)
+	return far(centre, shape) if n == 1 else past(centre, shape, boxes, screen)
 
 
 ## The middles a name of shape `shape` at `centre` takes by R10's slides, nearest first.

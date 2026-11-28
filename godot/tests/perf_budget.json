@@ -24,6 +24,18 @@
     "owner_change_200_ms": {"limit": 50.0, "class": "cpu", "what": "M2: a transfer of 200 hexes (a peace treaty): all the work, total CPU; the chunks are sliced"},
     "country_names_ms": {"limit": 15.0, "class": "cpu", "what": "M2: CountryNames.places_of for the largest country"},
     "scenario_grow_ms": {"limit": 5000.0, "class": "cpu", "what": "M2: ScenarioGrowth.grow on the whole map (the tool and the editor, not play)"},
-    "owner_mem_mb": {"limit": 8.0, "class": "mem", "what": "M2: overlay textures and border meshes"}
+    "owner_mem_mb": {"limit": 8.0, "class": "mem", "what": "M2: overlay textures and border meshes"},
+    "parchment_build_ms": {"limit": 1500.0, "class": "cpu", "what": "parchment: made-up Europe, ParchmentShape and the chunk meshes, total CPU of the 5 ms slices"},
+    "parchment_build_ni_ms": {"limit": 20.0, "class": "cpu", "what": "parchment: north Italy's geometry at once, worst of 3"},
+    "parchment_slice_worst_ms": {"limit": 16.0, "class": "cpu", "what": "parchment: worst frame while the made-up Europe builds"},
+    "parchment_goods_bytes_ms": {"limit": 80.0, "class": "cpu", "what": "parchment: ParchmentView.goods_bytes for the whole made-up Europe, cold, worst of 3"},
+    "parchment_good_switch_ms": {"limit": 6.0, "class": "cpu", "what": "parchment: set_good plus legend and icon layout to the next frame at zoom 0.30 (Goods), worst of 8; temporary limit until #485 (planned 2)"},
+    "parchment_owner_change_ms": {"limit": 25.0, "class": "cpu", "what": "parchment: a 1-hex transfer with the parchment solid (Owner, the zoom-out limit): texel, owner_bytes, names laid out, to the next frame; worst of 24; temporary limit until #485 (planned 16)"},
+    "parchment_labels_ms": {"limit": 12.0, "class": "cpu", "what": "parchment: ParchmentLabels.relayout for one view change on the made-up Europe, 1920 x 1080, at the switch and limit zooms (Terrain) and zoom 0.30 (Goods), worst; temporary limit until #485 (planned 4)"},
+    "parchment_labels_ni_ms": {"limit": 5.0, "class": "cpu", "what": "parchment: the same on north Italy at the switch and limit zooms (Terrain) and the fit zoom (Goods), worst; temporary limit until #485 (planned 1)"},
+    "parchment_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "parchment: worst frame panning the made-up Europe in Terrain, Owner and Goods at the switch and limit zooms (Goods also 0.12, 0.28, 0.36, 1.0), 60 countries"},
+    "parchment_frame_mean_ms": {"limit": 8.0, "class": "gpu", "what": "parchment: mean of the same (the highest mean of the views)"},
+    "parchment_band_frame_worst_ms": {"limit": 16.0, "class": "gpu", "what": "parchment: worst frame of the cross-fade (both pictures drawn): made-up Europe over the far picture, north Italy over the tiles"},
+    "parchment_mem_mb": {"limit": 80.0, "class": "mem", "what": "parchment: meshes and textures on the made-up Europe"}
   }
 }

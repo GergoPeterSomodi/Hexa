@@ -6,13 +6,19 @@
 ## Invariants, every frame of a fog seed: on a sample of undiscovered hexes HexCard.of gives only "Unexplored" (no owner), PeopleView.at
 ## is not shown, and no army token of another country stands there; the hover card and the hex panel, when they show an undiscovered
 ## hex, carry no visible text that names its owner; each foreign army out of sight is in no view (ArmyView.visible false, no token,
-## no Knowledge.armies_seen entry). Not covered here: the log and the reports (their rule, Knowledge.witnessed, is tested in
-## tests/core/test_fog_views.gd).
+## no Knowledge.armies_seen entry). The parchment map (map-overview-build-spec.md R12 to R15), once it has read the state on show:
+## its textures hold the unknown owner and no good on the sampled undiscovered hexes, and the owners (light fog too) and the Goods
+## mode's districts exactly on a sample of discovered ones; nothing its names have laid out is of, or on, an undiscovered hex. Not
+## covered here: the log and the reports (their rule, Knowledge.witnessed, is tested in tests/core/test_fog_views.gd).
 class_name MonkeyFog
 extends MonkeyM8
 
-## The fog counters a fog seed must raise above 0: the sampled dark hexes, the text checks of a dark card or panel, the hidden armies.
-const FOG_REQUIRED: Array[String] = ["fog_hexes", "fog_dark", "fog_armies_hidden"]
+## The fog counters a thin fog seed must raise above 0: the sampled dark hexes, the text checks of a dark card or panel, the
+## hidden armies, the frames the parchment's textures were checked. Every fog seed must raise the last two.
+const FOG_REQUIRED: Array[String] = ["fog_hexes", "fog_dark", "fog_armies_hidden", "fog_parchment"]
+## The frames the parchment's laid-out names were checked (they are laid out only while the parchment shows, which the
+## random input decides: counted, not required).
+const FOG_NAMES_COUNTER := "fog_parchment_names"
 ## Undiscovered hexes sampled per frame by the model check.
 const FOG_SAMPLE := 16
 ## The thin seed's radius around the country's land sight (FogFixture.thin).
@@ -25,9 +31,11 @@ const FOG_PICK_TRIES := 40
 ## The fog actions are on (a fog seed), and the seed's thin flag.
 var _fog: bool = false
 var _fog_thin: bool = false
-## The game the pick was checked on (the thin fixture is applied once per game), and the sample cursor over the hexes.
+## The game the pick was checked on (the thin fixture is applied once per game), and the sample cursors over the hexes
+## (the undiscovered ones; the discovered ones of the parchment check).
 var _fog_game: Game = null
 var _fog_cursor: int = 0
+var _fog_lit_cursor: int = 0
 ## True from the start of a fog seed's run to the next one (the base counters that follow real frame time are not asserted on it).
 var _fog_run: bool = false
 
@@ -39,10 +47,12 @@ func _fog_begin(on: bool, thin: bool) -> void:
 	_fog_thin = thin
 	_fog_game = null
 	_fog_cursor = 0
+	_fog_lit_cursor = 0
 	if on:
 		for key: String in FOG_REQUIRED:
 			_n[key] = 0
 		_n["fog_thins"] = 0
+		_n[FOG_NAMES_COUNTER] = 0
 
 
 ## The M8 end check. Every M8 counter is asserted as the base does, except m8_skips on the thin seed (1505): the forced
@@ -71,7 +81,7 @@ func _fog_end(on: bool, seed_value: int) -> void:
 	if _fog_thin:
 		required.append_array(FOG_REQUIRED)
 	else:
-		required.append("fog_armies_hidden")
+		required.append_array(["fog_armies_hidden", "fog_parchment"])
 	for key: String in required:
 		assert_gt(int(_n[key]), 0, "seed %d: the fog monkey did %s" % [seed_value, key])
 	if _fog_thin:
@@ -161,10 +171,12 @@ func _fog_assert(app: App, game: Game, tag: String) -> void:
 	var idx := _fog_cursor % n
 	var scanned := 0
 	var wrong := PackedStringArray()
+	var dark: Array[Vector2i] = []
 	while sampled < FOG_SAMPLE and scanned < n:
 		var hex := game.map.hex_of(idx)
 		if not Knowledge.discovered(game, viewer, hex):
 			sampled += 1
+			dark.append(hex)
 			_fog_check_hex(game, viewer, hex, tokens, wrong)
 		idx = (idx + 1) % n
 		scanned += 1
@@ -172,6 +184,86 @@ func _fog_assert(app: App, game: Game, tag: String) -> void:
 	assert_eq(" | ".join(wrong), "", "%s: the undiscovered hexes tell nothing" % tag)
 	_fog_check_panels(app, game, viewer, tag)
 	_fog_check_armies(game, viewer, tokens, tag)
+	var parchment := PackedStringArray()
+	_fog_check_textures(app, game, viewer, dark, parchment)
+	_fog_check_names(app, game, viewer, parchment)
+	assert_eq(" | ".join(parchment), "", "%s: the parchment tells nothing under the fog and is exact beside it" % tag)
+
+
+## The textures the parchment's shaders read, when they were written from this state and viewer: unknown and no good on
+## the `dark` hexes; between seasons, the owner (and in Goods mode the district's good and stage) on a sample of
+## discovered hexes. What is wrong is added to `wrong`.
+func _fog_check_textures(app: App, game: Game, viewer: StringName, dark: Array[Vector2i], wrong: PackedStringArray) -> void:
+	var map := app.map_scene()
+	if map == null:
+		return
+	var node := map.parchment()
+	var key: Array = [game.version, MapModes.discovered_key(game, viewer)]
+	if node.owner_image() == null or node._facts_key != key:
+		return  # not read yet (the world paused since the change)
+	_bump("fog_parchment")
+	var owners := node.owner_image().get_data()
+	var goods := node.goods_image().get_data()
+	if owners.size() != game.map.hex_count():
+		wrong.append("%d owner texels" % owners.size())
+		return
+	for hex: Vector2i in dark:
+		var i := game.map.index_of(hex)
+		if owners[i] != ParchmentView.UNKNOWN or goods[2 * i] != 0 or goods[2 * i + 1] != 0:
+			wrong.append("the texels of the undiscovered %s hold owner %d, good %d" % [hex, owners[i], goods[2 * i]])
+	if Session.in_season():
+		return  # land may have changed hands since the textures were told
+	var with_goods: bool = node.mode() == MapModes.Mode.GOODS and node._goods_key == key
+	var view := StateView.of(game.state)
+	var n := game.map.hex_count()
+	var sampled := 0
+	var idx := _fog_lit_cursor % n
+	for _scanned: int in n:
+		if sampled >= FOG_SAMPLE:
+			break
+		var hex := game.map.hex_of(idx)
+		if Knowledge.discovered(game, viewer, hex):
+			sampled += 1
+			var owner := Territory.owner_id(game, hex) if game.map.land[idx] == 1 else 0
+			if owners[idx] != owner:
+				wrong.append("the owner texel of %s is %d, the owner %d" % [hex, owners[idx], owner])
+			var good := Economy.good_of(game, view, hex) if with_goods else -1
+			if with_goods and int(goods[2 * idx]) != good + 1:
+				wrong.append("the goods texel of %s is %d, the district makes %d" % [hex, goods[2 * idx], good])
+		idx = (idx + 1) % n
+	_fog_lit_cursor = idx
+
+
+## What the parchment's names have laid out, when they show and read this viewer's discovered set: every entry stands on
+## a discovered hex, and so do the middle and the corners of its box (a dot with no name: its hex only).
+func _fog_check_names(app: App, game: Game, viewer: StringName, wrong: PackedStringArray) -> void:
+	var map := app.map_scene()
+	if map == null:
+		return
+	var names := map.parchment_names()
+	if not names.visible or names._stale or names._viewer != viewer \
+			or names._fog_key != MapModes.discovered_key(game, viewer) or names.placed().is_empty():
+		return
+	_bump(FOG_NAMES_COUNTER)
+	var into := names.draw_base()  # screen px to map px
+	for item: Dictionary in names.placed():
+		if not Knowledge.discovered(game, viewer, item["hex"]):
+			wrong.append("the %s '%s' stands on the undiscovered %s" % [item["kind"], item["text"], item["hex"]])
+		if item.has("dot") and str(item["text"]) == "":
+			continue
+		var rect: Rect2 = item["rect"]
+		var centre := rect.get_center()
+		var half := rect.size * 0.499
+		var angle := 0.0
+		if item["kind"] == ParchmentLabels.KIND_COUNTRY:
+			centre = item["centre"]
+			half = (item["extent"] as Vector2) * 0.499
+			angle = deg_to_rad(float(item["angle"]))
+		for corner: Vector2 in [Vector2.ZERO, Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			var hex := MapModes.hex_at_px(into * (centre + (half * corner).rotated(angle)))
+			if game.map.has(hex) and not Knowledge.discovered(game, viewer, hex):
+				wrong.append("the box of the %s '%s' reaches the undiscovered %s" % [item["kind"], item["text"], hex])
+				break
 
 
 ## The map's army tokens (null when the map has no army layer yet).

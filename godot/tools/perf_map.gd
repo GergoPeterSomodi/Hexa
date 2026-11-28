@@ -11,6 +11,7 @@
 ## scenario (FakeScenario) on the map and measures the overlay, the borders, an owner change, the country names and the
 ## owner-mode frames (rows `owner_*`, `height_bytes_ms`, `overlay_setup_ms`, `mode_switch_ms`, `borders_all_ms`,
 ## `border_chunk_ms`, `country_names_ms`, `scenario_grow_ms`).
+## The pass ends with the parchment map's rows (`parchment_*`, tools/perf_parchment.gd).
 ## `--dry-run` runs only the CPU rows of that pass and opens no game window: run it with `--headless`
 ## (`godot --headless --path godot -s res://tools/perf_map.gd -- --dry-run`); the frame rows are then "not measured".
 ## Limits have a class (the budget file): cpu and mem always fail the run; gpu (frame times) only with --gpu-limits,
@@ -413,6 +414,7 @@ func _countries_pass() -> void:
 		_add_labels()
 	await _owner_changes()
 	await _owner_frames()
+	await PerfParchment.measure(self, _r, _map, _countries, _seed, _timed, _dry)  # the parchment_* rows
 
 
 ## CPU time of `set_mode`, worst of four switches (it ends in Owner mode). The frame wait sits outside the timing:
@@ -608,7 +610,7 @@ func _finish() -> int:
 	var rows := ""
 	for key: String in limits:
 		var spec: Dictionary = limits[key]
-		if not _r.has(key) and (_dry or (_countries <= 0 and M2_KEYS.has(key))):
+		if not _r.has(key) and (_dry or (_countries <= 0 and (M2_KEYS.has(key) or PerfParchment.KEYS.has(key)))):
 			rows += "| %s | not measured | %.2f | %s | skipped (%s) |\n" % [key, float(spec["limit"]), str(spec["class"]),
 				"--dry-run" if _dry else "--countries=0"]
 			continue
@@ -703,7 +705,7 @@ func _markdown_countries() -> String:
 		_r["owner_change_frame_ms"], _r["owner_change_samples"], _r["owner_change_200_hexes"], _r["owner_change_200_ms"],
 		_r["owner_change_200_frame_worst_ms"]]
 	s += "| names of the largest country | %.2f ms (%d labels) |\n" % [_r["country_names_ms"], _r["country_names_count"]]
-	return s
+	return s + str(_r.get("parchment_table", ""))
 
 
 ## The table of a `--dry-run`: the CPU rows only, nothing windowed.

@@ -84,6 +84,12 @@ repository root.
   `pm_band` (the fade, half way), `pm_goods_wine` (card and legend), `pm_goods_close` (Goods at zoom 1), `pm_hover`
   (the one-line card), `pm_fog_thin` (the thin fixture: unknown paper, no names there), `pm_high_contrast`,
   `pm_text_150`, `pm_army_over` (a selected army's reach and path over the parchment).
+  Amendment (2026-11-28, after the owner's playtest of 2026-11-27, spec D2): the whole-map (fit) view shows the tiles
+  and the parchment lies past it. So the `pm_fit_*` pictures are taken two default wheel notches past the whole-map
+  view (zoom 0.756 of the fit), as are `pm_hover`, `pm_fog_thin`, `pm_high_contrast`, `pm_text_150` and
+  `pm_army_over`; `pm_band` is the 0.25 s cross-fade stopped half way, at that zoom. `pm_goods_wine` is at the
+  whole-map view (Goods shows the parchment at every zoom) and `pm_goods_close` at zoom 1. The goldens are the 1280 x
+  720 pictures, as M3's; the same run writes the 2560 x 1440 ones.
 
 ---
 
@@ -105,9 +111,24 @@ repository root.
 
 Amendment (2026-11-27): `parchment_mem_mb` is raised from 32 to 80 (measured 62 MB on the made-up Europe, accepted).
 
+Amendment (2026-11-28, PM6): the switch follows the fit zoom (spec D2), so the zooms of the table no longer show the
+Terrain or Owner parchment. `tools/perf_parchment.gd` takes them from the constants, "switch" (just under fit x 0.80) and
+"limit" (fit x 0.65): `parchment_frame_*` pans the made-up Europe in Terrain, Owner and Goods at both, and in Goods also
+at 0.12, 0.28, 0.36 and 1.0; `parchment_band_frame_worst_ms` times the frames of the 0.25 s cross-fade while both
+pictures are drawn (the made-up Europe over its far picture, north Italy over its tiles), not a band at 0.32;
+`parchment_labels_ms` takes switch, limit and Goods at 0.30; north Italy's 1 ms is its own row,
+`parchment_labels_ni_ms` (switch, limit, Goods at fit). The made-up Europe of these rows has a district on one land hex in
+six (about a new game's count) and a viewer who has discovered all of it. `goods_bytes` is timed with the sight's land
+cache filled. Windowed, the window is not rendered while the CPU rows are timed. The fog proofs are
+`tests/core/test_parchment_fog.gd` and `tests/shell/test_parchment_fog_shell.gd` (the labels, textures and shader rules).
+
 The made-up Europe is larger than any planned map, so a pass there covers the real Europe. The old rows
 (`owner_frame_*`, `mode_switch_ms`, `owner_change_frame_ms`, `owner_change_200_ms`) must not get worse by more than 5 %.
 A failing frame row is fixed by spec D14's fallbacks in PM6's pull request.
+
+Amendment (2026-11-28, #485): `parchment_good_switch_ms`, `parchment_owner_change_ms`, `parchment_labels_ms` and
+`parchment_labels_ni_ms` measure over their planned limits (the name layout). `tests/perf_budget.json` carries temporary
+limits of 6, 25, 12 and 5 ms until #485 brings them back to 2, 16, 4 and 1 ms or agrees new ones.
 
 ---
 
