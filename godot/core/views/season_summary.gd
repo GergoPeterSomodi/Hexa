@@ -19,7 +19,7 @@ const SHOWN := 6
 const BEFORE_SHOWN := 5
 const TOP := 3
 ## The order kinds, in the order their lines come.
-const ORDER_KINDS: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"]
+const ORDER_KINDS: Array[String] = ["build", "build_barracks", "upgrade", "clear", "cancel_work", "choose_country", "set_tax"]
 ## The order of the Treasury section's lines (by reason).
 const MONEY_ORDER: Array[StringName] = [&"tax_people", &"tax_goods", &"port_dues", &"upkeep_districts", &"upkeep_walls",
 	&"upkeep_army", &"work", &"refund", &"raise", &"dev"]
@@ -399,6 +399,8 @@ static func _orders(game: Game, tag: StringName, turn: int, started: Dictionary,
 		match action:
 			"choose_country":
 				text = "Took the rule of %s." % list[0]
+			"build_barracks":
+				text = "Ordered to build: %s." % Words.list(list)
 			"cancel_work":
 				text = "Cancelled: %s." % Words.list(list)
 			"set_tax":
@@ -429,7 +431,7 @@ static func _item(game: Game, action: String, args: Dictionary, hex: Vector2i, s
 	if work != null and work.action == Works.UPGRADE:
 		return WorksView.line(game, work)  # "vineyard, first to second stage, near Savona (7, 12)"
 	if work != null:
-		piece = WorksView.piece_name(work.family)
+		piece = "barracks" if work.action == Works.BARRACKS else WorksView.piece_name(work.family)
 	var where := Words.place(game, hex)
 	return "%s %s" % [piece, where if where.begins_with("near ") else "at " + where]
 
@@ -653,6 +655,9 @@ static func _brings(game: Game, tag: StringName, work: Work) -> String:
 	if c == null or game.defs == null or game.defs.goods.is_empty() or game.state == null:
 		return ""
 	var view := StateView.of(game.state)
+	if work.action == Works.BARRACKS:  # it brings nothing: its own upkeep, not the town's
+		var upkeep := Recruiting.upkeep_at(game.defs, view, game.map.index_of(work.hex))
+		return "Upkeep %s a season." % Words.number(upkeep) if upkeep > 0 else ""
 	var year := PackedInt32Array()
 	year.resize(game.defs.goods.size())
 	var cost := 0

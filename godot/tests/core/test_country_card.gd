@@ -118,7 +118,7 @@ func test_france_outside_power_with_reason_and_region_focus() -> void:
 func test_treasury_is_exact_yours_with_the_season_and_a_known_foreign_one_alone() -> void:
 	var game := EconomyFixture.game(&"GEN")
 	var gen := CountryCard.of(game, &"GEN")["treasury"] as Dictionary
-	assert_eq(gen, {"shown": true, "value": 610, "own": true, "change": 0, "expected": 86, "expected_realm": 93, "tax": "Normal"})
+	assert_eq(gen, {"shown": true, "value": 610, "own": true, "change": 0, "expected": 85, "expected_realm": 92, "tax": "Normal"})
 	var mlo := CountryCard.of(game, &"MLO")["treasury"] as Dictionary
 	assert_true(bool(mlo["shown"]))
 	assert_false(bool(mlo["own"]), "another country's card carries no change and no tax")
@@ -140,8 +140,8 @@ func test_own_treasury_change_after_a_season() -> void:
 	var game := EconomyFixture.game(&"GEN")
 	assert_true(bool(Season.run(game)["ok"]))
 	var gen := CountryCard.of(game, &"GEN")["treasury"] as Dictionary
-	assert_eq(int(gen["value"]), 696)
-	assert_eq(int(gen["change"]), 86)
+	assert_eq(int(gen["value"]), 695)
+	assert_eq(int(gen["change"]), 85)
 	assert_eq(gen["tax"], "Normal")
 
 

@@ -117,8 +117,8 @@ func test_after_spring_shows_the_ledger_and_the_chart() -> void:
 	var page := _page(game)
 	var chips := _chip_texts(page)
 	assert_true(chips.has("+102"), "money in total")
-	assert_true(chips.has(MINUS + "16"), "money out total")
-	assert_true(chips.has("+86"), "left over")
+	assert_true(chips.has(MINUS + "17"), "money out total")
+	assert_true(chips.has("+85"), "left over")
 	assert_true(chips.has("+65"), "taxes on people")
 	assert_true((page.find_child("Right", true, false) as Control).visible)
 	var chart := page.find_child("Chart", true, false) as InkChart
@@ -284,10 +284,10 @@ func test_districts_at_turn_one_has_the_five_places_in_the_worked_order() -> voi
 	var years: Array[int] = []
 	for id: Variant in table.sorted_ids():
 		years.append(int(by_id[int(id)]))
-	assert_eq(years, [232, 105, 68, 38, 33])
+	assert_eq(years, [228, 105, 68, 38, 33])
 	assert_true(table.row_name(int(table.sorted_ids()[0])).begins_with("Genoa (8, 13)"))
 	assert_true(_label_texts(tab).any(func(t: String) -> bool: return t.begins_with("Wild land: 9 places")))
-	assert_true(_chip_texts(tab).has("+533 a year"))
+	assert_true(_chip_texts(tab).has("+529 a year"))
 	assert_true(_chip_texts(tab).has("+57 a year"))
 	assert_eq(table.accessibility_name, "Districts")
 
@@ -340,17 +340,17 @@ func test_history_after_the_first_year_shows_the_worked_season() -> void:
 	var page := _tabbed(game, &"history")
 	var tab := _tab(page, &"history") as EconomyHistoryTab
 	assert_eq(tab.cursor(), 3, "the cursor starts on the newest season")
-	assert_eq(tab.ledger_sum, 134)
+	assert_eq(tab.ledger_sum, 133)
 	tab.chart().point_activated.emit(0)
 	assert_eq(tab.shown_season(), 0)
 	var texts := _label_texts(tab.ledger())
 	assert_true(texts.has("Spring 1480"))
-	assert_true(texts.has("Treasury 610 → 696"))
-	assert_eq(tab.ledger_sum, 86)
+	assert_true(texts.has("Treasury 610 → 695"))
+	assert_eq(tab.ledger_sum, 85)
 	var chips := _chip_texts(tab.ledger())
-	for want: String in ["+65", "+7", "+30", MINUS + "12", MINUS + "4", "+86"]:
+	for want: String in ["+65", "+7", "+30", MINUS + "13", MINUS + "4", "+85"]:
 		assert_true(chips.has(want), want)
-	assert_true(tab.year_chart().summary().contains("1,068"))
+	assert_true(tab.year_chart().summary().contains("1,064"))
 	assert_false((tab.find_child("YearNote", true, false) as Label).visible)
 
 

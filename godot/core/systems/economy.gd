@@ -136,6 +136,8 @@ static func district_base(game: Game, view: StateView, hex: Vector2i) -> Diction
 	out["level"] = level
 	out["keep"] = _at(fam.keep_wild, level, 100)
 	out["upkeep"] = _at(fam.upkeep, level, 0)
+	if f == SETTLEMENTS:  # a barracks is paid with the settlement's own upkeep
+		out["upkeep"] = int(out["upkeep"]) + Recruiting.upkeep_at(defs, view, i)
 	out["walls"] = _at(fam.walls, level, 0)
 	var place := Improve.place_of(map, hex)
 	if f == SETTLEMENTS and bool(place.get("port", false)) and int(place.get("level", 0)) >= 1 \

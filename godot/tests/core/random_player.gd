@@ -1,5 +1,5 @@
 ## The seeded random player (docs/architecture/m6-build-spec.md section 9, L13; M1 to M6's actions). `next` picks one name of
-## Actions.NAMES and its arguments from the state of a country, so that refusals and successes both occur. It goes through
+## its fixed list NAMES (and of `extra`, when asked) and its arguments from the state of a country, so that refusals and successes both occur. It goes through
 ## the same door as a player (Game.check and Game.act in the tests); it never changes the game itself. Deterministic: the
 ## same game, tag and Rng state give the same pick. Tests only: no engine calls, no autoload.
 ##   next(game, tag, luck) -> {action, args}
@@ -8,8 +8,17 @@
 ## merge_armies {army, into, tag}, disband {army, unit, tag}, march {army, goal, tag}, halt and continue_march {army, tag},
 ## storm {army, goal, tag}, set_standing {army, standing, tag}. MV19: with `stops`, a march now and then carries `via` (one to
 ## three stops: near land, any land, the army's own hex or the stop before it again), so refusals and successes both occur.
+## RQ2 (recruitment-queue.md 12): the list is fixed, so an action added to Actions.NAMES shifts no older test's stream; a test
+## that wants a newer one passes it in `extra` (ADDED): build_barracks {hex, tag}.
 class_name RandomPlayer
 extends RefCounted
+
+## The actions picked from: Actions.NAMES as it stood before the recruitment work, in its order. Never add to it.
+const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise",
+	"split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm",
+	"set_standing"]
+## The actions added since, picked only when a test asks (`extra`).
+const ADDED: Array[String] = ["build_barracks"]
 
 ## Land hexes tried for a random pick before a random one is taken as it is.
 const TRIES := 12
@@ -24,9 +33,11 @@ const MOVES_EVERY := 4
 
 
 ## One random action for `tag`: {action, args}. Changes nothing. `moves` weights Continue and storm up (MOVES); `stops` gives some
-## marches stops (MV19). Without them the stream is the one of before.
-static func next(game: Game, tag: StringName, luck: Rng, moves: bool = false, stops: bool = false) -> Dictionary:
-	var names := Actions.NAMES
+## marches stops (MV19); `extra` adds actions of ADDED to the list. Without them the stream is the one of before.
+static func next(game: Game, tag: StringName, luck: Rng, moves: bool = false, stops: bool = false,
+		extra: Array[String] = []) -> Dictionary:
+	var names: Array[String] = NAMES.duplicate()
+	names.append_array(extra)
 	var action := names[luck.randi_range(0, names.size() - 1)]
 	if moves and luck.randi_range(0, MOVES_EVERY - 1) == 0:
 		action = MOVES[luck.randi_range(0, MOVES.size() - 1)]
@@ -41,6 +52,8 @@ static func _args(game: Game, tag: StringName, action: String, luck: Rng) -> Dic
 			return _build_args(game, tag, luck)
 		"upgrade", "clear", "cancel_work":
 			return {"hex": _hex_of_land(game, tag, luck), "tag": tag}
+		"build_barracks":
+			return _barracks_args(game, tag, luck)
 		"choose_country":
 			return {"tag": _any_tag(game, tag, luck)}
 		"set_tax":
@@ -138,6 +151,20 @@ static func _build_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
 	if not options.is_empty():
 		family = int(options[luck.randi_range(0, options.size() - 1)]["family_id"])
 	return {"hex": hex, "family": family, "tag": tag}
+
+
+## A barracks at a settlement of the country's land (most picks; towns and villages alike, with one or without) or at any
+## hex of it.
+static func _barracks_args(game: Game, tag: StringName, luck: Rng) -> Dictionary:
+	var c := Countries.by_tag(game, tag)
+	var towns: Array[Vector2i] = []
+	if c != null:
+		for i: int in Territory.districts(game, c.id):
+			if int(game.state.main_use[i]) == ImproveRules.SETTLEMENT:
+				towns.append(game.map.hex_of(i))
+	if towns.is_empty() or luck.randi_range(0, STRAY - 1) == 0:
+		return {"hex": _hex_of_land(game, tag, luck), "tag": tag}
+	return {"hex": towns[luck.randi_range(0, towns.size() - 1)], "tag": tag}
 
 
 ## A raise at a settlement of the country's land (most picks) or at any hex; a kind and 1 to 4 companies.

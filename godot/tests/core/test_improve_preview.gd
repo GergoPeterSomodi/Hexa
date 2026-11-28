@@ -229,15 +229,15 @@ func test_4_15_c_the_vineyard_card() -> void:
 	for cell: Dictionary in cells:
 		before_t.append(int(cell["before_treasury"]))
 		after_t.append(int(cell["after_treasury"]))
-	assert_eq(before_t, [88, 95, 114, 136])
-	assert_eq(after_t, [87, 93, 128, 135])
+	assert_eq(before_t, [87, 94, 113, 135])
+	assert_eq(after_t, [86, 92, 127, 134])
 	var year: Dictionary = card["year"]
-	assert_eq([year["before"], year["after"], year["gain"], year["gain_realm"], year["gain_treasury"]], [511, 533, 22, 22, 10])
+	assert_eq([year["before"], year["after"], year["gain"], year["gain_realm"], year["gain_treasury"]], [507, 529, 22, 22, 10])
 	var lands: Dictionary = card["lands"]
 	assert_eq(lands["district"], {"before": 6, "after": 32})
 	assert_eq(lands["upkeep"], 4)
 	assert_eq(lands["ring"], [{"text": "Ring of six: nothing changes"}])
-	assert_eq([(lands["country"] as Dictionary)["before"], (lands["country"] as Dictionary)["after"]], [511, 533])
+	assert_eq([(lands["country"] as Dictionary)["before"], (lands["country"] as Dictionary)["after"]], [507, 529])
 	var cost: Dictionary = card["cost"]
 	assert_eq(cost["text"], "40 ducats · 4 seasons · ready Spring 1481 · first vintage Autumn 1481")
 	assert_eq([cost["ducats"], cost["seasons"], cost["ready_turn"], cost["first_yield_turn"]], [40, 4, 5, 7])
@@ -264,7 +264,8 @@ func test_4_15_c_the_vineyard_card() -> void:
 func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 	# M5 spec 4.11 (c) replaces M4's 4.15 (d): an upgrade brings room, not people (D17), so the card says "Room 45,000 ->
 	# 100,000" and the gains are the dues, fish, lift and upkeep alone (+15, +16, +15, +10 a season, +56 a year). The people
-	# never change in this game (no people phase runs here), so the realm's year is M4's 557 plus 56.
+	# never change in this game (no people phase runs here), so the realm's year is M4's 557, less 4 for the barracks'
+	# upkeep (RQ2), plus 56.
 	var g := EconomyFixture.game(&"GEN")
 	var card := ImprovePreview.of(g, &"GEN", Vector2i(8, 13), {"action": Works.UPGRADE, "family": 0})
 	_same_keys(card, PreviewSample.genoa_city_refused(), "genoa")
@@ -288,7 +289,7 @@ func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 	assert_eq(treasury, [13, 15, 14, 8])
 	assert_eq((card["by_season"][3] as Dictionary)["note"], "port dues 30 % lower")
 	var year: Dictionary = card["year"]
-	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [557, 613, 56, 50])
+	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [553, 609, 56, 50])
 	var ring: Array = (card["lands"] as Dictionary)["ring"]
 	assert_eq((ring[0] as Dictionary)["text"], "timber near Genoa (9, 13): +1 a season, +2 in winter (the city's market)")
 	assert_eq(card["cost"]["text"], "1,000 ducats · 20 timber · 40 stone · 8 seasons · ready Spring 1482 if begun now")
@@ -305,7 +306,7 @@ func test_4_15_d_genoa_to_city_refused_for_money() -> void:
 
 func test_4_11_c_genoa_to_city_with_people_growing() -> void:
 	# The same card on the real, growing defs (spec 4.11 c): the people's taxes grow in both runs, so the gains are the
-	# dues, fish, lift and upkeep alone; the realm's year is 561 -> 617 and the treasury's payback is Autumn 1503, 94 seasons
+	# dues, fish, lift and upkeep alone; the realm's year is 557 -> 613 (561 -> 617 before the barracks' upkeep, RQ2) and the treasury's payback is Autumn 1503, 94 seasons
 	# (spec 4.11 c is right: on still people the treasury's gains are 13, 15, 14, 8 and the payback 92 seasons, Spring 1503).
 	var g := PeopleFixture.genoa()
 	var card := ImprovePreview.of(g, &"GEN", Vector2i(8, 13), {"action": Works.UPGRADE, "family": 0})
@@ -319,7 +320,7 @@ func test_4_11_c_genoa_to_city_with_people_growing() -> void:
 	assert_eq(gains, [15, 16, 15, 10])
 	assert_eq(treasury, [13, 14, 14, 8])
 	var year: Dictionary = card["year"]
-	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [561, 617, 56, 49])
+	assert_eq([year["before"], year["after"], year["gain_realm"], year["gain_treasury"]], [557, 613, 56, 49])
 	assert_eq((card["brings"] as Array)[0], {"field": &"room", "label": "Room", "before": 45000, "after": 100000, "per": &""})
 	assert_eq(card["people_note"], "People 30,000: the new room counts once they pass 45,000, in about 41 seasons.")
 	var chips: Array = card["chips"]

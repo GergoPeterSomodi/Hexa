@@ -159,7 +159,7 @@ static func _new_holder(game: Game, tag: StringName) -> Dictionary:
 	var own := StateView.of(game.state)
 	var holder: Dictionary = {"records": [] as Array[Dictionary], "country": c, "memo": {}, "standing": [] as Array[Dictionary],
 		"profile": {}, "live": {}, "own": own, "stepped": 0, "p": {}, "lv": {}, "act": {}, "gone": {}, "landed": 0,
-		"stock": PackedInt32Array(), "view_next": own,
+		"stock": PackedInt32Array(), "view_next": own, "barracks": [] as Array[int],
 		"cum_town": 0, "cum_rest": 0, "dirty_cum": {}, "cand": {}, "losers": {}, "staff": {}}
 	if c == null or game.defs == null:
 		holder["country"] = null
@@ -216,8 +216,10 @@ static func _record(game: Game, holder: Dictionary, tax: int, k: int) -> Diction
 	}
 	var dirty: Dictionary = {}
 	var heavy := PackedInt32Array()
-	if not lv.is_empty():
-		heavy = EconomyPreviewDelta.around(game, lv.keys())
+	var changed: Array = lv.keys()
+	changed.append_array(holder["barracks"] as Array[int])  # the barracks finished by now: their upkeep
+	if not changed.is_empty():
+		heavy = EconomyPreviewDelta.around(game, changed)
 		EconomyPreviewDelta.adjust(game, c, rec, own, view, heavy, season, tax, [], true, true, holder["memo"] as Dictionary)
 		for i: int in heavy:
 			dirty[i] = true
@@ -342,8 +344,9 @@ static func _rates3(defs: GameDefs, season: int, tax: int) -> Array[Vector2i]:
 
 
 ## The works that finish in the works phase of the season at `turn` (ready the turn after): laid on the baseline's pieces, marked
-## gone (they no longer block a level change) and their hexes made active. Returns hex index -> pair.
-static func _land_works(game: Game, holder: Dictionary, turn: int) -> Dictionary:
+## gone (they no longer block a level change) and their hexes made active. Returns hex index -> pair. A barracks changes no
+## piece: its hex index goes into holder.barracks and into `built`.
+static func _land_works(game: Game, holder: Dictionary, turn: int, built: Array[int]) -> Dictionary:
 	var c: Country = holder["country"]
 	var lv: Dictionary = holder["lv"]
 	var act: Dictionary = holder["act"]
@@ -354,8 +357,12 @@ static func _land_works(game: Game, holder: Dictionary, turn: int) -> Dictionary
 	while landed < standing.size() and int((standing[landed] as Dictionary)["ready"]) <= turn + 1:
 		var entry: Dictionary = standing[landed]
 		var at := int(entry["i"])
-		lv[at] = entry["pair"]
-		landing[at] = entry["pair"]
+		if (entry["work"] as Work).action == Works.BARRACKS:
+			(holder["barracks"] as Array[int]).append(at)
+			built.append(at)
+		else:
+			lv[at] = entry["pair"]
+			landing[at] = entry["pair"]
 		gone[entry["work"]] = true
 		var ruler := int(game.state.occupier[at]) if int(game.state.occupier[at]) != 0 else int(game.state.owner[at])
 		if ruler == c.id:  # M7: the country that controls the hex walks it (People.active)
@@ -384,10 +391,13 @@ static func _step_record(game: Game, holder: Dictionary, tax: int) -> void:
 	var lv: Dictionary = holder["lv"]
 	var act: Dictionary = holder["act"]
 	var gone: Dictionary = holder["gone"]
-	var landing := _land_works(game, holder, turn)
+	var built: Array[int] = []
+	var landing := _land_works(game, holder, turn, built)
 	var view_p: StateView = rec["view"]
 	if not landing.is_empty():
 		view_p = view_p.with(landing)
+	if not built.is_empty():
+		view_p = view_p.with_barracks(built)
 	var p: Dictionary = holder["p"]
 	var p_next := p.duplicate()
 	var rates := _rates3(defs, season, tax)

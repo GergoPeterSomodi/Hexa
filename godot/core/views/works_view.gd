@@ -6,9 +6,11 @@ extends RefCounted
 const NO_HEX := Vector2i(-1, -1)
 
 
-## "vineyard, first stage"; "walled town to city"; "vineyard, first to second stage"; "clearing the vineyard".
-## The level words are HexCard's.
+## "vineyard, first stage"; "walled town to city"; "vineyard, first to second stage"; "clearing the vineyard";
+## "barracks". The level words are HexCard's.
 static func label(_game: Game, work: Work) -> String:
+	if work.action == Works.BARRACKS:
+		return "barracks"
 	var piece := FamilyIds.NAMES[clampi(work.family, 0, FamilyIds.COUNT - 1)]
 	if work.action == Works.CLEAR:
 		return "clearing the %s" % piece_name(work.family)

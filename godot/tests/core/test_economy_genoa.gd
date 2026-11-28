@@ -43,11 +43,11 @@ func test_genoas_first_year_to_the_ducat() -> void:
 	var used := {FISH: 4, OIL: 1, WINE: 1, SALT: 1}
 	# per season: made, sold, [people, goods, dues, upkeep, walls], net, treasury after.
 	var years: Array = [
-		[{GRAIN: 2, FISH: 6, TIMBER: 6}, {GRAIN: 2, FISH: 2, TIMBER: 6}, [65, 7, 30, -12, -4], 86, 696],
-		[{GRAIN: 6, FISH: 6, TIMBER: 6}, {GRAIN: 6, FISH: 2, TIMBER: 6}, [65, 9, 33, -12, -4], 91, 787],
+		[{GRAIN: 2, FISH: 6, TIMBER: 6}, {GRAIN: 2, FISH: 2, TIMBER: 6}, [65, 7, 30, -13, -4], 85, 695],
+		[{GRAIN: 6, FISH: 6, TIMBER: 6}, {GRAIN: 6, FISH: 2, TIMBER: 6}, [65, 9, 33, -13, -4], 90, 785],
 		[{GRAIN: 4, FISH: 6, OIL: 14, WINE: 24, TIMBER: 12}, {GRAIN: 4, FISH: 2, OIL: 11, WINE: 21, TIMBER: 12},
-			[65, 68, 30, -12, -4], 147, 934],
-		[{GRAIN: 1, FISH: 4, OIL: 28, TIMBER: 23}, {GRAIN: 1, OIL: 27, TIMBER: 23}, [65, 64, 21, -12, -4], 134, 1068],
+			[65, 68, 30, -13, -4], 146, 931],
+		[{GRAIN: 1, FISH: 4, OIL: 28, TIMBER: 23}, {GRAIN: 1, OIL: 27, TIMBER: 23}, [65, 64, 21, -13, -4], 133, 1064],
 	]
 	for n: int in 4:
 		var row: Array = years[n]
@@ -108,19 +108,19 @@ func test_the_report_of_spring_1480_on_the_fixture_4_15_b() -> void:
 	assert_eq(c.treasury, 570, "40 ducats for the first stage")
 	assert_eq(c.stock[TIMBER], 40, "no goods for a first stage")
 	Season.run(g)
-	assert_eq(c.treasury, 658)
+	assert_eq(c.treasury, 657)
 	var lines := c.ledger_closed["lines"] as Array
 	var totals := EconomyFixture.totals(lines)
 	assert_eq(totals["tax_people"], 65)
 	assert_eq(totals["tax_goods"], 7)
 	assert_eq(totals["port_dues"], 30)
-	assert_eq(totals["upkeep_districts"], -10)
+	assert_eq(totals["upkeep_districts"], -11)
 	assert_eq(totals["upkeep_walls"], -4)
 	assert_eq(totals["work"], -40)
 	var typed: Array[Dictionary] = []
 	typed.assign(lines)
-	assert_eq(Treasury.left_over(typed), 88, "left over each season")
-	assert_eq(int(c.ledger_closed["closing"]) - int(c.ledger_closed["opening"]), 48)
+	assert_eq(Treasury.left_over(typed), 87, "left over each season")
+	assert_eq(int(c.ledger_closed["closing"]) - int(c.ledger_closed["opening"]), 47)
 	assert_eq(c.stock[GRAIN], 16, "grain 16 (made 3, sold 3)")
 	assert_eq(Stores.flow(c, GRAIN, &"made", true), 3)
 	assert_eq(c.stock[WINE], 3)

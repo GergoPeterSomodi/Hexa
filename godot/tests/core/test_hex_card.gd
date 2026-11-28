@@ -355,7 +355,7 @@ func test_no_gives_or_weather_without_countries_or_at_sea() -> void:
 func test_worth_line_of_genoa_and_others() -> void:
 	var game := EconomyFixture.game(&"GEN")
 	var card := HexCard.of(game, InsightsFixture.GENOA_HEX)
-	assert_eq(_find_line(card["lines"] as Array, "Worth"), ["Worth", &"good", "+232 a year (+60 this season)"])
+	assert_eq(_find_line(card["lines"] as Array, "Worth"), ["Worth", &"good", "+228 a year (+59 this season)"])
 	var vineyard := HexCard.of(game, EconomyFixture.VINEYARD_HEX)
 	assert_eq(_find_line(vineyard["lines"] as Array, "Worth"), ["Worth", &"good", "+68 a year (+2 this season)"])
 

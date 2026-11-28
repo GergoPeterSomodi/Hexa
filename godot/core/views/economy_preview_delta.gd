@@ -96,14 +96,15 @@ static func base(game: Game, view: StateView, i: int, own: bool, memo: Dictionar
 	return base
 
 
-## A negative key that stands for everything a hex's base reads from a view: the piece and the people of the hex and the six
-## round it (the owner never changes within a version). The same numbers in another view (the next season's, an option's)
+## A negative key that stands for everything a hex's base reads from a view: its barracks, the piece and the people of the
+## hex and the six round it (the owner never changes within a version). The same numbers in another view (the next season's, an option's)
 ## share one base instead of working it out again.
 static func signature(game: Game, view: StateView, i: int) -> int:
 	var h := i + 1
 	h = h * 1000003 + view.main_use_at(i)
 	h = h * 1000003 + view.level_at(i)
 	h = h * 1000003 + view.people_at(i)
+	h = h * 1000003 + int(view.barracks_at(i))
 	for j: int in Economy.ring_of(game.map, i):
 		if j >= 0:
 			h = h * 1000003 + view.main_use_at(j)

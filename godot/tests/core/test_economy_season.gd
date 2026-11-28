@@ -158,11 +158,11 @@ func test_genoas_first_year_equals_4_15_a() -> void:
 	var treasury := 610
 	# made, sold, the lines (people, goods, dues, upkeep, walls), the net and the treasury after, per season.
 	var years: Array = [
-		[{GRAIN: 2, FISH: 6, TIMBER: 6}, {GRAIN: 2, FISH: 2, TIMBER: 6}, [65, 7, 30, -12, -4], 86, 696],
-		[{GRAIN: 6, FISH: 6, TIMBER: 6}, {GRAIN: 6, FISH: 2, TIMBER: 6}, [65, 9, 33, -12, -4], 91, 787],
+		[{GRAIN: 2, FISH: 6, TIMBER: 6}, {GRAIN: 2, FISH: 2, TIMBER: 6}, [65, 7, 30, -13, -4], 85, 695],
+		[{GRAIN: 6, FISH: 6, TIMBER: 6}, {GRAIN: 6, FISH: 2, TIMBER: 6}, [65, 9, 33, -13, -4], 90, 785],
 		[{GRAIN: 4, FISH: 6, OIL: 14, WINE: 24, TIMBER: 12}, {GRAIN: 4, FISH: 2, OIL: 11, WINE: 21, TIMBER: 12},
-			[65, 68, 30, -12, -4], 147, 934],
-		[{GRAIN: 1, FISH: 4, OIL: 28, TIMBER: 23}, {GRAIN: 1, OIL: 27, TIMBER: 23}, [65, 64, 21, -12, -4], 134, 1068],
+			[65, 68, 30, -13, -4], 146, 931],
+		[{GRAIN: 1, FISH: 4, OIL: 28, TIMBER: 23}, {GRAIN: 1, OIL: 27, TIMBER: 23}, [65, 64, 21, -13, -4], 133, 1064],
 	]
 	for season: int in 4:
 		var info := EconomySeason.made_of(_game, _view(), &"GEN", season, weather, 1)
@@ -183,7 +183,7 @@ func test_genoas_first_year_equals_4_15_a() -> void:
 		treasury += net
 		assert_eq(treasury, row[4])
 		stock = step["stock"]
-		assert_eq(info["upkeep"], 12)
+		assert_eq(info["upkeep"], 13)
 		assert_eq(info["upkeep_count"], 5)
 	# Salt ran out in Winter 1480: salt's satisfaction is 0 from Spring 1481, contentment 900, the factor 975.
 	assert_eq(stock[SALT], 0)
@@ -202,7 +202,7 @@ func test_genoa_as_a_city_taxes_and_needs_4_15_d() -> void:
 	assert_eq(EconomySeason.town_people(_game, view, &"GEN"), 70000)
 	assert_eq(EconomySeason.needs_of(_game, view, &"GEN")["food"], 7)
 	var info := EconomySeason.made_of(_game, view, &"GEN", 0, PackedByteArray(CALM), 1)
-	assert_eq(info["upkeep"], 15, "the country's upkeep: Genoa's 2 becomes 5")
+	assert_eq(info["upkeep"], 16, "the country's upkeep: Genoa's 2 becomes 5, its barracks' 1 stays")
 	assert_eq(info["walls"][0]["amount"], 6, "Genoa's upkeep and walls 6 -> 11")
 	assert_eq(info["dues"][0]["amount"], 45)
 	assert_eq(info["made"][FISH], 10)
@@ -313,7 +313,7 @@ func test_production_moves_every_good_through_stores_with_the_three_flows() -> v
 	assert_eq(c.treasury, 610, "production touches no money")
 	assert_true(c.ledger_open.is_empty())
 	Season.run_phase(g, &"income")
-	assert_eq(c.treasury, 696)
+	assert_eq(c.treasury, 695)
 	assert_eq(c.stock[11], 40, "income touches no goods")
 
 

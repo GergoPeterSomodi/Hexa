@@ -85,9 +85,9 @@ func test_the_lists_show_the_exact_numbers_of_north_italy() -> void:
 	assert_eq(land[7], ["8", "Genoa (you)", "14"])
 	var income := _row_texts(_table(page, INCOME))
 	assert_eq(income.size(), 13)
-	assert_eq(income[0], ["1", "Venice", "+287"])
-	assert_eq(income[1], ["2", "Milan", "+261"])
-	assert_eq(income[5], ["6", "Genoa (you)", "+86"])
+	assert_eq(income[0], ["1", "Venice", "+286"])
+	assert_eq(income[1], ["2", "Milan", "+260"])
+	assert_eq(income[5], ["6", "Genoa (you)", "+85"])
 
 
 func test_you_are_ranked_under_both_lists() -> void:

@@ -182,7 +182,7 @@ static func _near(game: Game, hex: Vector2i) -> Array[Dictionary]:
 				out.append({"family": int(game.state.main_use[i]), "level": int(game.state.level[i]), "distance": distance, "hex": at})
 	for w: Work in game.state.works:
 		var distance := ImproveRules.hex_distance(hex, w.hex)
-		if w.hex != hex and w.action != Works.CLEAR and distance >= 1 and distance <= 2:
+		if w.hex != hex and Works.changes_piece(w) and distance >= 1 and distance <= 2:
 			out.append({"family": w.family, "level": w.level_to, "distance": distance, "hex": w.hex})
 	return out
 
@@ -212,7 +212,7 @@ static func pair_lines(game: Game, hex: Vector2i, family: int, level: int) -> Ar
 ## Works.pending_conflict walks them; {} for none.
 static func pending(game: Game, hex: Vector2i, family: int, level: int) -> Dictionary:
 	for w: Work in game.state.works:
-		if w.hex == hex or w.action == Works.CLEAR:
+		if w.hex == hex or not Works.changes_piece(w):
 			continue
 		var distance := ImproveRules.hex_distance(hex, w.hex)
 		if distance < 1 or distance > 2:

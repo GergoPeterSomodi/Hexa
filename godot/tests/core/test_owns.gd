@@ -13,6 +13,7 @@ const ACTION_OWNERS := {
 	"upgrade": ["works", "next_work_id", "purse", "stores"],
 	"clear": ["works", "next_work_id", "purse", "stores"],
 	"cancel_work": ["works", "next_work_id", "purse", "stores"],
+	"build_barracks": ["works", "next_work_id", "purse", "stores"],
 	"choose_country": ["countries", "player"],
 	"set_tax": ["countries"],
 }
@@ -25,7 +26,7 @@ const PHASE_OWNERS := {
 	&"supply": ["armies", "stores", "people", "people_flows"],  # hunger through Armies, food through Stores, foraging through People
 	&"production": ["stores", "countries"],
 	&"income": ["purse"],  # the upkeep_army line is Treasury's too (M6)
-	&"works": ["main_use", "level", "works", "next_work_id"],
+	&"works": ["main_use", "level", "works", "next_work_id", "barracks"],  # barracks: a finished one, Recruiting's (RQ2)
 	&"people": ["people", "people_flows", "food", "main_use", "level"],
 	# The End-turn leg (moves-build-spec.md R22a): the movement phase's walks, then the battles they open, fought as that phase.
 	&"march_on": ["armies", "countries", "battles", "wars", "occupier", "garrison", "unsupported", "people", "people_flows", "luck"],
@@ -148,6 +149,34 @@ func test_every_action_changes_only_its_owners_and_the_door() -> void:
 	changed = _act(g, "clear", {"hex": HOME, "tag": &"AAA"})
 	assert_true(changed.has("works"), str(changed))
 	assert_false(changed.has("luck"), "no action draws luck")
+
+
+func test_building_a_barracks_writes_only_the_owners_fields() -> void:
+	var g := _game()
+	g.act("choose_country", {"tag": &"AAA"})
+	var hex := ScenarioFixture.ALPHA_CAPITAL
+	var i := g.map.index_of(hex)
+	g.state.barracks[i] = 0  # the capital's own, taken off to build one
+	g.state.level[i] = g.defs.barracks.min_level
+	g.dev_money(&"AAA", 1000)
+	for key: String in g.defs.barracks.cost_goods:
+		g.dev_goods(&"AAA", g.defs.good_id(StringName(key)), 100)
+	var changed := _act(g, "build_barracks", {"hex": hex, "tag": &"AAA"})
+	assert_true(changed.has("works") and changed.has("purse") and changed.has("stores"), str(changed))
+	assert_false(changed.has("barracks"), "an action puts no barracks")
+	var wrote := false
+	for n: int in 40:
+		if g.state.works.is_empty():
+			break
+		for phase: StringName in Season.PHASES:
+			var before := _fields(g)
+			Season.run_phase(g, phase)
+			var diff := _changed(before, _fields(g))
+			assert_eq(_violations(diff, PHASE_OWNERS[phase] as Array), [] as Array[String], "phase %s" % phase)
+			wrote = wrote or (phase == &"works" and diff.has("barracks"))
+		Season.finish(g)
+	assert_true(wrote, "the works phase put the barracks")
+	assert_true(Recruiting.has_barracks(g, hex))
 
 
 func test_refused_actions_change_nothing() -> void:

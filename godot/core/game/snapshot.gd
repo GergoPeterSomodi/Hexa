@@ -353,8 +353,8 @@ static func _occupied_ok(game: Game, i: int, occ: int) -> bool:
 	return bool(Wars.at_war.call(game, occupier.tag, owner.tag))
 
 
-## Every use is a family, every level within the family's top, every owner a country, and the sea holds none; a barracks
-## stands only on a settlement.
+## Every use is a family, every level within the family's top, every owner a country, and the sea holds none; a barracks,
+## and a barracks work, only on a settlement.
 static func _ranges_ok(state: MapState, map: MapData, country_count: int) -> bool:
 	for i: int in map.hex_count():
 		var use := int(state.main_use[i])
@@ -367,6 +367,9 @@ static func _ranges_ok(state: MapState, map: MapData, country_count: int) -> boo
 		if state.barracks[i] != 0 and use != ImproveRules.SETTLEMENT:
 			return false
 		if not _people_ok(state, map, i):
+			return false
+	for w: Work in state.works:
+		if String(w.action) == "barracks" and int(state.main_use[map.index_of(w.hex)]) != ImproveRules.SETTLEMENT:
 			return false
 	return true
 

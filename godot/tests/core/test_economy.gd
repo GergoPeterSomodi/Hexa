@@ -340,7 +340,7 @@ func test_genoa_hex_by_hex_equals_4_15_a() -> void:
 			assert_eq(goods, GENOA[hex][season], "%s season %d" % [hex, season])
 			assert_eq(out["ducats"], GENOA_DUES[season] if hex == Vector2i(8, 13) else 0, "dues %s %d" % [hex, season])
 	var walled := Economy.district_output(_game, view, Vector2i(8, 13), 0)
-	assert_eq([walled["upkeep"], walled["walls"]], [2, 4])
+	assert_eq([walled["upkeep"], walled["walls"]], [3, 4])  # the walled town's 2 and its barracks' 1
 	assert_eq(Economy.district_output(_game, view, Vector2i(7, 14), 0)["upkeep"], 4)
 
 
@@ -351,7 +351,7 @@ func test_genoa_as_a_city_4_15_d() -> void:
 	var spring := Economy.district_output(_game, view, Vector2i(8, 13), 0)
 	assert_eq(spring["ducats"], 45)
 	assert_eq(spring["goods"][1], 10, "fish")
-	assert_eq([spring["upkeep"], spring["walls"]], [5, 6])
+	assert_eq([spring["upkeep"], spring["walls"]], [6, 6])  # the city's 5 and the barracks' 1
 	var ring := Economy.district_output(_game, view, Vector2i(9, 13), 0)
 	assert_eq(ring["goods"][11], 7, "timber near a city: +1 a season")
 	assert_eq(Economy.district_output(_game, view, Vector2i(9, 13), 3)["goods"][11], 21, "+2 in winter")

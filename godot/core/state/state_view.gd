@@ -11,6 +11,8 @@ var state: MapState = null
 var _over: Dictionary = {}
 ## Hex index -> people (int); never shared with another view.
 var _people_over: Dictionary = {}
+## Hex index -> true: barracks the state does not hold yet; never shared with another view.
+var _barracks_over: Dictionary = {}
 
 
 ## A view with no overlay: it reads exactly what the state holds.
@@ -27,6 +29,7 @@ func with(changes: Dictionary) -> StateView:
 	v.state = state
 	v._over = _over.duplicate()
 	v._people_over = _people_over.duplicate()
+	v._barracks_over = _barracks_over.duplicate()
 	var n := state.main_use.size()
 	for key: Variant in changes:
 		var i := int(key)
@@ -45,6 +48,7 @@ func with_people(people: Dictionary) -> StateView:
 	v.state = state
 	v._over = _over.duplicate()
 	v._people_over = _people_over.duplicate()
+	v._barracks_over = _barracks_over.duplicate()
 	var n := state.main_use.size()
 	for key: Variant in people:
 		if typeof(key) != TYPE_INT:
@@ -55,6 +59,25 @@ func with_people(people: Dictionary) -> StateView:
 			continue
 		v._people_over[i] = int(value)
 	return v
+
+
+## A new view that also has a barracks on these hex indices (a barracks work that will have finished,
+## recruitment-queue.md 4.2); this view's other changes are kept. Indices outside the state's hexes are dropped.
+func with_barracks(indices: Array[int]) -> StateView:
+	var v := with({})
+	var n := state.main_use.size()
+	for i: int in indices:
+		if i >= 0 and i < n:
+			v._barracks_over[i] = true
+	return v
+
+
+## Whether a barracks stands on hex `i` in the view: its own, else the state's; false for an index outside the state or
+## an empty array.
+func barracks_at(i: int) -> bool:
+	if _barracks_over.has(i):
+		return true
+	return i >= 0 and i < state.barracks.size() and state.barracks[i] != 0
 
 
 ## The view's own people number for hex `i`, else the state's; 0 for an index outside the state or an empty array.

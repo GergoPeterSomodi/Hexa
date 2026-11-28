@@ -59,8 +59,8 @@ func test_turn_two_lists_on_north_italy_every_country_known() -> void:
 	assert_eq((land["rows"] as Array)[7]["name"], "Genoa (you)")
 	assert_eq((land["rows"] as Array)[7]["text"], "14", "yours exact, no band")
 	var income := _measure(r, &"income")
-	assert_eq(_texts(income)[0], "Venice +287")
-	assert_eq(_texts(income)[1], "Milan +261")
+	assert_eq(_texts(income)[0], "Venice +286")
+	assert_eq(_texts(income)[1], "Milan +260")
 	assert_eq(income["rank"], 6)
 	assert_eq(income["you_text"], "You are 6th of 13.")
 

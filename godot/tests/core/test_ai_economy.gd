@@ -131,7 +131,7 @@ func test_the_first_row_that_applies_wins() -> void:
 
 func test_the_tax_line_names_its_numbers() -> void:
 	var line: String = _tax(192, NORMAL)["line"]
-	for part: String in ["T 192", "R 96", "W 0", "N_low 64", "N_normal 86", "at peace", "level Normal", "row 5", "Low"]:
+	for part: String in ["T 192", "R 96", "W 0", "N_low 63", "N_normal 85", "at peace", "level Normal", "row 5", "Low"]:
 		assert_true(line.contains(part), "%s in %s" % [part, line])
 
 
@@ -514,10 +514,10 @@ func test_p_fortify_is_for_the_steadfast_only_and_while_a_threat_exists() -> voi
 func test_genoas_brief_is_4_16_a() -> void:
 	var g := AiFixture.watch()
 	var b := AiBrief.make(g, GEN)
-	assert_eq([b.treasury, b.upkeep, b.reserve, b.net, b.people], [610, 16, 96, 86, 82700], "T, U, R, N, people")
+	assert_eq([b.treasury, b.upkeep, b.reserve, b.net, b.people], [610, 17, 102, 85, 82700], "T, U, R, N, people")
 	assert_eq(AiKnow.slots_free(g, GEN), 2)
-	assert_eq(AiKnow.preview_net(g, GEN, 0), 64, "N_low")
-	assert_eq(AiKnow.preview_net(g, GEN, 1), 86, "N_normal: 4.16 (a)'s +86")
+	assert_eq(AiKnow.preview_net(g, GEN, 0), 63, "N_low")
+	assert_eq(AiKnow.preview_net(g, GEN, 1), 85, "N_normal: 4.16 (a)'s +86, less the barracks' upkeep")
 	assert_eq(AiKnow.work_candidates(g, GEN).size(), 11)
 
 
@@ -539,6 +539,6 @@ func test_genoas_first_turn_works_and_tax() -> void:
 	var text := "\n".join(hook.trace_of(GEN))
 	for part: String in ["works_scan 0: 11 candidates", "works_card 0: build grazing at (8, 12) prior 750 x priority 1000 = score 750",
 			"payback 8 seasons x jitter", "works_act: takes build grazing at (8, 12), payback 8 (limit 40), cost 40",
-			"works_act: 2 of 2 works begun, W 0", "tax: T ", " N_low 57 N_normal 78, at peace, level Normal: row 5 gives Low",
+			"works_act: 2 of 2 works begun, W 0", "tax: T ", " N_low 56 N_normal 77, at peace, level Normal: row 5 gives Low",
 			"did build hex=(8, 12) family=9", "did set_tax level=0"]:
 		assert_true(text.contains(part), "%s in the trace" % part)

@@ -89,12 +89,12 @@ static func _vineyard_brings() -> Variant:
 
 static func _vineyard_by_season() -> Variant:
 	return [{
-	"after": 94,
-	"after_realm": 94,
-	"after_treasury": 87,
-	"before": 96,
-	"before_realm": 96,
-	"before_treasury": 88,
+	"after": 93,
+	"after_realm": 93,
+	"after_treasury": 86,
+	"before": 95,
+	"before_realm": 95,
+	"before_treasury": 87,
 	"gain": -2,
 	"gain_realm": -2,
 	"gain_treasury": -1,
@@ -108,12 +108,12 @@ static func _vineyard_by_season() -> Variant:
 	"season": "Spring",
 	"turn": 1
 	}, {
-	"after": 102,
-	"after_realm": 102,
-	"after_treasury": 93,
-	"before": 105,
-	"before_realm": 105,
-	"before_treasury": 95,
+	"after": 101,
+	"after_realm": 101,
+	"after_treasury": 92,
+	"before": 104,
+	"before_realm": 104,
+	"before_treasury": 94,
 	"gain": -3,
 	"gain_realm": -3,
 	"gain_treasury": -2,
@@ -127,12 +127,12 @@ static func _vineyard_by_season() -> Variant:
 	"season": "Summer",
 	"turn": 2
 	}, {
-	"after": 168,
-	"after_realm": 168,
-	"after_treasury": 128,
-	"before": 140,
-	"before_realm": 140,
-	"before_treasury": 114,
+	"after": 167,
+	"after_realm": 167,
+	"after_treasury": 127,
+	"before": 139,
+	"before_realm": 139,
+	"before_treasury": 113,
 	"gain": 28,
 	"gain_realm": 28,
 	"gain_treasury": 14,
@@ -150,12 +150,12 @@ static func _vineyard_by_season() -> Variant:
 	"season": "Autumn",
 	"turn": 3
 	}, {
-	"after": 169,
-	"after_realm": 169,
-	"after_treasury": 135,
-	"before": 170,
-	"before_realm": 170,
-	"before_treasury": 136,
+	"after": 168,
+	"after_realm": 168,
+	"after_treasury": 134,
+	"before": 169,
+	"before_realm": 169,
+	"before_treasury": 135,
 	"gain": -1,
 	"gain_realm": -1,
 	"gain_treasury": -1,
@@ -169,12 +169,12 @@ static func _vineyard_by_season() -> Variant:
 
 static func _vineyard_year() -> Variant:
 	return {
-	"after": 533,
-	"after_realm": 533,
-	"after_treasury": 443,
-	"before": 511,
-	"before_realm": 511,
-	"before_treasury": 433,
+	"after": 529,
+	"after_realm": 529,
+	"after_treasury": 439,
+	"before": 507,
+	"before_realm": 507,
+	"before_treasury": 429,
 	"gain": 22,
 	"gain_realm": 22,
 	"gain_treasury": 10
@@ -184,10 +184,10 @@ static func _vineyard_year() -> Variant:
 static func _vineyard_lands() -> Variant:
 	return {
 	"country": {
-	"after": 533,
-	"after_treasury": 443,
-	"before": 511,
-	"before_treasury": 433
+	"after": 529,
+	"after_treasury": 439,
+	"before": 507,
+	"before_treasury": 429
 	},
 	"district": {
 	"after": 32,
@@ -373,8 +373,8 @@ static func _genoa_city_refused_brings() -> Variant:
 	"label": "Towns' food",
 	"per": &"season"
 	}, {
-	"after": 11,
-	"before": 6,
+	"after": 12,
+	"before": 7,
 	"field": &"upkeep",
 	"label": "Upkeep and walls",
 	"per": &"season"
@@ -383,12 +383,12 @@ static func _genoa_city_refused_brings() -> Variant:
 
 static func _genoa_city_refused_by_season() -> Variant:
 	return [{
-	"after": 108,
-	"after_realm": 108,
-	"after_treasury": 99,
-	"before": 93,
-	"before_realm": 93,
-	"before_treasury": 86,
+	"after": 107,
+	"after_realm": 107,
+	"after_treasury": 98,
+	"before": 92,
+	"before_realm": 92,
+	"before_treasury": 85,
 	"gain": 15,
 	"gain_realm": 15,
 	"gain_treasury": 13,
@@ -402,12 +402,12 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Spring",
 	"turn": 1
 	}, {
-	"after": 116,
-	"after_realm": 116,
-	"after_treasury": 106,
-	"before": 100,
-	"before_realm": 100,
-	"before_treasury": 91,
+	"after": 115,
+	"after_realm": 115,
+	"after_treasury": 105,
+	"before": 99,
+	"before_realm": 99,
+	"before_treasury": 90,
 	"gain": 16,
 	"gain_realm": 16,
 	"gain_treasury": 15,
@@ -421,12 +421,12 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Summer",
 	"turn": 2
 	}, {
-	"after": 211,
-	"after_realm": 211,
-	"after_treasury": 161,
-	"before": 196,
-	"before_realm": 196,
-	"before_treasury": 147,
+	"after": 210,
+	"after_realm": 210,
+	"after_treasury": 160,
+	"before": 195,
+	"before_realm": 195,
+	"before_treasury": 146,
 	"gain": 15,
 	"gain_realm": 15,
 	"gain_treasury": 14,
@@ -440,12 +440,12 @@ static func _genoa_city_refused_by_season() -> Variant:
 	"season": "Autumn",
 	"turn": 3
 	}, {
-	"after": 178,
-	"after_realm": 178,
-	"after_treasury": 142,
-	"before": 168,
-	"before_realm": 168,
-	"before_treasury": 134,
+	"after": 177,
+	"after_realm": 177,
+	"after_treasury": 141,
+	"before": 167,
+	"before_realm": 167,
+	"before_treasury": 133,
 	"gain": 10,
 	"gain_realm": 10,
 	"gain_treasury": 8,
@@ -463,12 +463,12 @@ static func _genoa_city_refused_by_season() -> Variant:
 
 static func _genoa_city_refused_year() -> Variant:
 	return {
-	"after": 613,
-	"after_realm": 613,
-	"after_treasury": 508,
-	"before": 557,
-	"before_realm": 557,
-	"before_treasury": 458,
+	"after": 609,
+	"after_realm": 609,
+	"after_treasury": 504,
+	"before": 553,
+	"before_realm": 553,
+	"before_treasury": 454,
 	"gain": 56,
 	"gain_realm": 56,
 	"gain_treasury": 50
@@ -478,10 +478,10 @@ static func _genoa_city_refused_year() -> Variant:
 static func _genoa_city_refused_lands() -> Variant:
 	return {
 	"country": {
-	"after": 613,
-	"after_treasury": 508,
-	"before": 557,
-	"before_treasury": 458
+	"after": 609,
+	"after_treasury": 504,
+	"before": 553,
+	"before_treasury": 454
 	},
 	"district": {
 	"after": 207,

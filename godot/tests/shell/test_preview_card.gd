@@ -58,7 +58,7 @@ func test_accepted_vineyard_fills_every_part_of_spec_6_5() -> void:
 
 	var caption := _caption(card)
 	assert_true(caption.visible)
-	assert_eq((caption.get_child(0) as Label).text, "A year 511 → 533")
+	assert_eq((caption.get_child(0) as Label).text, "A year 507 → 529")
 	assert_eq((caption.get_child(1) as DeltaChip).text(), "+22", "realm gain a year by default")
 
 	var chart := card.chart()

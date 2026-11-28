@@ -720,7 +720,7 @@ func _m4_begin_and_undo(vp: SubViewport, app: App) -> void:
 	assert_eq(AppFlowHelpers.ducats_shown(app), "570")
 
 
-## Checklist 7: Space: the report, 610 to 656; Open the study opens the Economy page and the report is gone.
+## Checklist 7: Space: the report, 610 to 655; Open the study opens the Economy page and the report is gone.
 func _m4_report_and_study(vp: SubViewport, app: App) -> Study:
 	await _wait_until(func() -> bool: return _guard_over(app), 600)
 	_send_key(vp, KEY_SPACE)
@@ -730,8 +730,8 @@ func _m4_report_and_study(vp: SubViewport, app: App) -> Study:
 	for section: Dictionary in SeasonSummary.of(Session.game, &"GEN", 1)["sections"]:
 		if section["id"] == &"treasury":
 			treasury_total = str((section["total"] as Dictionary)["text"])
-	assert_eq(treasury_total, "610 → 656")
-	assert_true(AppFlowHelpers.labels_under(report).any(func(t: String) -> bool: return t.contains("656")), "the report shows it")
+	assert_eq(treasury_total, "610 → 655")
+	assert_true(AppFlowHelpers.labels_under(report).any(func(t: String) -> bool: return t.contains("655")), "the report shows it")
 	var open_study := report.find_child("StudyButton", true, false) as Button
 	assert_not_null(open_study, "Open the study")
 	open_study.pressed.emit()

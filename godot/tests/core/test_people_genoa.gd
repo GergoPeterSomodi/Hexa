@@ -30,10 +30,10 @@ func test_genoas_first_year_with_people_growing() -> void:
 	assert_eq(_people_of(g, c.id), 82700, "the start people")
 	# per season: people at the start, at the end, towns at the start, need, [people, goods, dues, upkeep, walls], net, treasury.
 	var years: Array = [
-		[82700, 83285, 40000, 4, [65, 7, 30, -12, -4], 86, 696],
-		[83285, 83874, 40400, 5, [66, 6, 33, -12, -4], 89, 785],
-		[83874, 84469, 40804, 5, [66, 67, 30, -12, -4], 147, 932],
-		[84469, 84977, 41212, 5, [67, 63, 21, -12, -4], 135, 1067],
+		[82700, 83285, 40000, 4, [65, 7, 30, -13, -4], 85, 695],
+		[83285, 83874, 40400, 5, [66, 6, 33, -13, -4], 88, 783],
+		[83874, 84469, 40804, 5, [66, 67, 30, -13, -4], 146, 929],
+		[84469, 84977, 41212, 5, [67, 63, 21, -13, -4], 134, 1063],
 	]
 	for n: int in 4:
 		var row: Array = years[n]
@@ -56,7 +56,7 @@ func test_genoas_first_year_with_people_growing() -> void:
 		assert_eq(int(totals["upkeep_walls"]), lines[4], "walls, " + label)
 		assert_eq(c.treasury - before, row[5], "net, " + label)
 		assert_eq(c.treasury, row[6], "treasury, " + label)
-	assert_eq(c.treasury, 1067, "the year's treasury (M4's still year: 1,068)")
+	assert_eq(c.treasury, 1063, "the year's treasury (M4's still year: 1,064)")
 
 
 func test_springs_growth_is_genoa_savona_and_three_countryside_hexes() -> void:

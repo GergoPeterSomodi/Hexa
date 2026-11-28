@@ -2,18 +2,19 @@
 ## name -> [check, do]. Each is a static function of (game, args) returning {ok, reason}; `do` checks again and then
 ## acts. The UI and the AI change the game only through Game.act, which looks the pair up here.
 ##   build {hex, family, tag}   upgrade {hex, tag}   clear {hex, tag}   cancel_work {hex, tag}   choose_country {tag}
+##   build_barracks {hex, tag}   (Works, recruitment-queue.md 4.2)
 ##   set_tax {level, tag}   raise, split_army, merge_armies, disband (Military)
 ##   march {army, goal}   halt {army}   continue_march {army}   (Movement)
 ##   declare_war {target, tag}   (Wars, M7 B5)
 ##   make_peace {target, terms, tag}   (Wars, M7 B11)
 ##   storm {army, goal, tag}   (Movement, M7 B12)   set_standing {army, standing, tag}   (Military, M7 B12)
-## build, upgrade and clear begin a work (Works); the works phase puts the piece.
+## build, upgrade, clear and build_barracks begin a work (Works); the works phase puts the piece or the barracks.
 class_name Actions
 extends RefCounted
 
 const NAMES: Array[String] = ["build", "upgrade", "clear", "cancel_work", "choose_country", "set_tax", "raise",
 	"split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war", "make_peace", "storm",
-	"set_standing"]
+	"set_standing", "build_barracks"]
 
 static var _test_pairs: Dictionary[String, Array] = {}
 
@@ -29,6 +30,8 @@ static func pair_of(action: String) -> Array[Callable]:
 			return [Works.clear_check, Works.clear]
 		"cancel_work":
 			return [Works.cancel_work_check, Works.cancel_work]
+		"build_barracks":
+			return [Works.barracks_check, Works.build_barracks]
 		"choose_country":
 			return [Countries.choose_check, Countries.choose]
 		"set_tax":

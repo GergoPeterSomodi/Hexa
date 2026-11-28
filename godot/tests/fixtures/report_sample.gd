@@ -21,11 +21,11 @@ static func genoa_spring() -> Dictionary:
 		"seal_letter": "G",
 		"quiet": false,
 		"serious": false,
-		"swing_permille": 78,
-		"toast": "Spring 1480 ended: ▲ +48 ducats. J: the report",
+		"swing_permille": 77,
+		"toast": "Spring 1480 ended: ▲ +47 ducats. J: the report",
 		"sections": [
 			_section(&"glance", "At a glance", [
-				_line("Treasury", "good", {"detail": "658", "amount": 48, "value": 658}),
+				_line("Treasury", "good", {"detail": "657", "amount": 47, "value": 657}),
 				_line("People", "good", {"detail": "83,205", "amount": 505, "value": 83205}),
 				_line("Works", "plain", {"detail": "1 under way"}),
 				_line("Wine", "bad", {"detail": "3", "amount": -1, "value": 3}),
@@ -43,13 +43,13 @@ static func genoa_spring() -> Dictionary:
 				_line("Taxes on people", "good", {"amount": 65, "rank": 65, "top": true}),
 				_line("Taxes on goods", "good", {"amount": 7, "rank": 7}),
 				_line("Port dues, Genoa", "good", {"amount": 30, "rank": 30}),
-				_line("District upkeep, 4 districts", "bad", {"amount": -10, "rank": 10}),
+				_line("District upkeep, 4 districts", "bad", {"amount": -11, "rank": 11}),
 				_line("Walls of Genoa", "bad", {"amount": -4, "rank": 4}),
 				_line("Work begun: vineyard, first stage, near Savona (7, 12)", "bad", {
 					"amount": -40, "rank": 40, "top": true, "hex": Vector2i(7, 12)}),
-				_line("Left over each season", "good", {"amount": 88, "sub": true}),
-				_line("With your spending", "good", {"amount": 48, "sub": true}),
-			], 6, "", _line("610 → 658", "good", {"from": 610, "to": 658, "amount": 48})),
+				_line("Left over each season", "good", {"amount": 87, "sub": true}),
+				_line("With your spending", "good", {"amount": 47, "sub": true}),
+			], 6, "", _line("610 → 657", "good", {"from": 610, "to": 657, "amount": 47})),
 			_section(&"goods", "Goods", [
 				_line("Wine 3", "bad", {"detail": "(drunk 1)", "amount": -1, "value": 3, "rank": 3}),
 				_line("Olive oil 3", "bad", {"detail": "(used 1)", "amount": -1, "value": 3, "rank": 3}),

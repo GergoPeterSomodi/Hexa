@@ -238,16 +238,16 @@ func dev_goods(tag: StringName, good: int, amount: int) -> bool:
 	return done
 
 
-## Developer barracks (logged for the replay, recruitment-queue.md 6): Recruiting.put on a settlement, whatever its
+## Developer barracks (logged for the replay, recruitment-queue.md 6): Recruiting.finish on a settlement, whatever its
 ## size and owner. False (nothing logged) in a map-only game, on a hex with no settlement or one with a barracks.
 func dev_barracks(hex: Vector2i) -> bool:
 	if not has_countries():
 		return false
-	var done: bool = Recruiting.put.call(self, hex)
-	if done:
+	var verdict: Dictionary = Recruiting.finish.call(self, hex)
+	if bool(verdict["ok"]):
 		action_log.append({"turn": turn, "action": "dev_barracks", "args": {"hex": hex}})
 		version += 1
-	return done
+	return bool(verdict["ok"])
 
 
 ## Whether the action may be done now: {ok, reason} ("" when ok). Changes nothing.

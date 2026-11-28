@@ -421,8 +421,11 @@ static func ready_text(game: Game, work: Work, turn: int) -> String:
 	return Calendar.date_text(t, game.start_year)
 
 
-## "a vineyard", "a walled town", "an olive grove": the piece a work makes (or, for a clearing, takes off).
+## "a vineyard", "a walled town", "an olive grove": the piece a work makes (or, for a clearing, takes off); "a
+## barracks".
 static func noun_of(work: Work) -> String:
+	if work.action == Works.BARRACKS:
+		return "a barracks"
 	var piece := FamilyIds.NAMES[clampi(work.family, 0, FamilyIds.COUNT - 1)]
 	var base := WorksView.piece_name(work.family)
 	if HexCard.LEVEL_WORDS.has(piece) and work.action != Works.CLEAR:

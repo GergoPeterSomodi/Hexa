@@ -95,7 +95,7 @@ func test_ducats_chip_shows_the_treasury_and_the_expected_card() -> void:
 	assert_eq(_chips.ducats_chip().name_label().text, "Ducats")
 	var card := _chips.ducats_card()
 	assert_eq(card["title"], "Ducats")
-	assert_eq(_amount_of(card, "Expected this season"), "▲ +86", "Expected this season +86")
+	assert_eq(_amount_of(card, "Expected this season"), "▲ +85", "Expected this season +85")
 	var lines := card["lines"] as Array
 	assert_eq((lines[0] as Array)[0], "No season has ended yet.", "no season has ended yet")
 	assert_eq(str((lines[-1] as Array)[0]), "L: the Economy page", "the hint is the last row")

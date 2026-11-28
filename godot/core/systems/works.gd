@@ -1,6 +1,7 @@
-## Works: a build, an upgrade or a clearing takes seasons (docs/architecture/m3-build-spec.md 4.3, 5.3).
-## The actions begin a work; the works phase (`season`) counts it down, halts it in a snow winter and, when it is done,
-## puts the piece through Improve. Writes `state.works` and `state.next_work_id` and nothing else.
+## Works: a build, an upgrade, a clearing or a barracks takes seasons (docs/architecture/m3-build-spec.md 4.3, 5.3;
+## docs/design/recruitment-queue.md 4.2). The actions begin a work; the works phase (`season`) counts it down, halts it in
+## a snow winter and, when it is done, puts the piece through Improve (a barracks through Recruiting). Writes
+## `state.works` and `state.next_work_id` and nothing else.
 class_name Works
 extends RefCounted
 
@@ -8,6 +9,8 @@ const OWNS: Array[String] = ["works", "next_work_id"]
 const BUILD := &"build"
 const UPGRADE := &"upgrade"
 const CLEAR := &"clear"
+## A barracks beside the settlement (recruitment-queue.md 4.2): the one work that changes no piece.
+const BARRACKS := &"barracks"
 ## The longest a ready date is searched for (seasons); a work never takes anywhere near it.
 const HORIZON := 1024
 ## ready_turn's answer when occupation or a siege halts the work now: no date can be given (the halt may end, or not).
@@ -40,6 +43,15 @@ static func clear_check(game: Game, args: Dictionary) -> Dictionary:
 	return _begin_check(game, CLEAR, hex as Vector2i, _tag_of(args), 0, args)
 
 
+## The barracks' check (recruitment-queue.md 4.2): the rows of every work, with Recruiting.site_check for the piece's
+## (a settlement, no barracks there yet, a town or larger).
+static func barracks_check(game: Game, args: Dictionary) -> Dictionary:
+	var hex: Variant = args.get("hex", null)
+	if typeof(hex) != TYPE_VECTOR2I:
+		return _refusal("no hex given")
+	return _begin_check(game, BARRACKS, hex as Vector2i, _tag_of(args), 0, args)
+
+
 ## Rows 2 to 9 of the check table (4.3, m4-build-spec.md 4.11); `args` is passed on to Improve's own check (row 5).
 static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: StringName, family: int,
 		args: Dictionary) -> Dictionary:
@@ -63,6 +75,8 @@ static func _begin_check(game: Game, action: StringName, hex: Vector2i, tag: Str
 			piece = Improve.build_check(game, args)
 		UPGRADE:
 			piece = Improve.upgrade_check(game, args)
+		BARRACKS:
+			piece = Recruiting.site_check(game, hex)
 		_:
 			piece = Improve.clear_check(game, args)
 	if not bool(piece["ok"]):
@@ -154,6 +168,14 @@ static func clear(game: Game, args: Dictionary) -> Dictionary:
 	return verdict
 
 
+## Begins a barracks (after checking again); the work keeps the hex's family, the settlements, and no level.
+static func build_barracks(game: Game, args: Dictionary) -> Dictionary:
+	var verdict := barracks_check(game, args)
+	if bool(verdict["ok"]):
+		_begin(game, BARRACKS, args["hex"] as Vector2i, _tag_of(args), ImproveRules.SETTLEMENT, 0)
+	return verdict
+
+
 ## Appends the work (id next_work_id) and emits work_started. Nothing on the map changes.
 static func _begin(game: Game, action: StringName, hex: Vector2i, tag: StringName, family: int, level_to: int) -> void:
 	var work := Work.new()
@@ -225,13 +247,16 @@ static func season(game: Game) -> void:
 
 
 ## The piece of a finished work. The home rule was checked at the top of the phase for this work, so the `_here` forms
-## (the piece rules only) are used; the verdicts are those of Improve.build, upgrade and clear.
+## (the piece rules only) are used; the verdicts are those of Improve.build, upgrade and clear, and a barracks'
+## Recruiting.finish.
 static func _put_piece(game: Game, work: Work) -> Dictionary:
 	match work.action:
 		BUILD:
 			return Improve.build_here(game, work.hex, work.family)
 		UPGRADE:
 			return Improve.upgrade_here(game, work.hex)
+		BARRACKS:
+			return Recruiting.finish(game, work.hex)
 	return Improve.clear_here(game, work.hex)
 
 
@@ -258,8 +283,12 @@ static func _pay(game: Game, work: Work, cost: Dictionary) -> void:
 # ----- facts -----------------------------------------------------------------------------------------------------
 
 
-## Seasons a work takes: FamilyDef.work_seasons[level_to], or clear_seasons for a clearing. 1 for an unknown family.
+## Seasons a work takes: FamilyDef.work_seasons[level_to], clear_seasons for a clearing, BarracksDef.seasons for a
+## barracks. 1 for an unknown family or no barracks numbers.
 static func seasons_for(game: Game, action: StringName, family: int, level_to: int) -> int:
+	if action == BARRACKS:
+		var barracks := Recruiting.def_of(game)
+		return barracks.seasons if barracks != null else 1
 	var def: FamilyDef = game.defs.family(family) if game.defs != null else null
 	if def == null:
 		return 1
@@ -327,7 +356,7 @@ static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value
 	if family <= 0:
 		return ""
 	for w: Work in game.state.works:
-		if gone.has(w) or w.hex == hex or w.action == CLEAR or absi(w.hex.y - hex.y) > 2:  # a row apart is a hex apart, at least
+		if gone.has(w) or w.hex == hex or not changes_piece(w) or absi(w.hex.y - hex.y) > 2:  # a row apart is a hex apart, at least
 			continue
 		var distance := ImproveRules.hex_distance(hex, w.hex)
 		if distance < 1 or distance > 2:
@@ -336,6 +365,12 @@ static func pending_conflict(game: Game, hex: Vector2i, family: int, level_value
 		if why != "":
 			return "a work under way at (%d, %d) would break it: %s" % [w.hex.x, w.hex.y, why]
 	return ""
+
+
+## Whether a work puts a piece on its hex that the pair rules read: a build or an upgrade (a clearing takes one off,
+## a barracks stands beside the settlement).
+static func changes_piece(work: Work) -> bool:
+	return work.action != CLEAR and work.action != BARRACKS
 
 
 ## What a cancelled work gives back: its payment when cancelled in the season it began, else 0.
@@ -348,11 +383,17 @@ static func refund_goods(game: Game, work: Work) -> Dictionary:
 	return work.paid_goods.duplicate() if work.started_turn == game.turn else {}
 
 
-## The price of a work (4.11): {ducats, goods: {good key: loads}} from FamilyDef.cost[level_to] and cost_goods[level_to]. A
-## clearing is free, and so is any work in a game without countries or definitions.
+## The price of a work (4.11): {ducats, goods: {good key: loads}} from FamilyDef.cost[level_to] and cost_goods[level_to],
+## or from BarracksDef for a barracks. A clearing is free, and so is any work in a game without countries or definitions.
 static func cost_of(game: Game, action: StringName, family: int, level_to: int) -> Dictionary:
 	var out := {"ducats": 0, "goods": {}}
 	if action == CLEAR or game == null or game.defs == null or not game.has_countries():
+		return out
+	if action == BARRACKS:
+		var barracks := Recruiting.def_of(game)
+		if barracks != null:
+			out["ducats"] = maxi(barracks.cost, 0)
+			_add_goods(out["goods"] as Dictionary, barracks.cost_goods)
 		return out
 	var def := game.defs.family(family)
 	if def == null or level_to < 1:
@@ -360,11 +401,15 @@ static func cost_of(game: Game, action: StringName, family: int, level_to: int) 
 	if level_to < def.cost.size():
 		out["ducats"] = maxi(def.cost[level_to], 0)
 	if level_to < def.cost_goods.size():
-		var goods: Dictionary = out["goods"]
-		for key: Variant in def.cost_goods[level_to]:
-			if int(def.cost_goods[level_to][key]) > 0:
-				goods[String(key)] = int(def.cost_goods[level_to][key])
+		_add_goods(out["goods"] as Dictionary, def.cost_goods[level_to])
 	return out
+
+
+## Adds a price's goods (good key -> loads) to `goods`, the loads above 0 only.
+static func _add_goods(goods: Dictionary, price: Dictionary) -> void:
+	for key: Variant in price:
+		if int(price[key]) > 0:
+			goods[String(key)] = int(price[key])
 
 
 static func _good_count(game: Game) -> int:
@@ -396,8 +441,11 @@ static func ready_words(game: Game, work: Work) -> String:
 # ----- words -----------------------------------------------------------------------------------------------------
 
 
-## "vineyard, first stage"; "walled town to city"; "vineyard, first to second stage"; "clearing the vineyard".
+## "vineyard, first stage"; "walled town to city"; "vineyard, first to second stage"; "clearing the vineyard";
+## "barracks".
 static func _label(work: Work) -> String:
+	if work.action == BARRACKS:
+		return "barracks"
 	var piece := FamilyIds.NAMES[clampi(work.family, 0, FamilyIds.COUNT - 1)]
 	if work.action == CLEAR:
 		return "clearing the %s" % piece

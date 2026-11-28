@@ -23,13 +23,13 @@ func test_before_any_season() -> void:
 	assert_eq((s["money_in"]["lines"] as Array).size(), 0)
 	assert_eq((s["money_out"]["lines"] as Array).size(), 0)
 	assert_eq(int(s["left_over"]), 0)
-	assert_eq(int(s["expected"]["net"]), 86)
+	assert_eq(int(s["expected"]["net"]), 85)
 	assert_eq(int(s["expected"]["net"]), int(EconomyPreview.expected(g, GEN)["net"]))
 	assert_eq(int(s["expected"]["realm"]), int(EconomyPreview.expected(g, GEN)["realm"]))
 	assert_eq(Countries.by_tag(g, GEN).treasury, 610)
 	assert_eq((s["chart"]["labels"] as Array).size(), 0)
 	assert_gt((s["earns_most"] as Array).size(), 0)
-	assert_eq(_sum(s["expected"]["lines"] as Array), 86)
+	assert_eq(_sum(s["expected"]["lines"] as Array), 85)
 
 
 func test_equals_the_closed_ledger() -> void:
@@ -41,17 +41,17 @@ func test_equals_the_closed_ledger() -> void:
 	assert_eq(s["date"], "Summer 1480")
 	assert_eq(s["closed_date"], "Spring 1480")
 	assert_eq(int(s["money_in"]["total"]), 65 + 7 + 30)
-	assert_eq(int(s["money_out"]["total"]), -16)
-	assert_eq(int(s["left_over"]), 86)
+	assert_eq(int(s["money_out"]["total"]), -17)
+	assert_eq(int(s["left_over"]), 85)
 	assert_eq(int(s["change"]), c.treasury - 610)
-	assert_eq(int(s["change"]), 86)
+	assert_eq(int(s["change"]), 85)
 	assert_eq(int(s["left_over"]), Treasury.left_over(c.ledger_closed["lines"] as Array[Dictionary]))
 	assert_eq(int(s["spending"]["total"]), 0)
 	var shown := (s["money_in"]["lines"] as Array).size() + (s["money_out"]["lines"] as Array).size()
 	assert_eq(shown, (c.ledger_closed["lines"] as Array).size())
-	assert_eq(int(s["expected"]["net"]), 91)
+	assert_eq(int(s["expected"]["net"]), 90)
 	assert_eq(int(s["expected"]["net"]), int(EconomyPreview.expected(g, GEN)["net"]))
-	assert_eq(_sum(s["expected"]["lines"] as Array), 91)
+	assert_eq(_sum(s["expected"]["lines"] as Array), 90)
 
 
 func test_spending_is_apart() -> void:
@@ -78,7 +78,7 @@ func test_tax_levels() -> void:
 	assert_eq((options[1] as Dictionary)["note"], "Normal: as now; people grow 0 % a season.", "the still people of M4's numbers")
 	assert_eq(int((options[1] as Dictionary)["change"]), 0)
 	for l: int in [0, 2]:
-		var want := int(EconomyPreview.with(g, GEN, {"tax": l}, 1)["seasons"][0]["net"]) - 86
+		var want := int(EconomyPreview.with(g, GEN, {"tax": l}, 1)["seasons"][0]["net"]) - 85
 		assert_eq(int((options[l] as Dictionary)["change"]), want)
 	assert_gt(int((options[2] as Dictionary)["change"]), 0)
 	assert_lt(int((options[0] as Dictionary)["change"]), 0)
@@ -90,14 +90,14 @@ func test_chart_and_top_lists() -> void:
 	Season.run(g)
 	Season.run(g)
 	var s := StudyEconomy.this_season(g, GEN)
-	assert_eq(s["chart"]["treasury"], PackedInt32Array([696, 787]))
-	assert_eq(s["chart"]["change"], PackedInt32Array([86, 91]))
+	assert_eq(s["chart"]["treasury"], PackedInt32Array([695, 785]))
+	assert_eq(s["chart"]["change"], PackedInt32Array([85, 90]))
 	assert_eq(s["chart"]["labels"], ["Spring 1480", "Summer 1480"] as Array[String])
 	var earns: Array = s["earns_most"]
 	assert_lte(earns.size(), 3)
 	assert_eq((earns[0] as Dictionary)["hex"], Vector2i(7, 12))  # the vineyard's wine, 62
-	assert_eq((earns[1] as Dictionary)["hex"], Vector2i(8, 13))  # Genoa, 60
-	assert_eq(int((earns[1] as Dictionary)["amount"]), 60)
+	assert_eq((earns[1] as Dictionary)["hex"], Vector2i(8, 13))  # Genoa, 59
+	assert_eq(int((earns[1] as Dictionary)["amount"]), 59)
 	for k: int in range(1, earns.size()):
 		assert_gte(int((earns[k - 1] as Dictionary)["amount"]), int((earns[k] as Dictionary)["amount"]))
 	var costs: Array = s["costs_most"]
@@ -150,10 +150,10 @@ func test_districts_at_turn_1_equal_4_10() -> void:
 	for row: Dictionary in rows:
 		years.append(int(row["year"]))
 		upkeeps.append(int(row["upkeep"]))
-	assert_eq(years, [232, 105, 68, 38, 33])
-	assert_eq(upkeeps, [-24, -16, -8, -8, -8])
+	assert_eq(years, [228, 105, 68, 38, 33])
+	assert_eq(upkeeps, [-28, -16, -8, -8, -8])
 	var want := [
-		["Genoa (8, 13)", "walled town, port", "22 fish · dues 114", [60, 63, 60, 49]],
+		["Genoa (8, 13)", "walled town, port", "22 fish · dues 114", [59, 62, 59, 48]],
 		["near Savona (7, 14)", "olives, third stage", "42 olive oil", [0, 0, 35, 70]],
 		["near Savona (7, 12)", "vineyard, second stage", "24 wine", [2, 2, 62, 2]],
 		["Savona (6, 13)", "town", "6 grain", [9, 11, 10, 8]],
@@ -171,7 +171,7 @@ func test_districts_at_turn_1_equal_4_10() -> void:
 	assert_eq(int(d["wild"]["count"]), 9)
 	assert_eq(d["wild"]["gives"], "7 grain · 10 timber")
 	assert_eq(int(d["wild"]["year"]), 57)
-	assert_eq(int(d["total_year"]), 533)
+	assert_eq(int(d["total_year"]), 529)
 
 
 func test_districts_hold_only_your_land() -> void:
@@ -342,7 +342,7 @@ func test_history_after_the_first_year_equals_4_10() -> void:
 		change.append(int(s["change"]))
 		closing.append(int(s["closing"]))
 		assert_eq(int(s["people"]), 65)
-		assert_eq(int(s["upkeep"]), 12)
+		assert_eq(int(s["upkeep"]), 13)
 		assert_eq(int(s["walls"]), 4)
 		assert_eq(int(s["spending"]), 0)
 		assert_eq(int(s["other"]), 0)
@@ -350,16 +350,16 @@ func test_history_after_the_first_year_equals_4_10() -> void:
 	assert_eq(titles, ["Spring 1480", "Summer 1480", "Autumn 1480", "Winter 1480"])
 	assert_eq(goods, [7, 9, 68, 64])
 	assert_eq(dues, [30, 33, 30, 21])
-	assert_eq(change, [86, 91, 147, 134])
-	assert_eq(closing, [696, 787, 934, 1068])
+	assert_eq(change, [85, 90, 146, 133])
+	assert_eq(closing, [695, 785, 931, 1064])
 	assert_eq(int(seasons[0]["opening"]), 610, "D7: the closing less the lines, turn 1")
-	assert_eq(int(seasons[2]["opening"]), 787)
+	assert_eq(int(seasons[2]["opening"]), 785)
 	var years: Array = h["years"]
 	assert_eq(years.size(), 1)
-	assert_eq(years[0], {"year": 1480, "closing": 1068, "land": 14})
+	assert_eq(years[0], {"year": 1480, "closing": 1064, "land": 14})
 	var two := StudyEconomy.history(g, GEN, 2)
 	assert_eq((two["seasons"] as Array).size(), 2)
-	assert_eq(int((two["seasons"] as Array)[0]["opening"]), 787, "the row before it is in the ring")
+	assert_eq(int((two["seasons"] as Array)[0]["opening"]), 785, "the row before it is in the ring")
 
 
 func test_history_before_a_season_has_ended() -> void:
@@ -408,7 +408,7 @@ func test_a_developer_gift_shows_as_other() -> void:
 	Season.run(g)
 	var s: Dictionary = (StudyEconomy.history(g, GEN, 12)["seasons"] as Array)[1]
 	assert_eq(int(s["other"]), 500)
-	assert_eq(int(s["change"]), 591)
+	assert_eq(int(s["change"]), 590)
 	_assert_adds_up(s)
 
 
@@ -473,7 +473,7 @@ func test_a_caller_cannot_change_what_worth_seasons_gives_next() -> void:
 	var b := EconomyPreview.worth_seasons(g, GEN, 4)
 	assert_eq((b["worth"] as PackedInt32Array)[0], before)
 	assert_eq((b["hexes"] as PackedInt32Array).size(), 14)
-	assert_eq(int(StudyEconomy.districts(g, GEN)["total_year"]), 533, "the views read the cache, not the caller's copy")
+	assert_eq(int(StudyEconomy.districts(g, GEN)["total_year"]), 529, "the views read the cache, not the caller's copy")
 
 
 # ----- M5: the tax notes name the people's growth (6.7) ---------------------------------------------------------------

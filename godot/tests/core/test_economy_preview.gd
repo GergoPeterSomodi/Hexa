@@ -194,7 +194,7 @@ func test_a_change_stands_from_the_first_season_and_both_measures_come() -> void
 	var after := EconomyPreview.with(g, &"GEN", {"hexes": {i: Vector2i(VINEYARD, 1)}}, 4)
 	assert_eq(int(after["year"]["realm"]) - int(base["year"]["realm"]), 22)
 	assert_eq(int(after["year"]["net"]) - int(base["year"]["net"]), 10)
-	assert_eq(int(base["year"]["realm"]), 511)
+	assert_eq(int(base["year"]["realm"]), 507)
 	for k: int in 4:
 		assert_true((after["seasons"][k] as Dictionary).has("net"))
 		assert_true((after["seasons"][k] as Dictionary).has("realm"))
@@ -217,7 +217,7 @@ func test_expected_is_the_first_season() -> void:
 	var g := EconomyFixture.game(&"GEN")
 	var first := EconomyPreview.expected(g, &"GEN")
 	assert_eq(first, (EconomyPreview.with(g, &"GEN", {}, 1)["seasons"] as Array)[0])
-	assert_eq(int(first["net"]), 86)
+	assert_eq(int(first["net"]), 85)
 	assert_eq(EconomyPreview.expected(g, &"NOPE"), {})
 	assert_eq((EconomyPreview.with(g, &"NOPE", {}, 4)["seasons"] as Array).size(), 0)
 
@@ -259,10 +259,10 @@ func test_worth_by_hex_follows_4_17() -> void:
 		if row["hex"] == Vector2i(8, 13):
 			genoa = row
 	assert_false(genoa.is_empty())
-	# fish 6 at 1.0, dues 30, people 30,000 x 1,000 x 1,000 / 1,000 x 1,000 / 10^9 = 30, less upkeep 2 and walls 4.
+	# fish 6 at 1.0, dues 30, people 30,000 x 1,000 x 1,000 / 1,000 x 1,000 / 10^9 = 30, less upkeep 3 (the barracks' 1 in it) and walls 4.
 	var fish_price := g.defs.goods[Economy.FISH].price_milli
-	assert_eq(int(genoa["worth"]), 6 * fish_price / 1000 + 30 + 30 - 6)
-	assert_eq(int(genoa["upkeep"]), 6)
+	assert_eq(int(genoa["worth"]), 6 * fish_price / 1000 + 30 + 30 - 7)
+	assert_eq(int(genoa["upkeep"]), 7)
 	assert_eq(genoa["label"], "Genoa (8, 13)")
 	var total := 0
 	for row: Dictionary in rows:
@@ -321,7 +321,7 @@ func test_worth_seasons_at_turn_1_equals_the_districts_of_4_10() -> void:
 	assert_eq(int(ws["turn"]), 1)
 	assert_eq(int(ws["seasons"]), 4)
 	assert_eq((ws["hexes"] as PackedInt32Array).size(), 14)
-	var want := {Vector2i(8, 13): [60, 63, 60, 49], Vector2i(7, 14): [0, 0, 35, 70], Vector2i(7, 12): [2, 2, 62, 2],
+	var want := {Vector2i(8, 13): [59, 62, 59, 48], Vector2i(7, 14): [0, 0, 35, 70], Vector2i(7, 12): [2, 2, 62, 2],
 		Vector2i(6, 13): [9, 11, 10, 8], Vector2i(9, 13): [5, 5, 5, 18]}
 	for hex: Vector2i in want:
 		assert_eq(_worths(ws, _hex_row(ws, g, hex)), want[hex], str(hex))
@@ -329,7 +329,7 @@ func test_worth_seasons_at_turn_1_equals_the_districts_of_4_10() -> void:
 	var dues := (ws["dues"] as PackedInt32Array).slice(genoa * 4, genoa * 4 + 4)
 	assert_eq(dues, PackedInt32Array([30, 33, 30, 21]))
 	var upkeep := (ws["upkeep"] as PackedInt32Array).slice(genoa * 4, genoa * 4 + 4)
-	assert_eq(upkeep, PackedInt32Array([6, 6, 6, 6]))
+	assert_eq(upkeep, PackedInt32Array([7, 7, 7, 7]))
 	var fish := 0
 	for k: int in 4:
 		fish += (ws["goods"] as PackedInt32Array)[(genoa * 4 + k) * g.defs.goods.size() + Economy.FISH]
@@ -337,7 +337,7 @@ func test_worth_seasons_at_turn_1_equals_the_districts_of_4_10() -> void:
 	var total := 0
 	for v: int in ws["worth"] as PackedInt32Array:
 		total += v
-	assert_eq(total, 533, "all the land, each place rounded down")
+	assert_eq(total, 529, "all the land, each place rounded down")
 
 
 func test_worth_by_hex_is_the_first_season_hex_by_hex() -> void:

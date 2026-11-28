@@ -271,7 +271,7 @@ static func _maker(game: Game, country: Country, goods: Array[int], last_turn: i
 	var best_ready := 0
 	for work: Work in game.state.works:
 		var i := game.map.index_of(work.hex)
-		if work.tag != country.tag or work.action == Works.CLEAR or i < 0:
+		if work.tag != country.tag or not Works.changes_piece(work) or i < 0:
 			continue
 		var ready := Works.ready_turn(game, work)
 		if ready == Works.NO_DATE or ready > last_turn or (best != null and (ready > best_ready or (ready == best_ready and work.id > best.id))):

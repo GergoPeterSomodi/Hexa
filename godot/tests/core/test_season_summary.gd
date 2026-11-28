@@ -120,7 +120,7 @@ func test_an_m3_season_of_genoa() -> void:
 	var s := _spring()
 	assert_eq([s["turn"], s["title"], s["next"]], [1, "Spring 1480", "Summer 1480"])
 	assert_eq(s["lede"], "The Chancellor's report to the Doge of Genoa. Summer 1480 begins.")
-	assert_eq([s["seal_letter"], s["quiet"], s["serious"], s["swing_permille"]], ["G", false, false, 78], "48 of 610")
+	assert_eq([s["seal_letter"], s["quiet"], s["serious"], s["swing_permille"]], ["G", false, false, 77], "47 of 610")
 	assert_eq(s["toast"], "Spring 1480 ended: %s. J: the report" % _change_text(), "the money, once the season has a ledger")
 	assert_eq(_ids(s), [&"glance", &"before", &"treasury", &"goods", &"works", &"orders", &"befell", &"standing"] as Array[StringName],
 		"fixed order, empty ones left out")
@@ -129,7 +129,7 @@ func test_an_m3_season_of_genoa() -> void:
 	var chips: Array[String] = []
 	for chip: Dictionary in glance["lines"]:
 		chips.append("%s: %s" % [chip["text"], chip["detail"]])
-	assert_eq(chips, ["Treasury: 658", "Works: 1 finished, 2 under way", "Wine: 3", "Olive oil: 3", "Salt: 3"] as Array[String],
+	assert_eq(chips, ["Treasury: 657", "Works: 1 finished, 2 under way", "Wine: 3", "Olive oil: 3", "Salt: 3"] as Array[String],
 		"the treasury, the works, then the goods that moved most (no Land chip when the land is as it was)")
 	assert_eq(((glance["lines"] as Array)[1] as Dictionary)["tone"], "good", "good when one finished")
 	var place := Words.place(_g, WOODS)
@@ -474,7 +474,7 @@ func test_4_15_b_the_glance_and_before() -> void:
 	var chips: Array[String] = []
 	for chip: Dictionary in _section(s, &"glance")["lines"]:
 		chips.append("%s %s %s" % [chip["text"], chip["detail"], Words.signed(int(chip["amount"]))])
-	assert_eq(chips, ["Treasury 658 +48", "Works 1 under way 0", "Wine 3 −1", "Olive oil 3 −1", "Salt 3 −1"] as Array[String])
+	assert_eq(chips, ["Treasury 657 +47", "Works 1 under way 0", "Wine 3 −1", "Olive oil 3 −1", "Salt 3 −1"] as Array[String])
 	assert_eq(_section(s, &"before")["title"], "Before Summer")
 	assert_eq(_texts(s, &"before"), [
 		"Wine runs out in 4 seasons; the first vintage is Autumn 1481.",
@@ -491,17 +491,17 @@ func test_4_15_b_the_treasury() -> void:
 	var s := _fixture_report()
 	var treasury := _section(s, &"treasury")
 	var total := treasury["total"] as Dictionary
-	assert_eq([total["text"], total["from"], total["to"], total["amount"]], ["610 → 658", 610, 658, 48])
+	assert_eq([total["text"], total["from"], total["to"], total["amount"]], ["610 → 657", 610, 657, 47])
 	assert_eq(_rows(s, &"treasury"), [
-		"Taxes on people ▲ +65", "Taxes on goods ▲ +7", "Port dues, Genoa ▲ +30", "District upkeep, 4 districts ▼ −10",
+		"Taxes on people ▲ +65", "Taxes on goods ▲ +7", "Port dues, Genoa ▲ +30", "District upkeep, 4 districts ▼ −11",
 		"Walls of Genoa ▼ −4", "Work begun: vineyard, first stage, near Savona (7, 12) ▼ −40",
-		"Left over each season ▲ +88", "With your spending ▲ +48",
+		"Left over each season ▲ +87", "With your spending ▲ +47",
 	] as Array[String])
 	var lines := treasury["lines"] as Array
 	assert_eq([(lines[6] as Dictionary)["sub"], (lines[7] as Dictionary)["sub"], (lines[5] as Dictionary)["sub"]], [true, true, false])
 	assert_eq(treasury["count"], 6, "the sub lines are not counted")
 	assert_eq((lines[5] as Dictionary)["hex"], SAVONA)
-	assert_eq(_sum_of_lines(treasury), 48, "65 + 7 + 30 - 10 - 4 - 40 = 658 - 610")
+	assert_eq(_sum_of_lines(treasury), 47, "65 + 7 + 30 - 11 - 4 - 40 = 657 - 610")
 
 
 func test_4_15_b_the_goods_works_orders_and_standing() -> void:
@@ -517,12 +517,12 @@ func test_4_15_b_the_goods_works_orders_and_standing() -> void:
 	assert_eq(_texts(s, &"orders")[0], "Ordered to build: vineyard near Savona (7, 12).")
 	var standing := _texts(s, &"standing")
 	var people := _g.stats.value(&"GEN", 1, "people")
-	assert_true(standing[0].begins_with("Among the 13 countries you know, you are 8th in land (14 districts), 6th in income (+88 a season) and "), standing[0])
+	assert_true(standing[0].begins_with("Among the 13 countries you know, you are 8th in land (14 districts), 6th in income (+87 a season) and "), standing[0])
 	assert_true(standing[0].ends_with(" in people (%s)." % Words.number(people)), standing[0])
-	assert_eq(standing[1], "Savoy: 58 districts, +240, %s people." % Words.number(_g.stats.value(&"SAV", 1, "people")))
-	assert_eq(standing[2], "Milan: 52 districts, +261, %s people." % Words.number(_g.stats.value(&"MLO", 1, "people")))
+	assert_eq(standing[1], "Savoy: 58 districts, +239, %s people." % Words.number(_g.stats.value(&"SAV", 1, "people")))
+	assert_eq(standing[2], "Milan: 52 districts, +260, %s people." % Words.number(_g.stats.value(&"MLO", 1, "people")))
 	assert_eq(_section(s, &"people"), {}, "M4's numbers on still people: no change, no People section, no chip")
-	assert_eq([s["toast"], s["swing_permille"]], ["Spring 1480 ended: ▲ +48 ducats. J: the report", 78])
+	assert_eq([s["toast"], s["swing_permille"]], ["Spring 1480 ended: ▲ +47 ducats. J: the report", 77])
 
 
 func test_standing_names_only_the_countries_known() -> void:

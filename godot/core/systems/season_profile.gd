@@ -2,8 +2,8 @@
 ## walls, the wild land counted by cover and climate (every wild hex of one cover and climate gives the same loads, so a count
 ## stands for them all, exactly), and the hexes that stand for something (a district, a settlement, a castle) one by one,
 ## with their `raw` output. Built from the game's DistrictCache in one pass over the country's hexes, kept in the game's view
-## cache until an owner, a use or a level changes (the key is their hashes, so a direct edit in a test makes the next call
-## build it again). That part holds no people (M5 spec 5.0 R1): `live` adds them, the towns' and the countryside's people
+## cache until an owner, a use, a level or a barracks changes (the key is their hashes, so a direct edit in a test makes
+## the next call build it again). That part holds no people (M5 spec 5.0 R1): `live` adds them, the towns' and the countryside's people
 ## and each row's a0 after staffing, kept by the people's hash too (a season builds it once for production and income,
 ## once more for stats after the people phase). Read by `production`, `income` and `stats` in place of a pass over every
 ## hex. The answers equal EconomySeason's per-hex passes to the unit; test_season_profile checks it.
@@ -21,10 +21,11 @@ const LIVE := -1
 
 
 ## Every country's profile held so far, id -> profile: a dictionary that fills as profiles are asked for and is dropped
-## when an owner, a use or a level changes. Fetch it once a phase and pass it to `of`.
+## when an owner, a use, a level or a barracks changes. Fetch it once a phase and pass it to `of`.
 static func table(game: Game) -> Dictionary:
 	var key: Array = [hash(game.state.owner), hash(game.state.main_use), hash(game.state.level), game.map.hex_count(),
-		game.defs.get_instance_id(), hash(game.state.occupier), EconomySeason.sieges_key(game), EconomySeason.wars_key(game)]
+		game.defs.get_instance_id(), hash(game.state.occupier), EconomySeason.sieges_key(game), EconomySeason.wars_key(game),
+		hash(game.state.barracks)]
 	var held := game.view_cache.pinned(&"season_profiles", key, func() -> Dictionary: return {}) as Dictionary
 	# The live part follows the people: a new table of it when their hash is not the one it was made with.
 	var people := hash(game.state.people)

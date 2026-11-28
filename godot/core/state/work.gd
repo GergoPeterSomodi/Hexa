@@ -1,4 +1,5 @@
-## One work under way: a build, an upgrade or a clearing that takes seasons (docs/architecture/m3-build-spec.md 4.3, 5.2).
+## One work under way: a build, an upgrade, a clearing or a barracks that takes seasons (docs/architecture/m3-build-spec.md
+## 4.3, 5.2; docs/design/recruitment-queue.md 4.2).
 ## A plain value, written only by Works. Saved inside MapState.
 class_name Work
 extends RefCounted
@@ -6,17 +7,17 @@ extends RefCounted
 const SCHEMA := "hexa-godot/work/2"
 ## work/1 (M3) has no paid_goods; it loads with {}.
 const SCHEMA_V1 := "hexa-godot/work/1"
-const ACTIONS: Array[String] = ["build", "upgrade", "clear"]
+const ACTIONS: Array[String] = ["build", "upgrade", "clear", "barracks"]
 
 var id: int = 0
 ## The actor; &"" in a map-only game.
 var tag: StringName = &""
 var hex: Vector2i = Vector2i.ZERO
-## &"build", &"upgrade" or &"clear".
+## &"build", &"upgrade", &"clear" or &"barracks".
 var action: StringName = &"build"
-## build: the family; upgrade, clear: the hex's family when begun.
+## build: the family; upgrade, clear: the hex's family when begun; barracks: the settlements.
 var family: int = 0
-## build 1; upgrade level + 1; clear 0.
+## build 1; upgrade level + 1; clear and barracks 0.
 var level_to: int = 0
 var started_turn: int = 0
 var seasons: int = 0

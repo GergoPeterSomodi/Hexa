@@ -5,6 +5,8 @@
 ## Moves in the month (moves-build-spec.md 8.2, MV4): march, Continue and storm now walk (and may fight) in their do half; the pair
 ## rule must still hold, so the picks weight Continue and storm up (RandomPlayer.next's `moves`). The contract is unchanged.
 ## Multi-leg marches (MV19, R63): marches with random stops (RandomPlayer.next's `stops`) keep the pair rule too.
+## RQ2: the 3,000 picks cover RandomPlayer's fixed list; build_barracks is asked for by its own run, and the two lists
+## together are Actions.NAMES, so no action goes without the contract.
 extends GutTest
 
 const ACTIONS := 3000
@@ -71,7 +73,7 @@ func test_three_thousand_random_actions_keep_their_checks() -> void:
 			# two more companies of the player's country muster on the town each season (a merge is then always on offer).
 			ArmyFixture.army(g, ArmyFixture.TAG, town, 0, 2)
 	assert_eq(problems.size(), 0, "the contract holds: %s" % str(problems.slice(0, 5)))
-	for name: String in Actions.NAMES:
+	for name: String in RandomPlayer.NAMES:
 		assert_gt(int(ok_count.get(name, 0)) + int(refused.get(name, 0)), 0, "%s was picked" % name)
 	for name: String in ["raise", "split_army", "merge_armies", "disband", "march", "halt", "continue_march", "declare_war",
 			"set_standing"]:
@@ -114,6 +116,34 @@ static func _do_anyway(game: Game, _args: Dictionary) -> Dictionary:
 
 static func _do_refuse(_game: Game, _args: Dictionary) -> Dictionary:
 	return {"ok": false, "reason": "refused"}
+
+
+func test_every_action_is_in_the_random_players_lists() -> void:
+	var listed: Array[String] = RandomPlayer.NAMES.duplicate()
+	listed.append_array(RandomPlayer.ADDED)
+	assert_eq(listed, Actions.NAMES, "a new action goes into RandomPlayer.ADDED, with a contract run of its own")
+
+
+func test_building_a_barracks_keeps_its_check() -> void:
+	var g := EconomyFixture.game(&"MLO")
+	var counts := {"ok": 0, "refused": 0}
+	var problems: Array[String] = []
+	for n: int in 1500:
+		var tag := g.countries[_luck.randi_range(0, g.countries.size() - 1)].tag
+		var pick: Dictionary = RandomPlayer.next(g, tag, _luck, false, false, RandomPlayer.ADDED)
+		var action := str(pick["action"])
+		if action == "build_barracks" or action == "cancel_work":
+			var logged := g.action_log.size()
+			var problem := contract_problem(g, action, pick["args"] as Dictionary)
+			if problem != "":
+				problems.append(problem)
+			if action == "build_barracks":
+				counts["ok" if g.action_log.size() > logged else "refused"] += 1
+		if (n + 1) % EVERY == 0:
+			assert_true(bool(Season.run(g)["ok"]))
+	assert_eq(problems.size(), 0, "the contract holds: %s" % str(problems.slice(0, 5)))
+	assert_gt(int(counts["ok"]), 0, "a barracks was begun: %s" % str(counts))
+	assert_gt(int(counts["refused"]), 0, "a barracks was refused: %s" % str(counts))
 
 
 func test_marches_with_random_stops_keep_their_checks() -> void:

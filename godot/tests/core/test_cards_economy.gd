@@ -30,7 +30,7 @@ func test_ducats_card_at_the_start() -> void:
 	var last: Array = lines[lines.size() - 1]
 	assert_eq(last[0], "Expected this season")
 	assert_eq(last[1], &"good")
-	assert_eq(last[2], "▲ +86")
+	assert_eq(last[2], "▲ +85")
 	assert_eq((lines[lines.size() - 2] as Array)[1], &"rule")
 
 

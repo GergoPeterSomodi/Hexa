@@ -202,11 +202,11 @@ func test_the_money_goods_and_people_series_of_genoas_first_season() -> void:
 	Season.run(g)
 	var s := g.stats
 	assert_eq(s.goods, 16, "Stats.create takes the goods of the defs")
-	assert_eq(s.value(&"GEN", 1, "treasury"), 658)
+	assert_eq(s.value(&"GEN", 1, "treasury"), 657)
 	assert_eq(s.value(&"GEN", 1, "income_people"), 65)
 	assert_eq(s.value(&"GEN", 1, "income_goods"), 7)
 	assert_eq(s.value(&"GEN", 1, "income_dues"), 30)
-	assert_eq(s.value(&"GEN", 1, "upkeep_districts"), 10)
+	assert_eq(s.value(&"GEN", 1, "upkeep_districts"), 11)
 	assert_eq(s.value(&"GEN", 1, "upkeep_walls"), 4)
 	assert_eq(s.value(&"GEN", 1, "spending"), 40, "the work, less refunds, positive")
 	assert_eq(s.value(&"GEN", 1, "people"), 82700)

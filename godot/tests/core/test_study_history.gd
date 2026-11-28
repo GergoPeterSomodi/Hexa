@@ -132,17 +132,17 @@ func test_the_season_line_for_a_ring_row() -> void:
 	var s := StudyHistory.season(g, GEN, 5 - 1)
 	assert_eq(s["kept"], &"season")
 	assert_eq(s["title"], "Winter 1480")
-	assert_eq(s["opening"], 934)
-	assert_eq(s["closing"], 1068)
-	assert_eq(s["change"], 134)
+	assert_eq(s["opening"], 931)
+	assert_eq(s["closing"], 1064)
+	assert_eq(s["change"], 133)
 	assert_eq(s["land"], 14)
-	assert_eq(s["income"], 134)
+	assert_eq(s["income"], 133)
 	assert_eq(s["people"], g.stats.value(GEN, 4, "people"))
 	assert_gt(int(s["people"]), 0)
-	assert_eq(s["text"], "Treasury 934 → 1,068 ▲ +134 · land 14 · income ▲ +134 · people %s" % Words.number(int(s["people"])))
+	assert_eq(s["text"], "Treasury 931 → 1,064 ▲ +133 · land 14 · income ▲ +133 · people %s" % Words.number(int(s["people"])))
 	var first := StudyHistory.season(g, GEN, 1)
 	assert_eq(first["opening"], 610, "the opening of the oldest row: the closing less its lines (D7)")
-	assert_eq(first["closing"], 696)
+	assert_eq(first["closing"], 695)
 
 
 func test_the_kept_numbers_of_a_forty_eight_season_run() -> void:
