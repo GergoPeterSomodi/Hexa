@@ -24,6 +24,8 @@ extends Resource
 @export var works_per_season := 2
 @export var raises_peace := 2
 @export var raises_war := 4
+## The companies of the war goal of men that one barracks is wanted for (docs/design/recruitment-queue.md section 7).
+@export var companies_per_barracks := 4
 @export var merges_per_season := 4
 @export var order_tries := 2
 @export var food_priority := 3000
@@ -36,7 +38,8 @@ extends Resource
 
 
 ## Problems found, empty when valid (spec 5.1): think_every 1 to 20, peace_order_every 1 to 4, the ranges 1 to 40,
-## scan_per_step 1 to scan_hexes, the counts 0 to 20, the permilles 0 to 10,000 (a priority is a divisor: 1 or more),
+## scan_per_step 1 to scan_hexes, the counts 0 to 20 (companies_per_barracks is a divisor: 1 to 20), the permilles 0 to
+## 10,000 (a priority is a divisor: 1 or more),
 ## rest_morale 0 to 1,000, jitter 0 to 500.
 func validate() -> Array[String]:
 	var errors: Array[String] = []
@@ -51,6 +54,7 @@ func validate() -> Array[String]:
 	_range(errors, "scan_per_step", scan_per_step, 1, maxi(scan_hexes, 1))
 	for field: String in ["works_cards", "works_per_season", "raises_peace", "raises_war", "merges_per_season", "order_tries"]:
 		_range(errors, field, int(get(field)), 0, 20)
+	_range(errors, "companies_per_barracks", companies_per_barracks, 1, 20)
 	for field: String in ["threat_permille", "relief_last", "switch_permille", "disband_surplus", "yield_ratio"]:
 		_range(errors, field, int(get(field)), 0, 10000)
 	for field: String in ["food_priority", "walls_priority", "fortify_priority"]:

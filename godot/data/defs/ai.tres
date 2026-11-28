@@ -23,6 +23,7 @@ works_cards = 4
 works_per_season = 2
 raises_peace = 2
 raises_war = 4
+companies_per_barracks = 4
 merges_per_season = 4
 order_tries = 2
 food_priority = 3000

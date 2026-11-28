@@ -213,6 +213,38 @@ static func card(game: Game, tag: StringName, hex: Vector2i, option: Dictionary)
 		"payback": int(payback.get("seasons", -1)), "ducats": int(cost.get("ducats", 0)), "goods": cost.get("goods", [])}
 
 
+## The seat's own settlements that hold a barracks and that no one occupies, hex index order (recruitment-queue.md section
+## 7: a besieged one still counts, it is the seat's and works again when the siege ends).
+static func usable_barracks(game: Game, tag: StringName) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for hex: Vector2i in settlements(game, tag):
+		if owner_of(game, hex) == tag and Recruiting.has_barracks(game, hex):
+			out.append(hex)
+	return out
+
+
+## The barracks the seat is building on its own unoccupied land, one halted by a siege or the winter too. A work on
+## occupied land counts no more than a finished barracks there does: it must not hold back a new one.
+static func barracks_under_way(game: Game, tag: StringName) -> int:
+	var n := 0
+	for w: Work in game.state.works:
+		var held := owner_of(game, w.hex) == tag and controller_of(game, w.hex) == tag
+		if held and w.tag == tag and w.action == Works.BARRACKS:
+			n += 1
+	return n
+
+
+## The works card of a barracks on `hex`, as `card` gives it (payback -1: it brings nothing a card counts).
+static func barracks_card(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
+	return card(game, tag, hex, BarracksView.option())
+
+
+## The men of one company as the barracks the seat wants are counted: those of the first kind of company.
+static func company_men(game: Game) -> int:
+	var def := Military.unit_def(game, 0)
+	return def.men if def != null else 0
+
+
 static func raise_options(game: Game, tag: StringName, hex: Vector2i) -> Array[Dictionary]:
 	return Military.raise_options(game, tag, hex)
 
@@ -454,6 +486,16 @@ static func seen_enemies(game: Game, tag: StringName) -> Array[Dictionary]:
 	for seen: Dictionary in Knowledge.armies_seen(game, tag):
 		if Wars.at_war(game, tag, seen["tag"] as StringName):
 			out.append({"army": (seen["army"] as Army).id, "tag": seen["tag"], "hex": seen["hex"], "men": int(seen["men"])})
+	return out
+
+
+## The settlements `other` owns that `tag` has discovered, hex index order.
+static func known_settlements(game: Game, tag: StringName, other: StringName) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for i: int in land_of(game, other):
+		var hex := game.map.hex_of(i)
+		if int(game.state.main_use[i]) == People.SETTLEMENTS and discovered(game, tag, hex):
+			out.append(hex)
 	return out
 
 

@@ -40,8 +40,8 @@ const SHARED_TABLE := {
 	"think_every": 4, "min_upkeep": 10, "min_army_men": 500, "min_war_men": 1000, "threat_permille": 1500,
 	"threat_range": 3, "prize_range": 3, "attack_range": 6, "relief_range": 8, "target_range": 12, "relief_last": 600,
 	"rest_morale": 600, "switch_permille": 1300, "scan_hexes": 48, "scan_per_step": 24, "works_cards": 4,
-	"works_per_season": 2, "raises_peace": 2, "raises_war": 4, "merges_per_season": 4, "order_tries": 2,
-	"food_priority": 3000, "walls_priority": 2000, "fortify_priority": 2000, "jitter_permille": 50,
+	"works_per_season": 2, "raises_peace": 2, "raises_war": 4, "companies_per_barracks": 4, "merges_per_season": 4,
+	"order_tries": 2, "food_priority": 3000, "walls_priority": 2000, "fortify_priority": 2000, "jitter_permille": 50,
 	"disband_surplus": 2000, "peace_order_every": 1, "yield_ratio": 2000,
 }
 ## Spec 4.4 "Who has which": the 13 countries in the scenario's order.
@@ -113,7 +113,7 @@ func test_ai_numbers_equal_spec_4_4() -> void:
 	var a := _ai()
 	for field: String in SHARED_TABLE:
 		assert_eq(a.get(field), SHARED_TABLE[field], field)
-	assert_eq(SHARED_TABLE.size(), 28, "every row of the shared table is pinned")
+	assert_eq(SHARED_TABLE.size(), 29, "every row of the shared table is pinned")
 
 
 func test_the_scenarios_thirteen_tempers() -> void:
@@ -203,7 +203,8 @@ func test_planted_fault_scan_per_step_over_scan_hexes() -> void:
 	assert_true(_has(a.validate(), "scan_per_step is 49, expected 1 to 48"), "a step over the scan refused")
 	var cases: Array = [["think_every", 0, "1 to 20"], ["peace_order_every", 5, "1 to 4"], ["attack_range", 41, "1 to 40"],
 			["works_cards", 21, "0 to 20"], ["jitter_permille", 501, "0 to 500"], ["rest_morale", 1001, "0 to 1000"],
-			["food_priority", 0, "1 to 10000"], ["yield_ratio", 10001, "0 to 10000"]]
+			["food_priority", 0, "1 to 10000"], ["yield_ratio", 10001, "0 to 10000"], ["companies_per_barracks", 0, "1 to 20"],
+			["companies_per_barracks", 21, "1 to 20"]]
 	for case: Array in cases:
 		a = _ai()
 		a.set(case[0], case[1])

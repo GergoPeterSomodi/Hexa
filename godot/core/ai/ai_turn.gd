@@ -1,6 +1,6 @@
 ## The computer's turn (docs/architecture/m8-build-spec.md 4.2, 4.12, 5.5): the OrdersHook of the ai_orders phase. begin makes the
-## seats; step runs one bounded step of the current seat's queue (brief, peace, war, works scan x2, works cards, works act, forces,
-## one step an army, tax, done); a step may append steps for the same seat (push_step, army_retry). Nothing but the AI's own
+## seats; step runs one bounded step of the current seat's queue (brief, peace, war, barracks, works scan x2, works cards, works
+## act, forces, one step an army, tax, done); a step may append steps for the same seat (push_step, army_retry). Nothing but the AI's own
 ## acts changes the game while the turn runs, every step is a pure function of the game and its AI luck, and the queue's
 ## order is fixed, so the turn is the same stepped one at a time or all at once.
 ## The hook is not state: not saved, not in the digest. Pure core/ai/ code.
@@ -10,6 +10,7 @@ extends "res://core/game/orders_hook.gd"
 const BRIEF := &"brief"
 const PEACE := &"peace"
 const WAR := &"war"
+const BARRACKS := &"barracks"
 const WORKS_SCAN := &"works_scan"
 const WORKS_CARD := &"works_card"
 const WORKS_ACT := &"works_act"
@@ -147,7 +148,8 @@ func _key(tag: StringName, army_id: int) -> String:
 
 
 func _plan(game: Game) -> Array[Dictionary]:
-	var out: Array[Dictionary] = [_row(BRIEF, 0), _row(PEACE, 0), _row(WAR, 0), _row(WORKS_SCAN, 0), _row(WORKS_SCAN, 1)]
+	var out: Array[Dictionary] = [_row(BRIEF, 0), _row(PEACE, 0), _row(WAR, 0), _row(BARRACKS, 0), _row(WORKS_SCAN, 0),
+		_row(WORKS_SCAN, 1)]
 	for k: int in game.defs.ai.works_cards:
 		out.append(_row(WORKS_CARD, k))
 	out.append_array([_row(WORKS_ACT, 0), _row(FORCES, 0), _row(TAX, 0), _row(DONE, 0)])
@@ -175,6 +177,8 @@ func _run(game: Game, tag: StringName, step_name: StringName, arg: int) -> void:
 			AiPeace.peace(hook, game, brief, arg)
 		WAR:
 			AiWar.war(hook, game, brief, arg)
+		BARRACKS:
+			AiBarracks.barracks(hook, game, brief, arg)
 		WORKS_SCAN:
 			AiEconomy.works_scan(hook, game, brief, arg)
 		WORKS_CARD:

@@ -7,8 +7,8 @@
 extends GutTest
 
 const LIMIT := 5000
-const STEPS: Array[String] = ["brief", "peace", "war", "works_scan", "works_scan", "works_card", "works_card", "works_card",
-	"works_card", "works_act", "forces", "tax", "done"]
+const STEPS: Array[String] = ["brief", "peace", "war", "barracks", "works_scan", "works_scan", "works_card", "works_card",
+	"works_card", "works_card", "works_act", "forces", "tax", "done"]
 
 
 ## The names of a seat's trace lines in order ("works_scan 1" -> "works_scan"; an army line -> "army").
@@ -265,7 +265,7 @@ func test_a_turn_stepped_one_at_a_time_equals_the_turn_at_once() -> void:
 		steps += 1
 	assert_lt(steps, LIMIT, "the turn ends within the guard")
 	Season.orders_end(piece)
-	assert_gt(steps, 13 * STEPS.size() - 1, "13 seats of 13 fixed steps and the army steps, one at a time")
+	assert_gt(steps, 13 * STEPS.size() - 1, "13 seats of 14 fixed steps and the army steps, one at a time")
 	assert_eq((piece.orders as AiTurn).steps_done(), steps + 1)
 	assert_eq(piece.digest(), once.digest())
 	assert_eq(JSON.stringify(piece.action_log), JSON.stringify(once.action_log))

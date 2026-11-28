@@ -211,7 +211,7 @@ Each is decided. "Reverse" is the cost to change it later (S half a day, M a day
  End turn (the flow's RUNNING)
    Session.begin_season     end_check; Season.begin (the end_season record); Season.orders_begin -> AiTurn.begin: the seats
    every frame              Session.step_orders(5 or 10 ms): AiTurn.step, one bounded step at a time, then drain
-     a seat's turn          brief -> peace -> war -> works scan (2) -> works cards (up to 4) -> works -> forces
+     a seat's turn          brief -> peace -> war -> barracks -> works scan (2) -> works cards (up to 4) -> works -> forces
                             -> one step per army (order, standing) -> tax -> done        (acts through AiKnow.act only)
    Session.finish_season    Season.orders_end (the orders_done record); movement ... vision as M7; season_ended
  then REPLAY (the walks you saw, timed in view), DECISIONS (war and peace alerts), REPORT
@@ -245,6 +245,7 @@ first step runs; a step may append steps for the same seat:
 | 1 | `brief` | builds the seat's `AiBrief` from `AiKnow` (4.5) | one pass over its land and the hexes it sees |
 | 2 | `peace` | per live war, 4.11 | the checks of its wars |
 | 3 | `war` | on a think turn, 4.9 | one check per neighbour |
+| 3a | `barracks` | begins at most one barracks while the seat has fewer than it wants (`recruitment-queue.md` section 7) | the barracks checks of its settlements |
 | 4 | `works_scan` ×2 | the prior of 24 candidate hexes each (48 a season) | `Improve.build_options` and the static upgrade rules |
 | 5 | `works_card` ×k | one `ImprovePreview.of` for one of the best `works_cards` (4) | one card |
 | 6 | `works_act` | begins up to 2 works (4.7) | the chosen cards' acts |
@@ -364,6 +365,7 @@ steadfast, aggressive, opportunist][id mod 5]`.
 | `works_per_season` | 2 | works begun a season |
 | `raises_peace`, `raises_war` | 2, 4 | companies raised a season |
 | `merges_per_season` | 4 | merges a season |
+| `companies_per_barracks` | 4 | companies of the war goal of men that one barracks serves (`recruitment-queue.md` section 7) |
 | `order_tries` | 2 | march checks an army may ask a season |
 | `food_priority`, `walls_priority`, `fortify_priority` | 3,000, 2,000, 2,000 | payback divided by these (4.7) |
 | `jitter_permille` | 50 | a card's payback times a draw of 950 to 1,050 |

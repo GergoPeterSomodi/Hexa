@@ -15,9 +15,9 @@ const TEMPER_FIELDS: Array[String] = [
 const SHARED_FIELDS: Array[String] = [
 	"think_every", "min_upkeep", "min_army_men", "min_war_men", "threat_permille", "threat_range", "prize_range",
 	"attack_range", "relief_range", "target_range", "relief_last", "rest_morale", "switch_permille", "scan_hexes",
-	"scan_per_step", "works_cards", "works_per_season", "raises_peace", "raises_war", "merges_per_season", "order_tries",
-	"food_priority", "walls_priority", "fortify_priority", "jitter_permille", "disband_surplus", "peace_order_every",
-	"yield_ratio",
+	"scan_per_step", "works_cards", "works_per_season", "raises_peace", "raises_war", "companies_per_barracks",
+	"merges_per_season", "order_tries", "food_priority", "walls_priority", "fortify_priority", "jitter_permille",
+	"disband_surplus", "peace_order_every", "yield_ratio",
 ]
 
 

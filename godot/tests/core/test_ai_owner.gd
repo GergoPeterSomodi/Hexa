@@ -7,9 +7,9 @@ extends GutTest
 const M := AiFixture.MILAN
 const GEN := AiFixture.GENOA
 ## The war's start_turn, the first season after which Milan holds a Genoese district, the peace's turn and the districts it moved.
-const DECLARED := 3
-const FIRST_TAKEN := 7
-const PEACE_TURN := 15
+const DECLARED := 7
+const FIRST_TAKEN := 11
+const PEACE_TURN := 19
 const MOVED := 1
 
 
@@ -18,6 +18,16 @@ func _duel() -> Game:
 	for a: Army in Armies.of_country(g, GEN):
 		Armies.remove(g, a)
 	return g
+
+
+## The other neighbours' companies back at full strength, each season: they are there so that Milan's ratio over them
+## stays low and Genoa is its target (spec 4.16 (b)), and standing unfed they waste away. Without this Austria's is half
+## gone by turn 7, and Milan declares on Genoa only if its one roll of turn 3 (150 in 1,000) comes up.
+func _keep_neighbours(g: Game) -> void:
+	for a: Army in g.armies:
+		if a.tag != M:
+			for u: Unit in a.units:
+				u.men = g.defs.unit_def(u.kind).men
 
 
 ## Milan's controlled districts that Genoa owns.
@@ -43,6 +53,7 @@ func test_milan_declares_takes_land_and_makes_a_take_peace_within_forty_seasons(
 	var start := AiKnow.land_of(g, GEN).size()
 	var first_taken := 0
 	for n: int in 40:
+		_keep_neighbours(g)
 		Season.run(g)
 		if first_taken == 0 and _held(g) > 0:
 			first_taken = g.turn - 1
