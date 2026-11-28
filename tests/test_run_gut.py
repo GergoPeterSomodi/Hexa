@@ -91,6 +91,10 @@ class JudgeTest(unittest.TestCase):
         self.junit.write_text(JUNIT.format(run_gut.MAX_ASSERTS_PER_TEST + 1), encoding="utf-8")
         self.assertIn("test_one made", self.judge())
 
+    def test_the_assert_count_is_read_when_tests_failed(self) -> None:
+        many = CLEAN.replace("Asserts              10", f"Asserts {run_gut.MAX_ASSERTS_PER_PROCESS}/{run_gut.MAX_ASSERTS_PER_PROCESS + 1}")
+        self.assertIn("in one process", self.judge(many, status=1))
+
     def test_a_missing_junit_report_fails(self) -> None:
         self.junit.unlink()
         self.assertIn("JUnit", self.judge())

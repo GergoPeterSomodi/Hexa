@@ -35,6 +35,12 @@ about; the build takes it unless the owner says otherwise.
 | 18 | France, Austria and the Papal States start with theirs at **Fréjus, Bolzano and Bologna**. | 11-28 |
 | 19 | A barracks trains **one company a season**, although every country then starts at one company a season (confirms decision 4). | 11-28 |
 | 20 | A barracks costs **150 ducats, 10 timber and 10 stone, takes 4 seasons, upkeep 1 ducat a season**. | 11-28 |
+| 21 | **Unit looks: option D** of the [approved mockup](ui/unit-looks/mockup.html), the old Python game's figures with more detail. | 11-28 |
+| 22 | Stacked armies: a **fan picker** is added; the click cycle and Tab stay. | 11-28 |
+| 23 | A mixed army shows the **figure of the kind with the most men**, the other kinds as small discs. | 11-28 |
+| 24 | A foreign army in sight shows **only its main kind and its men**, as today. | 11-28 |
+
+The old unit types over three ages are the **next feature** after this one (issue 492), not part of it.
 
 Decision 15 replaces the older limits (3 a settlement, then the smaller of 3 and a number by settlement size).
 
@@ -411,8 +417,8 @@ withdrawals, a barracks picture on the map.
 **In:** unit art; unit cards and rows; picking units on the map apart from their tile.
 **Out:** new unit kinds, combat and balance numbers, army organisation (splitting, joining, stack size).
 
-This page does **not** design the art or the selection behaviour. An art director is preparing mockup options; every such
-point is **from the approved mockup**.
+The art and the selection behaviour are in the [mockup](ui/unit-looks/mockup.html), **approved on 2026-11-28 as option D**
+(decisions 21 to 24). Every point below marked **from the approved mockup** means option D there, with its fan picker.
 
 ### 11.2 Already built
 
@@ -423,9 +429,9 @@ From the code and `tests/shell/test_unit_select.gd`:
 - The click area is the plate and badge and follows the zoom. Foreign tokens are never selected (the click picks the hex),
   and unseen armies cannot be hit. Unit clicks are refused while moves replay.
 - Tab goes to the next army; the Army tab lists your armies on the hex with a Select button.
-- **Open:** the fan picker.
+- **To build:** the fan picker (decision 22).
 
-### 11.3 Points waiting for a mockup
+### 11.3 Points taken from the mockup
 
 | Point | Where | Content |
 |---|---|---|
@@ -478,7 +484,7 @@ Paths are under `godot/` unless they start with `tools/ui_bake`. Every task leav
 
 ### 12.2 Unit looks and selection
 
-Each task **starts only when the owner has approved its mockup**. They come after the queue tasks they share files with; the
+The mockup was approved on 2026-11-28 (decisions 21 to 24), so each task may start. They come after the queue tasks they share files with; the
 queue tasks never wait for them (whether the release does: question 6).
 
 | Task | Size | What | After | Main files | Key tests |
