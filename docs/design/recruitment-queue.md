@@ -31,17 +31,21 @@ about; the build takes it unless the owner says otherwise.
 | 14 | A barracks can be built in a **town or bigger**. | 11-28 |
 | 15 | A settlement with a barracks queues **at most 5 companies** ("as many as you want but limit to 5 now"). Kept in data. | 11-28 |
 | 16 | **Unit rework** joins this feature: **looks and selection only** (unit art and cards; clicking units on the map apart from their tile). No new unit kinds, no combat or balance changes, no army organisation changes. | 11-28 |
+| 17 | **Bern, Siena and Lucca start with a barracks** although they are villages; "town or bigger" applies to building. | 11-28 |
+| 18 | France, Austria and the Papal States start with theirs at **Fréjus, Bolzano and Bologna**. | 11-28 |
+| 19 | A barracks trains **one company a season**, although every country then starts at one company a season (confirms decision 4). | 11-28 |
+| 20 | A barracks costs **150 ducats, 10 timber and 10 stone, takes 4 seasons, upkeep 1 ducat a season**. | 11-28 |
 
 Decision 15 replaces the older limits (3 a settlement, then the smaller of 3 and a number by settlement size).
 
 ### Where the decisions and the data collide
 
-Numbers are in section 3. The first two need the owner (section 13); the page takes the recommended answer.
+Numbers are in section 3. The owner answered the first two (decisions 17 and 18).
 
 | Conflict | What the data says | This page takes |
 |---|---|---|
-| **13 against 14:** only the capital has a barracks, but a barracks is for a town or bigger | The capitals of Switzerland (Bern), Siena and Lucca are **villages** | The start barracks is given whatever the size; decision 14 governs **building** (question 1) |
-| **13 against the map:** a capital has the barracks | France, Austria and the Papal States have **no capital on this map** | The scenario names one settlement for each (question 2) |
+| **13 against 14:** only the capital has a barracks, but a barracks is for a town or bigger | The capitals of Switzerland (Bern), Siena and Lucca are **villages** | The start barracks is given whatever the size; decision 14 governs **building** (decision 17) |
+| **13 against the map:** a capital has the barracks | France, Austria and the Papal States have **no capital on this map** | The scenario names one settlement for each (decision 18) |
 | **11 with 14:** no barracks, no units; barracks only in a town | France, Siena and Lucca own **no town**. Siena and Lucca can **never** have one (each is beside a walled town, and two towns may not be neighbours) | Solved by the two rows above, as long as a barracks is never destroyed (question 4). Read strictly, Siena and Lucca could never raise a unit |
 
 ## 1. Goal
@@ -120,7 +124,7 @@ A **building of a settlement**, beside the settlement itself: one level, at most
 version: companies can be queued there. Drill, faster training and more levels come later (section 9, seams). It has no
 picture on the map in this version (page's choice); the Town tab shows it.
 
-| Name (data) | Where | Proposed value (question 3) |
+| Name (data) | Where | Value (decision 20) |
 |---|---|---|
 | `cost` | a new `data/defs/buildings/barracks.tres`, listed by `GameDefs` | 150 ducats |
 | `cost_goods` | the same | 10 timber, 10 stone |
@@ -491,17 +495,10 @@ R27), `economy-build-spec.md` (R46, R49), `m11-build-plan.md` (mustering) and th
 
 ## 13. Questions for the owner
 
-The build takes the recommendation unless you say otherwise.
+Questions 1 to 3 (the village capitals, the capitals off the map, the cost) were answered on 2026-11-28: decisions 17,
+18 and 20, with the training speed confirmed in decision 19. For the rest the build takes the recommendation unless you
+say otherwise.
 
-1. **Bern, Siena and Lucca are villages. Do they start with a barracks?** (a) Yes, each capital gets one whatever its size;
-   "town or bigger" applies to building new ones. (b) No: Switzerland must build one in a town, and Siena and Lucca can never
-   raise a unit. **Recommend (a).**
-2. **France, Austria and the Papal States have no capital on this map. Where is their barracks?** (a) Fréjus, Bolzano and
-   Bologna. (b) Other places (Besançon or Brignoles for France; Trento for Austria). (c) None: Austria and the Papal States
-   build one, and France waits years for a town. **Recommend (a).**
-3. **What does a barracks cost?** (a) 150 ducats, 10 timber, 10 stone, 4 seasons, 1 ducat a season. (b) The old game's
-   price: 220 ducats, with the same goods and time (the poorest state can barely pay it once). (c) Cheap and quick:
-   100 ducats, 2 seasons, no upkeep. **Recommend (a).**
 4. **Does a barracks survive being captured?** (a) Yes: it stands, the new owner of ceded land gets it, and it also keeps
    working if the town shrinks. (b) Capture destroys it; then your own capital must be allowed to rebuild one even as a
    village, or Siena and Lucca can be left without units for good. **Recommend (a).**
