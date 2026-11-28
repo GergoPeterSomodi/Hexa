@@ -350,6 +350,38 @@ func test_slice5_army_pieces_are_kit_icons() -> void:
 			assert_eq(theme_2x.get_icon(iname, &"Kit").get_image().get_size(), Vector2i(cell * 2, cell * 2), "%s 2x pixels" % iname)
 
 
+func test_unit_figures_of_option_d_are_kit_icons() -> void:
+	# recruitment-queue.md 12.2 UR1: every kind has its full and simplified figure, their tint cells and its far sign, in
+	# every theme, at its logical size, with 2x pixels in the 2x theme. Problems are gathered, then asserted once.
+	var studiolo := load(KitTheme.THEME_PATH) as Theme
+	var hc := load(KitTheme.HIGH_CONTRAST_PATH) as Theme
+	var theme_2x := KitTheme.load_for(2.0, &"2x", false)
+	var pieces := _load_pieces()
+	var problems: PackedStringArray = []
+	var names: Array = []
+	for kind: StringName in UnitDef.FIGURE_NAMES:
+		for level: String in ["full", "simple"]:
+			names.append(["%s_%s" % [kind, level], 64])
+			names.append(["%s_%s_tint" % [kind, level], 64])
+		names.append(["sign_%s" % str(kind).trim_prefix("fig_"), 24])
+	for atlas: String in ["unit_figures", "unit_figures_tint", "unit_signs"]:
+		for n: Variant in (pieces[atlas] as Dictionary)["icons"]:
+			if not names.any(func(e: Array) -> bool: return str(e[0]) == str(n)):
+				problems.append("%s names an unexpected cell %s" % [atlas, n])
+	for entry: Array in names:
+		var iname := StringName(str(entry[0]))
+		var px: int = entry[1]
+		for pair: Array in [["studiolo", studiolo], ["hc", hc], ["2x", theme_2x]]:
+			if not (pair[1] as Theme).has_icon(iname, &"Kit"):
+				problems.append("%s lacks %s" % [pair[0], iname])
+		if studiolo.has_icon(iname, &"Kit") and studiolo.get_icon(iname, &"Kit").get_size() != Vector2(px, px):
+			problems.append("%s is not %d px" % [iname, px])
+		if theme_2x.has_icon(iname, &"Kit") and theme_2x.get_icon(iname, &"Kit").get_image().get_size() != Vector2i(px * 2, px * 2):
+			problems.append("%s has no 2x pixels" % iname)
+	assert_eq(names.size(), 20, "4 kinds x (2 levels x 2 layers + 1 sign)")
+	assert_eq(problems, PackedStringArray(), "every unit figure, tint cell and sign is a Kit icon")
+
+
 func test_the_map_views_delta_tints_are_the_token_colours() -> void:
 	assert_eq(MapModes.DELTA_GOOD, Tokens.GOOD)
 	assert_eq(MapModes.DELTA_BAD, Tokens.BAD)

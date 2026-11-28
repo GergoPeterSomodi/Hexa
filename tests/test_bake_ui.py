@@ -163,6 +163,9 @@ class TestBakeUI(unittest.TestCase):
             "figures": ([128, 32], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
             "icons_army": ([192, 48], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
             "path_stop": ([20, 20], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "unit_figures": ([256, 128], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "unit_figures_tint": ([256, 128], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
+            "unit_signs": ([96, 24], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
         }
         expected_slice6 = {
             "badge_battle": ([40, 40], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], "stretch"),
@@ -481,6 +484,51 @@ class TestBakeUI(unittest.TestCase):
             sheet = Path(tmp) / "sheet.png"
             pieces_m6.write_token_sheet(sheet, tokens, REPO_ROOT, 1)
             self.assertGreater(load_png_rgba(sheet).shape[0], 13 * 48)
+
+    def test_unit_figures_option_d(self) -> None:
+        # UR1 (recruitment-queue.md 12.2): D's four figures at two levels in two layers, the far signs, the catalogue.
+        from tools.ui_bake import pieces_units
+
+        kit_dir = REPO_ROOT / "godot" / "assets" / "ui" / "kit"
+        pieces = json.loads(KIT_JSON.read_text(encoding="utf-8"))["pieces"]
+        kinds = ["fig_infantry", "fig_missile", "fig_cavalry", "fig_artillery"]
+        want = [f"{k}_{lv}" for lv in ("full", "simple") for k in kinds]
+        self.assertEqual(
+            [pieces["unit_figures"]["icons"], pieces["unit_figures_tint"]["icons"], pieces["unit_signs"]["icons"],
+             pieces["unit_figures"]["cell"], pieces["unit_signs"]["cell"]],
+            [want, [n + "_tint" for n in want], ["sign_infantry", "sign_missile", "sign_cavalry", "sign_artillery"], [64, 64], [24, 24]],
+        )
+        names = ("unit_figures", "unit_figures_tint", "unit_signs")
+        rendered = {(n, s): load_png_rgba(kit_dir / f"{s}x" / f"{n}.png") for n in names for s in (1, 2)}
+        shapes = {k: v.shape for k, v in rendered.items()}
+        self.assertEqual(shapes, {(n, s): ((24 if n == "unit_signs" else 128) * s, (96 if n == "unit_signs" else 256) * s, 4) for n in names for s in (1, 2)})
+        pieces_units.check_unit_pieces(rendered)
+        # The two layers drawn the game's way give back the painting for any colour (within one 8-bit step).
+        tokens = load_tokens(bake_ui.TOKENS_PATH)
+        colours = [(190, 60, 110), (40, 70, 170), (130, 150, 120), (255, 255, 255), (0, 0, 0)]
+        worst = max(pieces_units.check_split_exact(tokens, colours, 1, i, lv) for i in range(4) for lv in ("full", "simple"))
+        self.assertLessEqual(worst, 1.0)
+        # Planted faults: an empty cell, a cell touching its edge, a coloured tint texel, full equal to simplified.
+        faults = {}
+        blank = rendered[("unit_figures", 1)].copy()
+        blank[0:64, 64:128] = 0
+        faults["blank"] = {**rendered, ("unit_figures", 1): blank}
+        edge = rendered[("unit_signs", 1)].copy()
+        edge[0, 0:24, 3] = 255
+        faults["edge"] = {**rendered, ("unit_signs", 1): edge}
+        tint = rendered[("unit_figures_tint", 1)].copy()
+        tint[tint[..., 3] > 0, 0] = 10
+        faults["tint"] = {**rendered, ("unit_figures_tint", 1): tint}
+        same = rendered[("unit_figures", 2)].copy()
+        same[128:256] = same[0:128]
+        faults["same"] = {**rendered, ("unit_figures", 2): same}
+        caught = []
+        for label, bad in faults.items():
+            try:
+                pieces_units.check_unit_pieces(bad)
+            except BakeCheckError:
+                caught.append(label)
+        self.assertEqual(caught, list(faults))
 
     def test_slice6_war_pieces(self) -> None:
         from tools.ui_bake import pieces_m7

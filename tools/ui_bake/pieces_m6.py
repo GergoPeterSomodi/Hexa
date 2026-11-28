@@ -1,12 +1,15 @@
 """Slice 5 army pieces (m6-build-spec.md 6.2): the plate, its selection ring, the strength badge, four figures, 16 icons
-and the route stop.
+and the route stop; and the unit figures of option D (UR1, recruitment-queue.md 12.2), drawn in `pieces_units`.
 
 | Piece | Size (1x) | What |
 |---|---|---|
 | `army_plate` | 56 x 48 | a flat-top hex plate, white with an ink edge (tinted the country's colour at run time) |
 | `army_plate_ring` | 64 x 56 | the gold selection ring with a soft glow |
 | `army_badge` | 36 x 18 | a brass-rimmed slot for the strength |
-| `figures` | 128 x 32 | four 32 px cells: `fig_infantry`, `fig_missile`, `fig_cavalry`, `fig_artillery` |
+| `figures` | 128 x 32 | four 32 px cells: `fig_infantry`, `fig_missile`, `fig_cavalry`, `fig_artillery` (D's small form) |
+| `unit_figures` | 256 x 128 | D's figures, `fig_*_full` (row 0) and `fig_*_simple` (row 1): the fixed colours, drawn on top |
+| `unit_figures_tint` | 256 x 128 | the same cells, `fig_*_full_tint` / `fig_*_simple_tint`: white, drawn first in the country colour |
+| `unit_signs` | 96 x 24 | the far-zoom signs `sign_infantry`... (white; drawn in the country colour darkened by half) |
 | `icons_army` | 192 x 48 | 8 columns x 2 rows of 24 px cells, in `ARMY_ICON_NAMES` order |
 | `path_stop` | 20 x 20 | a brass ring that holds a season's numeral on the route |
 
@@ -28,11 +31,14 @@ from .icons import _Canvas
 from .materials import gilt_stops, sample_ramp
 from .pieces_frames import PieceSpec
 from .pieces_m2 import sd_polygon
+from .pieces_units import (
+    FIGURE_NAMES, SIGNS_SIZE, UNIT_FIGURES_SIZE, check_unit_pieces, render_small_figures, render_unit_figures,
+    render_unit_figures_tint, render_unit_signs,
+)
 from .png import save_png
 from .shapes import blend_rgb_mask, coverage, logical_grid, sd_rounded_rect, sd_circle
 from .tokens import TokenTable, contrast_ratio, parse_hex_color
 
-FIGURE_NAMES: tuple[str, ...] = ("fig_infantry", "fig_missile", "fig_cavalry", "fig_artillery")
 ARMY_ICON_NAMES: tuple[str, ...] = (
     "march", "hold", "halted", "wait_snow", "muster", "supply_ok", "supply_out", "forage",
     "raise", "disband", "split", "merge", "bridge", "ford", "wade", "pass_mark",
@@ -164,98 +170,10 @@ class _Cv(_Canvas):
         self.fill(self.cap(x0, y0, x1, y1, w), colour)
 
 
-# ---------------------------------------------------------------- figures (32 px, facing right)
-
-def _fig_infantry(c: _Cv) -> None:
-    # A pikeman: a long pike behind him, kettle hat, cream tabard, two legs.
-    c.fill(c.cap(8.0, 30.0, 23.4, 4.2, 1.6), "wood")
-    c.fill(c.poly([(24.0, 2.4), (25.8, 6.6), (22.0, 5.8)]), "steel")
-    c.fill(c.cap(12.0, 21.0, 11.2, 29.0, 3.0), "dark")
-    c.fill(c.cap(18.0, 21.0, 19.0, 29.0, 3.0), "dark")
-    c.fill(c.poly([(9.0, 12.0), (21.0, 12.0), (22.0, 23.0), (8.0, 23.0)]), "cream")
-    c.line(15.0, 13.0, 15.0, 22.5, 1.0, "red")
-    c.fill(c.cap(9.0, 14.0, 6.6, 20.0, 2.8), "cream")
-    c.fill(c.cap(21.0, 14.0, 23.6, 18.5, 2.8), "cream")
-    c.fill(c.circle(15.0, 8.2, 3.6), "skin")
-    c.fill(c.ell(15.0, 6.2, 6.4, 1.8), "steel")
-    c.fill(c.poly([(10.6, 6.4), (15.0, 1.4), (19.4, 6.4)]), "steel")
-    c.dot(16.4, 8.6, 0.6)
-
-
-def _fig_missile(c: _Cv) -> None:
-    # A crossbowman, seen from the front: kettle hat, the stave across the chest, a bolt laid on the stock.
-    c.fill(c.cap(12.0, 22.0, 11.2, 29.0, 3.0), "dark")
-    c.fill(c.cap(18.0, 22.0, 19.0, 29.0, 3.0), "dark")
-    c.fill(c.poly([(9.0, 12.5), (21.0, 12.5), (22.0, 24.0), (8.0, 24.0)]), "wheat")
-    c.fill(c.circle(15.0, 9.0, 3.6), "skin")
-    c.fill(c.ell(15.0, 6.6, 7.2, 1.8), "steel")
-    c.fill(c.poly([(10.4, 6.6), (15.0, 1.0), (19.6, 6.6)]), "steel")
-    # the stave: a bowed bar across the chest, string drawn straight, the stock running at the viewer
-    c.fill(c.poly([(2.0, 13.0), (6.0, 16.2), (15.0, 17.6), (24.0, 16.2), (28.0, 13.0), (28.6, 15.0), (25.0, 19.2), (15.0, 20.4), (5.0, 19.2), (1.4, 15.0)]), "wood")
-    c.line(2.4, 13.4, 14.8, 21.8, 0.8)
-    c.line(27.6, 13.4, 15.2, 21.8, 0.8)
-    c.fill(c.rbox(13.8, 17.0, 16.2, 27.0, 0.8), "bark")
-    c.fill(c.poly([(14.2, 10.0), (15.0, 8.4), (15.8, 10.0), (15.8, 17.6), (14.2, 17.6)]), "steel", ink=False)
-    c.fill(c.cap(8.5, 14.0, 10.5, 21.0, 2.8), "wheat")
-    c.fill(c.cap(21.5, 14.0, 19.5, 21.0, 2.8), "wheat")
-
-
-def _fig_cavalry(c: _Cv) -> None:
-    # A mounted knight with a couched lance and a red pennon, the horse in side view facing right.
-    c.fill(c.cap(3.0, 25.0, 28.0, 10.6, 1.4), "wood")
-    c.fill(c.poly([(26.6, 7.2), (29.8, 9.4), (25.8, 11.0)]), "red")
-    for (x0, y0, x1, y1) in ((7.0, 22.0, 6.0, 29.0), (10.6, 22.0, 11.4, 29.0), (20.0, 22.0, 19.4, 29.0), (23.6, 22.0, 25.0, 29.0)):
-        c.fill(c.cap(x0, y0, x1, y1, 2.4), "bark")
-    c.fill(c.poly([(3.0, 15.0), (6.0, 14.4), (7.5, 19.0), (5.4, 24.0), (2.0, 21.0)]), "brown")
-    c.fill(c.ell(15.0, 18.6, 10.4, 5.2), "brown")
-    c.fill(c.poly([(21.0, 15.6), (24.4, 8.6), (28.0, 10.6), (28.8, 14.6), (26.6, 15.2), (25.4, 12.6), (24.2, 17.4)]), "brown")
-    c.fill(c.poly([(22.4, 9.4), (23.4, 6.6), (24.8, 8.6)]), "bark")
-    c.dot(26.6, 11.6, 0.6, "cream")
-    c.fill(c.rbox(10.0, 13.8, 19.0, 19.4, 1.0), "red")
-    c.fill(c.cap(15.4, 13.0, 15.0, 9.4, 4.6), "steel")
-    c.fill(c.circle(15.2, 6.6, 3.0), "steel")
-    c.line(15.2, 5.8, 17.6, 5.8, 0.9)
-    c.line(15.2, 7.4, 17.4, 7.4, 0.9)
-    c.fill(c.poly([(14.0, 3.8), (15.4, 1.6), (16.6, 3.8)]), "red")
-
-
-def _fig_artillery(c: _Cv) -> None:
-    # A bombard on its bed: a thick iron barrel bound with rings, a stone ball beside it.
-    c.fill(c.poly([(2.0, 20.0), (27.0, 20.0), (29.0, 25.0), (4.0, 25.0)]), "bark")
-    c.fill(c.cap(14.0, 19.6, 14.0, 17.0, 3.0), "wood")
-    barrel = [(5.0, 14.4), (7.0, 10.2), (24.4, 6.0), (27.6, 9.8), (26.6, 14.4), (24.0, 18.2), (8.0, 19.8)]
-    c.fill(c.poly(barrel), "iron")
-    c.fill(c.circle(25.6, 11.0, 3.6), "dark")
-    c.fill(c.circle(25.6, 11.0, 1.8), "dark", ink=False)
-    for t in (0.30, 0.52, 0.74):
-        x = 7.0 + t * 18.0
-        c.line(x, 8.8 + (1 - t) * 3.0, x - 0.4, 18.4, 1.0)
-    c.stroke(c.cap(7.4, 12.6, 22.0, 8.8, 1.2), "steel", 0.8)
-    c.fill(c.circle(10.0, 26.0, 4.0), "wood")
-    c.fill(c.circle(10.0, 26.0, 1.3), "dark", ink=False)
-    c.fill(c.circle(22.0, 26.0, 4.0), "wood")
-    c.fill(c.circle(22.0, 26.0, 1.3), "dark", ink=False)
-    c.fill(c.circle(28.0, 26.8, 2.2), "stone")
-
-
-_FIGURES: dict[str, Callable[[_Cv], None]] = {
-    "fig_infantry": _fig_infantry, "fig_missile": _fig_missile,
-    "fig_cavalry": _fig_cavalry, "fig_artillery": _fig_artillery,
-}
-
-
-def figure_cell(name: str, s: int, tokens: TokenTable) -> np.ndarray:
-    c = _Cv(FIG_CELL, FIG_CELL, s, tokens)
-    _FIGURES[name](c)
-    return c.out
-
+# ---------------------------------------------------------------- figures (32 px cells): D's small card form, see pieces_units
 
 def render_figures(s: int, tokens: TokenTable) -> np.ndarray:
-    w, h = FIGURES_SIZE
-    atlas = np.zeros((h * s, w * s, 4), dtype=np.float64)
-    for i, name in enumerate(FIGURE_NAMES):
-        atlas[:, i * FIG_CELL * s : (i + 1) * FIG_CELL * s] = figure_cell(name, s, tokens)
-    return _finish(atlas)
+    return render_small_figures(s, tokens)
 
 
 # ---------------------------------------------------------------- icons (24 px)
@@ -477,6 +395,10 @@ def m6_pieces() -> list[PieceSpec]:
         spec("figures", FIGURES_SIZE, render_figures),
         spec("icons_army", ICONS_SIZE, render_icons_army),
         spec("path_stop", STOP_SIZE, _render_stop),
+        # UR1 (recruitment-queue.md 12.2): option D's figures in two layers and two levels, and the far-zoom signs.
+        spec("unit_figures", UNIT_FIGURES_SIZE, render_unit_figures),
+        spec("unit_figures_tint", UNIT_FIGURES_SIZE, render_unit_figures_tint),
+        spec("unit_signs", SIGNS_SIZE, render_unit_signs),
     ]
 
 
@@ -557,6 +479,7 @@ def check_m6_pieces(
                     raise BakeCheckError(f"{name} cell {i}@{s}x is hardly drawn")
                 if max(int(part[0].max()), int(part[-1].max()), int(part[:, 0].max()), int(part[:, -1].max())) > 200:
                     raise BakeCheckError(f"{name} cell {i}@{s}x touches its cell edge")
+    check_unit_pieces({k: v for k, v in rendered.items() if k[0] in names})
 
 
 # ---------------------------------------------------------------- the token sheet
