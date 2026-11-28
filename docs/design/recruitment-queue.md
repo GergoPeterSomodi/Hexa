@@ -39,6 +39,11 @@ about; the build takes it unless the owner says otherwise.
 | 22 | Stacked armies: a **fan picker** is added; the click cycle and Tab stay. | 11-28 |
 | 23 | A mixed army shows the **figure of the kind with the most men**, the other kinds as small discs. | 11-28 |
 | 24 | A foreign army in sight shows **only its main kind and its men**, as today. | 11-28 |
+| 25 | A country with **no town and no barracks** may build one in a **village**, so that no country is shut out of raising. | 11-28 |
+
+How decision 25 is read (page's choice): "no town" is no settlement of town size or bigger on land the country owns; "no
+barracks" is none standing and none being built on that land; an occupied town or barracks still counts. A hamlet (a
+settlement that shrank) is allowed like a village.
 
 The old unit types over three ages are the **next feature** after this one (issue 492), not part of it.
 
@@ -146,7 +151,8 @@ A scenario that lists none gives each capital on the map a barracks (page's choi
 A **work**, like every other building: action `build_barracks {hex, tag}`, a `Work` with the new action `barracks`.
 
 - Checks, in order: your land; no work under way on the hex; not occupied or besieged; a settlement; no barracks there yet;
-  a **town or bigger** ("a barracks is built in a town or larger"); a free work slot (question 5); ducats; goods.
+  a **town or bigger** ("a barracks is built in a town or larger"), or any settlement while you have no town and no
+  barracks (decision 25); a free work slot (question 5); ducats; goods.
 - It behaves as other works do: it counts down in the works step, halts under occupation, siege and in a snow winter, is
   refunded when cancelled in the season it began, and is lost with nothing back when the land is lost.
 - One work a hex: while a barracks is built, that settlement cannot be upgraded, and its people neither raise nor lower its
@@ -169,7 +175,7 @@ A **work**, like every other building: action `build_barracks {hex, tag}`, a `Wo
   move. While it is occupied you raise only at other barracks, or build one in another town. At the peace or the retaking it
   comes back with its barracks. Countries are not eliminated in today's rules.
 - The seats of France, Austria and the Papal States are not capitals in the rules, so they **can** be ceded. A country that
-  loses its last barracks this way builds a new one in a town, if it has or can make one.
+  loses its last barracks this way builds a new one in a town, or in a village if it has no town (decision 25).
 - In today's rules a peace moves only land the winner already occupies, so a ceded settlement has usually lost its queue at
   the capture. Decision 7 still applies to every change of owner (developer transfer, later diplomacy).
 
@@ -317,7 +323,8 @@ Same checks and actions, no shortcut. Without the two changes below its wars sta
 - with **none**, it builds as soon as it can pay (its money reserve waived); with fewer than wanted, one at a time and only
   keeping its reserve;
 - where: a town or bigger that passes the check, not on the front, nearest the front first; if all are on the front, the
-  farthest from the enemy.
+  farthest from the enemy;
+- with no town and no barracks (decision 25) the same choice is made among its villages and hamlets.
 
 **Using the queue:**
 
@@ -369,7 +376,7 @@ company.
 | building | "building · 1 of 4 seasons" |
 | can build | "cost 150 · 10 loads of timber · 10 loads of stone · upkeep 1" |
 | short | "cost 150 · you have 120", or the goods reason |
-| locked (village or hamlet) | "needs a town" |
+| locked (village or hamlet, while you have a town or a barracks) | "needs a town" |
 | refused | occupied, siege, no free work slot, one job at a time |
 
 Hover card: "Companies are raised here: up to 5 queued, one ready a season." It has no yearly gain. A built barracks on a
@@ -473,6 +480,7 @@ Paths are under `godot/` unless they start with `tools/ui_bake`. Every task leav
 | RQ2 | M | Building a barracks: action, work, checks, capture and cession, upkeep (economy pins updated); fixed list in `RandomPlayer` | `core/systems/{works,recruiting,economy_season}.gd`, `core/state/work.gd`, `core/game/actions.gd`, `core/views/works_view.gd` | each check row; village refused; halt, cancel refund, lost on cession; barracks survives capture and passes on cession; old random streams unchanged |
 | RQ3 | S/M | Town tab tile, hover card, work words and marks, foreign land facts | `core/views/{tile_buildings,building_card,tile_view,log_lines}.gd`, `shell/panels/tile_tabs/building_strips.gd`, `shell/map/work_marks.gd` | each row state; no gain figure; foreign tile only in sight |
 | RQ4 | S/M | The computer builds barracks | `core/ai/{ai_turn,ai_know}.gd`, a new AI step file, `core/defs/ai_def.gd`, `data/defs/ai.tres` | wanted number per country; none: reserve waived; place choice; slot respected |
+| RQ4b | S | A village barracks for a country with no town and no barracks (decision 25): the rule, its words in the Town tab, the computer's choice | `core/systems/recruiting.gd`, `core/ai/ai_barracks.gd`, `core/views/barracks_view.gd` | allowed only then; refused with a town or a barracks, standing or being built; the computer builds it |
 | RQ5 | S | The muster entry: state, save, digest, load checks. No rule yet | new `core/state/muster.gd`, `core/game/{game,snapshot}.gd` | round trip; each planted fault refused |
 | RQ6 | M | `raise` queues (limit 5 replaces the season cap; until RQ8 at any settlement), `withdraw`, `muster` step with all the waiting rules, `dev_muster`, men and refunds; computer counts and uses the queue; helpers and UI tools; minimal toast | `core/systems/{recruiting,military}.gd`, `core/game/{actions,season,replay}.gd`, `core/ai/{ai_forces,ai_know}.gd`, `core/views/{tile_army,company_card}.gd`, `shell/hud/dev_commands.gd`, `tests/core/army_fixture.gd`, `tests/shell/app_flow_helpers.gd`, `tools/ui/{shot_ui_m6,perf_ui_m6,shot_ui_tile}.gd` | queue then withdraw restores money, goods and people; ready exactly one season later and able to march; never two a settlement a season; 6th refused; waits for siege, enemy, occupation and no room, blocking those behind; non-enemy changes nothing; computer within goal and depth; replay equal |
 | RQ7 | S | Loss of the queue: capture, cession, transfer; the load check refuses an entry on land its tag does not hold unoccupied | `core/systems/{recruiting,occupation,wars}.gd`, `core/game/game.gd` | each way of losing it (storm, siege, walk-in, peace, transfer); men return; save and load after each |
