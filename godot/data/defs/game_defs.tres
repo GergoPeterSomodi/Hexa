@@ -71,6 +71,7 @@
 [ext_resource type="Resource" path="res://data/defs/terrain/snow.tres" id="t_snow"]
 [ext_resource type="Resource" path="res://data/defs/terrain/tundra.tres" id="t_tundra"]
 [ext_resource type="Resource" path="res://data/defs/terrain/sand.tres" id="t_sand"]
+[ext_resource type="Resource" path="res://data/defs/buildings/barracks.tres" id="b_barracks"]
 
 [resource]
 script = ExtResource("17_eiw27")
@@ -152,3 +153,4 @@ wait_extra_seasons = 2
 land_sight = 1
 fog_step_cost = -1
 max_stops = 6
+barracks = ExtResource("b_barracks")

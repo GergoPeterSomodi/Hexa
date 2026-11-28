@@ -160,9 +160,9 @@ func test_only_the_owners_write_what_they_own() -> void:
 	assert_eq(Improve.OWNS, ["main_use", "level"])
 	assert_eq(Works.OWNS, ["works", "next_work_id"])
 	var state := MapState.create(_map)
-	# M7 (5.2): the occupation arrays are MapState fields too.
+	# M7 (5.2): the occupation arrays are MapState fields too; RQ1 (recruitment-queue.md 6): so are the barracks.
 	var known_fields: Array[String] = ["main_use", "level", "owner", "works", "next_work_id", "people", "people_start", "people_end",
-		"occupier", "garrison", "unsupported"]
+		"occupier", "garrison", "unsupported", "barracks"]
 	for property: Dictionary in state.get_property_list():
 		if int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE != 0:
 			assert_true(known_fields.has(str(property["name"])), "%s is a known MapState field" % property["name"])

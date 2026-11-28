@@ -53,6 +53,10 @@ static func economy_into(defs: GameDefs) -> void:
 			"res://data/defs/tempers/%s.tres" % String(t.key), "", ResourceLoader.CACHE_MODE_IGNORE
 		) as AiTemperDef)
 	defs.tempers = tempers
+	# The barracks (recruitment-queue.md 4.1): a fresh copy of data/defs/buildings/barracks.tres, for the same reason.
+	defs.barracks = ResourceLoader.load(
+		"res://data/defs/buildings/barracks.tres", "", ResourceLoader.CACHE_MODE_IGNORE
+	) as BarracksDef
 	defs.wild_good = committed.wild_good.duplicate()
 	defs.wild_yield = committed.wild_yield
 	defs.country_people = committed.country_people

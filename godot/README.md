@@ -86,7 +86,8 @@ enters enemy land or ends out of supply asks once (`game/confirm_moves`, "Confir
 `V` orders at once (a march; each further click adds a point to its end; on the last point it removes it, the only one halts;
 at most 6 points before the goal), a plain right click replaces the path, and holding `Shift` previews the longer path. In the
 season a country declares a war its armies may not enter that enemy's land (the player's too). The computer moves by the same rules at the end of the season. Design `docs/design/moves-in-the-month.md`, rules
-`docs/architecture/moves-build-spec.md`; save format 8 (older saves are refused as an older test build).
+`docs/architecture/moves-build-spec.md`; save format 9 since the recruitment work began (the barracks,
+`docs/design/recruitment-queue.md`; older saves are refused as an older test build).
 
 ## Engine
 

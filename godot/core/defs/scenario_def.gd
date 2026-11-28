@@ -27,6 +27,9 @@ const NO_HEX := Vector2i(-1, -1)
 @export var tempers: Array[StringName] = []
 ## Companies the scenario starts with: {tag: StringName, hex: Vector2i, kind: int, count: int} (M8 spec 5.1). 1480: none.
 @export var start_armies: Array[Dictionary] = []
+## The settlements that start with a barracks, whatever their size (recruitment-queue.md 4.1, decisions 17 and 18). Kept by
+## hand; build_scenario.gd leaves it. None listed: every capital on the map has one (Recruiting.setup).
+@export var barracks: Array[Vector2i] = []
 ## Regions of the discovery set (fog spec R5): index 0 is the first region; byte value k + 1 in `region` means regions[k].
 @export var regions: Array[StringName] = []
 ## One byte a hex, in the map's order: the region's byte, 0 for none. Empty when the scenario has no regions (R7).
@@ -100,6 +103,7 @@ func validate(map: MapData, defs: GameDefs, deep: bool) -> Array[String]:
 	_validate_owner(map, errors)
 	_validate_tempers(defs, errors)
 	_validate_start_armies(map, defs, country_set, errors)
+	_validate_barracks(map, errors)
 	_validate_regions(map, errors)
 	if deep:
 		_validate_deep(map, defs, errors)
@@ -133,6 +137,9 @@ func digest() -> String:
 	for key: StringName in tempers:
 		_feed_str(ctx, String(key))
 	_feed_dict_list(ctx, start_armies)
+	_feed_int(ctx, barracks.size())
+	for hex: Vector2i in barracks:
+		ctx.update(PackedInt32Array([hex.x, hex.y]).to_byte_array())
 	_feed_int(ctx, regions.size())
 	for reg: StringName in regions:
 		_feed_str(ctx, String(reg))
@@ -287,6 +294,23 @@ func _validate_start_armies(map: MapData, defs: GameDefs, country_set: Dictionar
 		var count := int(a.get("count", 0))
 		if count < 1 or count > 8:
 			errors.append("start_armies[%d]: count is %d, expected 1 to 8" % [i, count])
+
+
+## recruitment-queue.md 4.1: each start barracks on a place of the map with a settlement (level 1 or more), on land a
+## country owns, listed once.
+func _validate_barracks(map: MapData, errors: Array[String]) -> void:
+	var seen: Dictionary = {}
+	for i: int in barracks.size():
+		var hex := barracks[i]
+		var at := map.index_of(hex)
+		var place := int(map.place_id[at]) if map.is_land(hex) else -1
+		if place < 0 or int(map.places[place].get("level", 0)) < 1:
+			errors.append("barracks[%d]: hex %s holds no settlement" % [i, hex])
+		elif owner.size() == map.hex_count() and owner[at] == 0:
+			errors.append("barracks[%d]: hex %s is owned by no one" % [i, hex])
+		if seen.has(hex):
+			errors.append("barracks[%d]: hex %s listed twice" % [i, hex])
+		seen[hex] = true
 
 
 ## The start discovery of `tag` (fog spec R6): one byte a hex, 1 where the hex's region is one of the tag's regions.

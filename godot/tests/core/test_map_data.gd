@@ -188,7 +188,7 @@ func test_map_state_round_trip() -> void:
 	s.owner[m.index_of(Vector2i(5, 2))] = 254
 	var d := s.to_dict()
 	assert_eq(d["schema"], MapState.SCHEMA)
-	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/5")
+	assert_eq(MapState.SCHEMA, "hexa-godot/map-state/6")
 	# JSON-safe: survives text.
 	var parsed: Variant = JSON.parse_string(JSON.stringify(d))
 	assert_true(parsed is Dictionary)
@@ -230,7 +230,7 @@ func test_map_state_schema_3_round_trip_with_works() -> void:
 	var m := _map()
 	var s := _state_with_works(m)
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/5")
+	assert_eq(d["schema"], "hexa-godot/map-state/6")
 	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
 	assert_not_null(back)
 	assert_eq(back.works.size(), 2)
@@ -374,7 +374,7 @@ func test_map_state_4_round_trip_with_the_people() -> void:
 	var m := _map()
 	var s := _state_with_people(m)
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/5")
+	assert_eq(d["schema"], "hexa-godot/map-state/6")
 	assert_true(d["people"] is PackedInt32Array, "packed as they are")
 	for form: int in 2:
 		var src: Dictionary = d
@@ -433,7 +433,7 @@ func test_map_state_schema_3_loads_with_people_at_zeros() -> void:
 	assert_eq(back.people_start.count(0), 35)
 	assert_eq(back.people_end.count(0), 35)
 	assert_eq(back.digest(), s.digest(), "the zero people of a fresh state")
-	assert_eq(back.to_dict()["schema"], MapState.SCHEMA, "saved again as map-state/5")
+	assert_eq(back.to_dict()["schema"], MapState.SCHEMA, "saved again as map-state/6")
 	var v2 := {"schema": MapState.SCHEMA_V2, "main_use": Marshalls.raw_to_base64(s.main_use),
 		"level": Marshalls.raw_to_base64(s.level), "owner": Marshalls.raw_to_base64(s.owner)}
 	var back2 := MapState.from_dict(v2, m)
@@ -497,7 +497,7 @@ func test_map_state_5_occupation_round_trip_and_copies() -> void:
 	s.garrison[i] = 250
 	s.unsupported[i] = 2
 	var d := s.to_dict()
-	assert_eq(d["schema"], "hexa-godot/map-state/5")
+	assert_eq(d["schema"], "hexa-godot/map-state/6")
 	var back := MapState.from_dict(JSON.parse_string(JSON.stringify(d)) as Dictionary, m)
 	assert_not_null(back)
 	assert_eq(back.occupier[i], 3)
@@ -543,7 +543,7 @@ func test_map_state_5_refuses_damaged_occupation() -> void:
 	missing.erase("unsupported")
 	assert_null(MapState.from_dict(missing, m), "P: unsupported missing")
 	var wrong_schema := s.to_dict()
-	wrong_schema["schema"] = "hexa-godot/map-state/6"
+	wrong_schema["schema"] = "hexa-godot/map-state/7"
 	assert_null(MapState.from_dict(wrong_schema, m), "P: a schema that is not known")
 
 

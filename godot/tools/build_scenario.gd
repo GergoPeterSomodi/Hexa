@@ -103,8 +103,8 @@ func _run_targets(targets: Array[ScenarioDef], defs: GameDefs, maps_dir: String,
 
 
 ## Regrows `scenario.owner`, stamps `scenario.map_digest` and writes `scenario.region` from the region source. `regions`,
-## `discovery`, `tempers` and `start_armies` (M8 spec 4.4, 7; fog spec R5) are written by hand and kept as they are;
-## validate() checks them.
+## `discovery`, `tempers`, `start_armies` and `barracks` (M8 spec 4.4, 7; fog spec R5; recruitment-queue.md 4.1) are
+## written by hand and kept as they are; validate() checks them.
 static func rebuild_scenario(scenario: ScenarioDef, map: MapData) -> void:
 	scenario.owner = ScenarioGrowth.grow(map, scenario)
 	scenario.map_digest = map.digest()

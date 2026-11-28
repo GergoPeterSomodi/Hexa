@@ -113,6 +113,8 @@ extends Resource
 @export var fog_step_cost := -1
 ## Multi-leg marches (moves-build-spec.md D36, R63): the most stops a march may pass before its goal (so at most max_stops + 1 legs).
 @export var max_stops := 6
+## The barracks (recruitment-queue.md 4.1, 5.2): the building's numbers, data/defs/buildings/barracks.tres.
+@export var barracks: BarracksDef = null
 
 var _country_cache: Dictionary[StringName, CountryDef] = {}
 var _country_cache_size: int = -1
@@ -214,7 +216,7 @@ func scenario(id: String) -> ScenarioDef:
 
 ## Problems found, empty when valid: unique country tags, each CountryDef valid, 8 CB colours, unique scenario ids,
 ## 14 families (each valid, ids 1 to 14 once each), work_slots_base 1 or more, work_slots_city_level 1 to 5,
-## and the people numbers (_check_people).
+## the people numbers (_check_people) and the barracks.
 func validate() -> Array[String]:
 	var errors: Array[String] = []
 	var seen_tags: Dictionary = {}
@@ -268,7 +270,16 @@ func validate() -> Array[String]:
 	_check_armies(errors)
 	_check_war(errors)
 	_check_ai(errors)
+	_check_barracks(errors)
 	return errors
+
+
+## The barracks (recruitment-queue.md 4.1): set, and valid (BarracksDef.validate).
+func _check_barracks(errors: Array[String]) -> void:
+	if barracks == null:
+		errors.append("barracks is not set")
+		return
+	errors.append_array(barracks.validate())
 
 
 ## The war (M7 spec 5.1): set, and valid (WarDef.validate).

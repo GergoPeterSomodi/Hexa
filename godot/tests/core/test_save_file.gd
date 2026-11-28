@@ -419,11 +419,16 @@ func test_a_write_after_a_crash_between_the_two_renames_leaves_no_bak() -> void:
 # ----- M4: format 2, the economy and the weather (m4-build-spec.md 4.22) ----------------------------------------
 
 
-func test_the_format_is_8_and_a_format_7_save_is_older() -> void:
-	# MV2 (moves-build R55, D22): the format is 8; a format-7 (fog build) save reads older and is refused quietly. The
-	# format-6 and older cases below are unchanged (they were older at 7 too).
-	assert_eq(SaveFile.FORMAT, 8)
-	assert_eq(SaveFile.OLDEST_FORMAT, 8)
+func test_the_format_is_9_and_a_format_8_save_is_older() -> void:
+	# RQ1 (recruitment-queue.md 6): the format is 9; a format-8 (moves build) save reads older and is refused quietly. So
+	# does a format-7 (fog build) one; the format-6 and older cases below are unchanged.
+	assert_eq(SaveFile.FORMAT, 9)
+	assert_eq(SaveFile.OLDEST_FORMAT, 9)
+	var moves := _saved("7")
+	_with_header(moves, "7", func(h: Dictionary) -> void: h["format"] = 8)
+	assert_eq(SaveFile.read_header("7", moves)["state"], &"older", "a format-8 header reads older")
+	assert_eq(SaveFile.read("7", moves)["problem"], "Made by an older test build", "refused quietly")
+	assert_true((SaveFile.read("7", moves)["body"] as Dictionary).is_empty(), "P: a format-8 file that loads")
 	var fog := _saved("6")
 	_with_header(fog, "6", func(h: Dictionary) -> void: h["format"] = 7)
 	assert_eq(SaveFile.read_header("6", fog)["state"], &"older", "a format-7 header reads older")
@@ -536,7 +541,7 @@ func test_save_load_save_is_byte_equal_with_a_trimmed_log() -> void:
 	assert_eq(_bytes(SaveFile.path_of("4", dir_a)), _bytes(SaveFile.path_of("4", dir_b)), "byte-equal files")
 
 
-# ----- FG2: the format 7 of the fog build (fog-build-spec R38, D16); MV2 moved the format to 8 --------------------------
+# ----- FG2: the format 7 of the fog build (fog-build-spec R38, D16); MV2 moved the format to 8, RQ1 to 9 ---------------
 
 
 func test_a_format_6_file_is_refused_without_a_crash() -> void:
@@ -553,7 +558,7 @@ func test_a_format_6_file_is_refused_without_a_crash() -> void:
 
 func test_save_load_save_is_byte_equal_on_north_italy_at_turn_8() -> void:
 	# R38, MV2 R55: the body round-trips on the north Italy map. Seven seasons from Spring 1480 reach turn 8; armies with
-	# spent points (and one with a season_from) stand on it, which the format-8 body (army/3) carries.
+	# spent points (and one with a season_from) stand on it, which the body (army/3, since format 8) carries.
 	var g := EconomyFixture.game(&"GEN")
 	for n: int in 7:
 		Season.run(g)
@@ -571,7 +576,7 @@ func test_save_load_save_is_byte_equal_on_north_italy_at_turn_8() -> void:
 	assert_eq(SaveFile.write(g, "2", INFO, {}, dir_a), "")
 	var read := SaveFile.read("2", dir_a)
 	assert_eq(read["problem"], "")
-	assert_eq((read["header"] as Dictionary)["format"], 8)
+	assert_eq((read["header"] as Dictionary)["format"], 9)
 	var r := Snapshot.restore(read["body"] as Dictionary, g.map, g.defs)
 	assert_eq(r["problem"], "")
 	var back := r["game"] as Game

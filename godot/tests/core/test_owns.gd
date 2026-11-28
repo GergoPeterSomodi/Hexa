@@ -37,7 +37,7 @@ const PHASE_OWNERS := {
 const HOME := Vector2i(0, 2)
 const FIELDS: Array[String] = ["turn", "weather", "player", "main_use", "level", "owner", "works", "next_work_id",
 	"countries", "armies", "purse", "stores", "people", "people_flows", "people_close", "food", "stats", "chronicle", "luck", "action_log", "seed", "start_year", "scenario_id", "map_id",
-	"wars", "battles", "sieges", "occupier", "garrison", "unsupported"]
+	"wars", "battles", "sieges", "occupier", "garrison", "unsupported", "barracks"]
 
 var _fx: Dictionary = {}
 
@@ -74,6 +74,7 @@ func _fields(game: Game) -> Dictionary:
 		"battles": var_to_bytes([war["battles"], war["battle_records"], war["next_record_id"], war["battle_names"]]),
 		"sieges": var_to_bytes([war["sieges"], war["siege_names"]]),
 		"occupier": state["occupier"], "garrison": state["garrison"], "unsupported": state["unsupported"],
+		"barracks": state["barracks"],
 		"weather": game.weather, "purse": purse, "stores": stores, "food": food,
 		"people": var_to_bytes(state["people"]), "people_flows": people_flows, "people_close": closes,
 		"turn": meta["turn"], "player": meta["player"], "main_use": state["main_use"], "level": state["level"],
@@ -230,6 +231,18 @@ func test_dev_people_writes_people_through_the_door() -> void:
 	assert_eq(_violations(changed, ["people", "people_flows"]), [] as Array[String])
 	assert_true(changed.has("people") and changed.has("people_flows") and changed.has("action_log"))
 	assert_false(changed.has("people_close") or changed.has("food"))
+
+
+func test_dev_barracks_writes_the_barracks_and_the_door() -> void:
+	# RQ1: the fixture's capitals have theirs from the start, so Beta's is taken off first.
+	assert_eq(Recruiting.OWNS, ["barracks"])
+	var g := _game()
+	g.state.barracks[g.map.index_of(ScenarioFixture.BETA_CAPITAL)] = 0
+	var before := _fields(g)
+	assert_true(g.dev_barracks(ScenarioFixture.BETA_CAPITAL))
+	var changed := _changed(before, _fields(g))
+	assert_eq(_violations(changed, ["barracks"]), [] as Array[String])
+	assert_true(changed.has("barracks") and changed.has("action_log"))
 
 
 func test_p_a_phase_that_writes_people_outside_the_people_phase_is_reported() -> void:

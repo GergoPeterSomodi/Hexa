@@ -137,6 +137,10 @@ func test_p_wrong_format() -> void:
 	var fog := _body()
 	fog["format"] = 7
 	_refused(fog, "Made by an older test build", "a format-7 body")
+	# RQ1 (recruitment-queue.md 6): the format-8 body of the moves build is older
+	var moves := _body()
+	moves["format"] = 8
+	_refused(moves, "Made by an older test build", "a format-8 body")
 
 
 func test_p_missing_pieces() -> void:

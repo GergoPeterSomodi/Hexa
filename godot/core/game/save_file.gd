@@ -5,14 +5,16 @@
 class_name SaveFile
 extends RefCounted
 
+## 9: recruitment (recruitment-queue.md 6): map-state/6 adds `barracks`, in the digest, and an old `raise` record will mean
+## something else; a format-8 file is refused as older, quietly ("Made by an older test build"). No upgrade step.
 ## 8: moves in the month (moves-build-spec.md R55, D22): army/3 adds `points` and `season_from`, both in the digest; a format-7
 ## file is refused as older, quietly ("Made by an older test build").
 ## 7: the fog build (fog-build-spec R38, D16): a format-6 (M8) file is refused as older, quietly ("Made by an older
 ## test build"); the body keeps its shape (country/4's `explored`; chronicle entries may carry `land`).
 ## 6: M8 (4.15, D34): the digest gains ai_only, the body `game.ai_only` and `log_from`, the log keeps the last 40 seasons. A
 ## format-5 (M7) file is refused as older, quietly ("Made by an older test build"). 5 had the war body (M7, 4.20).
-const FORMAT := 8
-const OLDEST_FORMAT := 8
+const FORMAT := 9
+const OLDEST_FORMAT := 9
 const DIR := "user://saves"
 const SLOTS: Array[String] = ["quick", "1", "2", "3", "4", "5", "6", "7", "8"]
 const AUTO_SLOTS: Array[String] = ["auto1", "auto2", "auto3"]

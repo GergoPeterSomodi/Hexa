@@ -270,7 +270,9 @@ static func _build(body: Dictionary, meta: Dictionary, map: MapData, defs: GameD
 
 
 ## "" when the three byte arrays are base64 text of the map's size, "map" when they decode to another size, "body" when
-## a value is not text or not base64, or a people array (map-state/4) is not a packed int array of the map's size. Checked before MapState.from_dict decodes, which would print an engine error.
+## a value is not text or not base64, or, in a current map-state, a people array is not a packed int array of the map's
+## size or `barracks` is not base64 text of that size. Checked before MapState.from_dict decodes, which would print an
+## engine error.
 static func _state_problem(d: Dictionary, map: MapData) -> String:
 	var n := map.hex_count()
 	var other_size := false
@@ -289,6 +291,9 @@ static func _state_problem(d: Dictionary, map: MapData) -> String:
 			var ints: Variant = d.get(key)
 			if not (ints is PackedInt32Array) or (ints as PackedInt32Array).size() != n:
 				return "body"
+		var held: Variant = d.get("barracks")
+		if not (held is String) or not _base64_ok(held as String) or Marshalls.base64_to_raw(held as String).size() != n:
+			return "body"
 	return ""
 
 
@@ -348,7 +353,8 @@ static func _occupied_ok(game: Game, i: int, occ: int) -> bool:
 	return bool(Wars.at_war.call(game, occupier.tag, owner.tag))
 
 
-## Every use is a family, every level within the family's top, every owner a country, and the sea holds none.
+## Every use is a family, every level within the family's top, every owner a country, and the sea holds none; a barracks
+## stands only on a settlement.
 static func _ranges_ok(state: MapState, map: MapData, country_count: int) -> bool:
 	for i: int in map.hex_count():
 		var use := int(state.main_use[i])
@@ -357,6 +363,8 @@ static func _ranges_ok(state: MapState, map: MapData, country_count: int) -> boo
 		if use >= FamilyIds.COUNT or lv > FamilyIds.TOP_LEVEL[use] or owner_id > country_count:
 			return false
 		if map.land[i] == 0 and (use != 0 or lv != 0 or owner_id != 0):
+			return false
+		if state.barracks[i] != 0 and use != ImproveRules.SETTLEMENT:
 			return false
 		if not _people_ok(state, map, i):
 			return false

@@ -106,6 +106,7 @@ static func new_scenario(p_map: MapData, p_defs: GameDefs, p_scenario: ScenarioD
 	out.districts.clear()
 	# Called by reference (A14): nobody occupies anything and every fortress holds its full garrison (M7 4.3, B13).
 	Occupation.setup.call(out)
+	Recruiting.setup.call(out, p_scenario)  # the scenario's barracks, or the capitals' (recruitment-queue.md 4.1)
 	# Called by reference (the layer rule: a typed call from game into systems makes the files need each other to parse).
 	People.setup.call(out)  # before the purse: the start treasury counts the people (M5 spec 5.4)
 	Treasury.setup.call(out)
@@ -233,6 +234,18 @@ func dev_goods(tag: StringName, good: int, amount: int) -> bool:
 	var done: bool = Stores.move.call(self, tag, good, cut, &"dev")
 	if done:
 		action_log.append({"turn": turn, "action": "dev_goods", "args": {"tag": String(tag), "good": good, "amount": cut}})
+		version += 1
+	return done
+
+
+## Developer barracks (logged for the replay, recruitment-queue.md 6): Recruiting.put on a settlement, whatever its
+## size and owner. False (nothing logged) in a map-only game, on a hex with no settlement or one with a barracks.
+func dev_barracks(hex: Vector2i) -> bool:
+	if not has_countries():
+		return false
+	var done: bool = Recruiting.put.call(self, hex)
+	if done:
+		action_log.append({"turn": turn, "action": "dev_barracks", "args": {"hex": hex}})
 		version += 1
 	return done
 

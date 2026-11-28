@@ -113,7 +113,7 @@ func _seed_every_state() -> void:
 	_save("quick", "Before the war")
 	_save("1")
 	_save("2")
-	_rewrite_header("2", "format", 9)
+	_rewrite_header("2", "format", SaveFile.FORMAT + 1)
 	_save("3")
 	_rewrite_header("3", "format", 0)
 	_save("4")

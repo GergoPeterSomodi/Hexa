@@ -42,6 +42,8 @@ static func run(map: MapData, defs: GameDefs, scenario_id: String, seed_value: i
 				game.dev_people(_hex(args.get("hex")), int(args.get("people", 0)))
 			"dev_transfer":
 				game.dev_transfer(_hexes(args.get("hexes")), int(args.get("to_id", 0)))
+			"dev_barracks":
+				game.dev_barracks(_hex(args.get("hex")))
 			_:
 				game.act(action, args)
 	return game

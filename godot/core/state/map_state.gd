@@ -6,12 +6,14 @@ class_name MapState
 extends RefCounted
 
 ## Schema 1 loads with owner zeros and no works; 2 loads with no works; 1 to 3 load with the people arrays at zeros;
-## 4 (tests only) loads with the three occupation arrays at zeros (docs/architecture/m7-build-spec.md 5.2).
+## 4 (tests only) loads with the three occupation arrays at zeros (docs/architecture/m7-build-spec.md 5.2); 1 to 5 load
+## with no barracks (docs/design/recruitment-queue.md).
 const SCHEMA_V1 := "hexa-godot/map-state/1"
 const SCHEMA_V2 := "hexa-godot/map-state/2"
 const SCHEMA_V3 := "hexa-godot/map-state/3"
 const SCHEMA_V4 := "hexa-godot/map-state/4"
-const SCHEMA := "hexa-godot/map-state/5"
+const SCHEMA_V5 := "hexa-godot/map-state/5"
+const SCHEMA := "hexa-godot/map-state/6"
 
 ## ImproveRules family id; 0 = wild.
 var main_use: PackedByteArray = PackedByteArray()
@@ -32,6 +34,8 @@ var occupier: PackedByteArray = PackedByteArray()
 var garrison: PackedInt32Array = PackedInt32Array()
 ## Per hex: seasons an occupied hex had no support (D18). Written only by Occupation (M7).
 var unsupported: PackedByteArray = PackedByteArray()
+## Per hex: 1 where a barracks stands (only ever on a settlement), else 0. Written only by Recruiting.
+var barracks: PackedByteArray = PackedByteArray()
 
 
 ## A wild state for a map: every hex unused, level 0, owner 0, no works.
@@ -47,6 +51,7 @@ static func create(map: MapData) -> MapState:
 	s.occupier.resize(n)
 	s.garrison.resize(n)
 	s.unsupported.resize(n)
+	s.barracks.resize(n)
 	return s
 
 
@@ -61,6 +66,7 @@ func duplicate_state() -> MapState:
 	s.occupier = occupier.duplicate()
 	s.garrison = garrison.duplicate()
 	s.unsupported = unsupported.duplicate()
+	s.barracks = barracks.duplicate()
 	for w: Work in works:
 		s.works.append(w.duplicate_work())
 	s.next_work_id = next_work_id
@@ -75,7 +81,7 @@ func work_at(hex: Vector2i) -> Work:
 	return null
 
 
-## The three byte arrays as base64 text, the works as plain dictionaries, the three people arrays as they are.
+## The byte arrays as base64 text, the works as plain dictionaries, the people and garrison arrays as they are.
 func to_dict() -> Dictionary:
 	var work_dicts: Array = []
 	for w: Work in works:
@@ -94,14 +100,16 @@ func to_dict() -> Dictionary:
 		"occupier": Marshalls.raw_to_base64(occupier),
 		"garrison": garrison.duplicate(),
 		"unsupported": Marshalls.raw_to_base64(unsupported),
+		"barracks": Marshalls.raw_to_base64(barracks),
 	}
 
 
 ## The state saved by to_dict, or null when the schema is wrong, the sizes do not match the map or a work is damaged.
-## Schema 1 dicts load with all-zero owners, schemas 1 and 2 with no works, schemas 1 to 3 with zero people.
+## Schema 1 dicts load with all-zero owners, schemas 1 and 2 with no works, schemas 1 to 3 with zero people, schemas 1
+## to 5 with no barracks.
 static func from_dict(d: Dictionary, map: MapData) -> MapState:
 	var schema := str(d.get("schema", ""))
-	if not [SCHEMA, SCHEMA_V4, SCHEMA_V3, SCHEMA_V2, SCHEMA_V1].has(schema):
+	if not [SCHEMA, SCHEMA_V5, SCHEMA_V4, SCHEMA_V3, SCHEMA_V2, SCHEMA_V1].has(schema):
 		return null
 	var n := map.hex_count()
 	var s := MapState.new()
@@ -120,24 +128,45 @@ static func from_dict(d: Dictionary, map: MapData) -> MapState:
 	var has_works := schema != SCHEMA_V1 and schema != SCHEMA_V2
 	if has_works and not s._load_works(d, map):
 		return null
-	if schema == SCHEMA or schema == SCHEMA_V4:
+	if schema == SCHEMA or schema == SCHEMA_V5 or schema == SCHEMA_V4:
 		if not s._load_people(d, n):
 			return null
 	else:
 		s.people.resize(n)
 		s.people_start.resize(n)
 		s.people_end.resize(n)
-	if schema == SCHEMA:
+	if schema == SCHEMA or schema == SCHEMA_V5:
 		if not s._load_occupation(d, map):
 			return null
 	else:
 		s.occupier.resize(n)
 		s.garrison.resize(n)
 		s.unsupported.resize(n)
+	if schema == SCHEMA:
+		if not s._load_barracks(d, map):
+			return null
+	else:
+		s.barracks.resize(n)
 	return s
 
 
-## Reads the three occupation arrays of a schema 5 dict: occupier and unsupported as base64 bytes of n, garrison as n
+## Reads the barracks of a schema 6 dict: base64 bytes of the map's size, each 0 or 1, none at sea. False when missing or
+## damaged. That each stands on a settlement is the snapshot's check.
+func _load_barracks(d: Dictionary, map: MapData) -> bool:
+	var n := map.hex_count()
+	var raw: Variant = d.get("barracks", null)
+	if not (raw is String):
+		return false
+	barracks = Marshalls.base64_to_raw(raw as String)
+	if barracks.size() != n:
+		return false
+	for i: int in n:
+		if barracks[i] > 1 or (barracks[i] != 0 and map.land[i] == 0):
+			return false
+	return true
+
+
+## Reads the three occupation arrays of a schema 5 or 6 dict: occupier and unsupported as base64 bytes of n, garrison as n
 ## whole numbers (a packed array or a JSON list), no negatives. False when one is missing or the wrong size.
 func _load_occupation(d: Dictionary, map: MapData) -> bool:
 	var n := map.hex_count()
@@ -212,8 +241,8 @@ static func _ints_of(raw: Variant, n: int) -> Variant:
 	return out
 
 
-## SHA-256 (hex text) of main_use, level, owner, people, people_start, people_end (as bytes of their ints), each work's
-## digest_text and next_work_id.
+## SHA-256 (hex text) of main_use, level, owner, people, people_start, people_end (as bytes of their ints), occupier,
+## garrison, unsupported, barracks, each work's digest_text and next_work_id.
 func digest() -> String:
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
@@ -233,6 +262,8 @@ func digest() -> String:
 		ctx.update(garrison.to_byte_array())
 	if not unsupported.is_empty():
 		ctx.update(unsupported)
+	if not barracks.is_empty():
+		ctx.update(barracks)
 	var parts: PackedStringArray = []
 	for w: Work in works:
 		parts.append(w.digest_text())
