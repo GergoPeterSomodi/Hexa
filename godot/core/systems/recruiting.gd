@@ -42,7 +42,8 @@ static func upkeep_at(defs: GameDefs, view: StateView, i: int) -> int:
 
 
 ## The place's rows of the build check (4.2), the first refusal as the verdict {ok, reason}: a settlement, no barracks
-## there yet, a town or larger. The owner, the work under way, war, the slot and the payment are Works.barracks_check's.
+## there yet, a town or larger (any settlement for a country with no town and no barracks: decision 25). The owner, the
+## work under way, war, the slot and the payment are Works.barracks_check's.
 static func site_check(game: Game, hex: Vector2i) -> Dictionary:
 	var def := def_of(game)
 	if def == null:
@@ -58,15 +59,39 @@ static func site_check(game: Game, hex: Vector2i) -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
-## "" when the settlement of `hex` is large enough for a barracks (or there are no numbers or no hex to ask about), else
-## the town rule's words: the tile window locks the tile by them.
+## "" when the size rule lets a barracks be built on the settlement of `hex` (or there are no numbers or no hex to ask
+## about), else the town rule's words: the tile window locks the tile by them. The rule passes a town or larger, and any
+## settlement of an owner with no town and no barracks (decision 25). The answer tells of the owner's whole land, so it
+## is asked for the owner's own screens and orders only: every caller has passed the owner row first.
 static func size_reason(game: Game, hex: Vector2i) -> String:
 	var def := def_of(game)
 	var i := game.map.index_of(hex)
-	if def == null or i < 0 or int(game.state.level[i]) >= def.min_level:
+	if def == null or i < 0 or int(game.state.level[i]) >= def.min_level \
+			or lacks_town_and_barracks(game, int(game.state.owner[i])):
 		return ""
 	var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
 	return "a barracks is built in a %s or larger" % str(words[clampi(def.min_level, 0, words.size() - 1)])
+
+
+## Decision 25: whether country `id` has no town and no barracks on the land it owns, occupied or not: no settlement of
+## the barracks' level or larger, no barracks standing and none being built (its own work: one that a former owner left
+## there is lost in the next works step). False for no country and without the barracks' numbers. Read from the state
+## each time (nothing is kept); it stops at the first town or barracks.
+static func lacks_town_and_barracks(game: Game, id: int) -> bool:
+	var def := def_of(game)
+	var country := Countries.by_id(game, id)
+	if def == null or country == null:
+		return false
+	for i: int in Territory.districts(game, id):
+		if game.state.barracks[i] != 0:
+			return false
+		if int(game.state.main_use[i]) == ImproveRules.SETTLEMENT and int(game.state.level[i]) >= def.min_level:
+			return false
+	for work: Work in game.state.works:
+		if work.action == Works.BARRACKS and work.tag == country.tag \
+				and int(game.state.owner[game.map.index_of(work.hex)]) == id:
+			return false
+	return true
 
 
 ## A barracks stands from now (a finished work, or the developer's): put, then a hex_changed, so that the district's

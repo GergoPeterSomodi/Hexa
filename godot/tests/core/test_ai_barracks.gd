@@ -8,6 +8,11 @@ extends GutTest
 const MLO := &"MLO"
 const SAV := &"SAV"
 const GEN := &"GEN"
+const FRA := &"FRA"
+## France's three villages: Fréjus starts with its barracks.
+const FREJUS := Vector2i(1, 17)
+const VILLAGE_A := Vector2i(0, 16)
+const VILLAGE_B := Vector2i(1, 0)
 ## The first settlement level a barracks is built in.
 const TOWN := 3
 ## The ducats of a barracks (decision 20).
@@ -452,7 +457,8 @@ func test_a_place_the_check_refuses_is_passed_over() -> void:
 	assert_eq(got["refusals"], 0)
 
 
-func test_no_town_no_barracks() -> void:
+## Milan keeps the barracks of its capital, so decision 25 opens no village to it.
+func test_with_no_free_town_while_it_has_a_barracks_there_is_no_place() -> void:
 	var g := _game()
 	_money(g, 5000)
 	for hex: Vector2i in _free_towns(g):
@@ -462,6 +468,110 @@ func test_no_town_no_barracks() -> void:
 	var got := _step(g, _brief(g))
 	assert_eq(got["acts"], [] as Array[Vector2i])
 	assert_string_ends_with(str(got["line"]), "no place for one")
+
+
+# ----- a village for a country with no town and no barracks (decision 25) ------------------------------------------------
+
+
+## The 1480 game with France's seat, the village that holds its barracks, given to Savoy: France has two villages left,
+## no town and no barracks.
+func _shut_out() -> Game:
+	var g := _game()
+	g.dev_transfer([FREJUS] as Array[Vector2i], Countries.by_tag(g, SAV).id)
+	return g
+
+
+func test_with_no_town_and_no_barracks_it_builds_in_a_village_its_reserve_waived() -> void:
+	var g := _shut_out()
+	_money(g, COST, FRA)
+	var b := _brief(g, FRA)
+	b.reserve = 96
+	var got := _step(g, b)
+	assert_eq((got["acts"] as Array).size(), 1, str(got["line"]))
+	assert_eq(AiKnow.use_at(g, (got["acts"] as Array)[0]), Vector2i(ImproveRules.SETTLEMENT, TOWN - 1), "a village")
+	assert_string_starts_with(str(got["line"]), "barracks: wanted 1, usable 0, under way 0: builds at ")
+	assert_string_ends_with(str(got["line"]), "(waived: it has none)")
+	assert_eq(got["refusals"], 0)
+	assert_eq(g.action_log.back()["action"], "build_barracks", "through the player's door")
+	assert_eq(_step(g, _brief(g, FRA))["line"], "barracks: wanted 1, usable 0, under way 1: enough")
+
+
+func test_the_villages_are_taken_in_the_place_order() -> void:
+	var got: Array = []
+	var want: Array = []
+	# Off the front before on it: with the front at one village the other is built on.
+	for front: Vector2i in [VILLAGE_A, VILLAGE_B]:
+		var g := _shut_out()
+		_money(g, 5000, FRA)
+		var b := _brief(g, FRA)
+		_front(g, b, [front] as Array[Vector2i])
+		got.append(_step(g, b)["acts"])
+		want.append([VILLAGE_B if front == VILLAGE_A else VILLAGE_A] as Array[Vector2i])
+	# Both on the front: the one farther from the enemy.
+	for enemy: Vector2i in [VILLAGE_A, VILLAGE_B]:
+		var g := _shut_out()
+		_money(g, 5000, FRA)
+		var b := _brief(g, FRA)
+		_front(g, b, [VILLAGE_A, VILLAGE_B] as Array[Vector2i])
+		b.threats = [] as Array[StringName]
+		b.seen = [{"hex": enemy}] as Array[Dictionary]
+		got.append(_step(g, b)["acts"])
+		want.append([VILLAGE_B if enemy == VILLAGE_A else VILLAGE_A] as Array[Vector2i])
+	assert_eq(got, want)
+
+
+func test_a_hamlet_too() -> void:
+	var g := _shut_out()
+	_money(g, 5000, FRA)
+	for hex: Vector2i in [VILLAGE_A, VILLAGE_B]:
+		g.state.level[g.map.index_of(hex)] = 1
+	g.districts.clear()
+	g.version += 1
+	assert_eq((_step(g, _brief(g, FRA))["acts"] as Array).size(), 1)
+
+
+## Milan with no town wants three: the first village, then no second while it is built nor after it stands.
+func test_it_builds_one_village_barracks_and_no_second() -> void:
+	var g := _game()
+	for i: int in Territory.districts(g, Countries.by_tag(g, MLO).id):
+		if int(g.state.main_use[i]) == ImproveRules.SETTLEMENT:
+			g.state.level[i] = TOWN - 1
+	_strip(g)
+	_money(g, 5000)
+	var first := _step(g, _brief(g))
+	assert_eq((first["acts"] as Array).size(), 1, str(first["line"]))
+	var b := _brief(g)
+	b.ai = b.ai.duplicate() as AiDef
+	b.ai.min_army_men = 100000
+	assert_eq(_step(g, b)["line"], "barracks: wanted %d, usable 0, under way 1: one at a time" % AiBarracks.wanted(g, b))
+	g.state.works.clear()
+	assert_true(g.dev_barracks((first["acts"] as Array)[0]))
+	var after := _step(g, b)
+	assert_eq([after["acts"], after["refusals"]], [[] as Array[Vector2i], 0])
+	assert_string_ends_with(str(after["line"]), "usable 1, under way 0: no place for one")
+
+
+## An occupied barracks serves nobody, so the computer counts none, but the rule still counts it.
+func test_an_occupied_barracks_leaves_it_no_village() -> void:
+	var g := _game()
+	_money(g, 5000, FRA)
+	WarFixture.at_war(g, SAV, FRA)
+	Occupation.capture(g, FREJUS, SAV, &"walk", {})
+	g.version += 1
+	var got := _step(g, _brief(g, FRA))
+	assert_eq([got["acts"], got["refusals"]], [[] as Array[Vector2i], 0])
+	assert_eq(got["line"], "barracks: wanted 1, usable 0, under way 0: no place for one")
+
+
+func test_a_shut_out_country_builds_in_its_own_turn() -> void:
+	var g := _shut_out()
+	_money(g, 5000, FRA)
+	var built: Array = []
+	for act: Dictionary in AiFixture.seat(g, FRA):
+		if act["action"] == "build_barracks":
+			built.append((act["args"] as Dictionary)["hex"])
+	assert_eq(built.size(), 1)
+	assert_true(built.size() == 1 and [VILLAGE_A, VILLAGE_B].has(built[0]), str(built))
 
 
 # ----- whole turns -------------------------------------------------------------------------------------------------------

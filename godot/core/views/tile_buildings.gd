@@ -144,7 +144,7 @@ static func _barracks_built_row(game: Game, full: bool) -> Dictionary:
 
 
 ## The barracks' tile as an offer: the check's verdict, or "one job at a time" while another work is under way; locked
-## ("needs a town") where the town rule is the first refusal.
+## ("needs a town") where the town rule is the first refusal (a smaller settlement, unless decision 25 lets it through).
 static func _barracks_offer_row(game: Game, tag: StringName, hex: Vector2i, work: Dictionary, full: bool) -> Dictionary:
 	var busy := not work.is_empty()
 	var offer := _offer(Works.BARRACKS, 0, BarracksView.NAME, _busy_words(work)) if busy else {"action": Works.BARRACKS,

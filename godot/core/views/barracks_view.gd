@@ -13,6 +13,8 @@ const KIND := &"barracks"
 ## The hover card's sentence (section 8). The 5 is the queue limit of decision 15; RQ6 brings it as data.
 const ABOUT := "Companies are raised here: up to 5 queued, one ready a season."
 const SEASONS_A_YEAR := 4
+## The works card's first need on a village or hamlet of a country with no town and no barracks (decision 25).
+const SMALL_NEED := "any settlement: you have no town and no barracks"
 
 
 ## The option of the barracks' tile, as the works rule and the cards take it.
@@ -36,6 +38,16 @@ static func needs_words(game: Game) -> String:
 	var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
 	var level := def.min_level if def != null else 0
 	return "needs %s" % Words.with_article(str(words[clampi(level, 0, words.size() - 1)]))
+
+
+## The works card's first need: "a town or larger"; on a smaller settlement that the size rule lets through (decision
+## 25), why it may be built there.
+static func size_need(game: Game, hex: Vector2i) -> String:
+	var def := Recruiting.def_of(game)
+	var i := game.map.index_of(hex)
+	if def != null and i >= 0 and int(game.state.level[i]) < def.min_level and Recruiting.size_reason(game, hex) == "":
+		return SMALL_NEED
+	return needs_words(game).trim_prefix("needs ") + " or larger"
 
 
 ## The ducats a year of a barracks (its upkeep a season, four times); 0 in a game without countries or its numbers.
@@ -65,8 +77,7 @@ static func settlement_alone(game: Game, hex: Vector2i, card: Dictionary) -> Dic
 ## The barracks' part of a works card that ImprovePreview has begun (a card no rule refuses): what it needs, its upkeep a
 ## year and what it is for. It changes no output, so the card has no year, seasons, chart or payback.
 static func fill_card(game: Game, tag: StringName, hex: Vector2i, cost: Dictionary, card: Dictionary) -> void:
-	var needs: Array[Dictionary] = [{"text": needs_words(game).trim_prefix("needs ") + " or larger",
-		"ok": Recruiting.size_reason(game, hex) == ""}]
+	var needs: Array[Dictionary] = [{"text": size_need(game, hex), "ok": Recruiting.size_reason(game, hex) == ""}]
 	needs.append_array(ImproveCardParts.requirements(game, tag, hex, Works.BARRACKS, {"family": 0, "level_to": 0}, cost))
 	card["requirements"] = needs
 	if upkeep_a_year(game) != 0:

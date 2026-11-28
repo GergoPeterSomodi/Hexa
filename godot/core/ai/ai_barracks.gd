@@ -2,9 +2,10 @@
 ## barracks gets the first claim on a free work slot and on the money. The seat wants one barracks for every
 ## `companies_per_barracks` companies of its war goal of men (in peace too), rounded up, at least 1. It counts its usable
 ## barracks and those under way. With none it builds as soon as it can pay, its reserve waived; with fewer than wanted it
-## builds one at a time and keeps its reserve. The place is a settlement the barracks' check allows (a town or larger):
-## off the front, nearest the front first; on the front only when no other will do, farthest from the enemy first. The step
-## reads only AiKnow and AiBrief (never another step module) and acts only through AiKnow.act.
+## builds one at a time and keeps its reserve. The place is a settlement the barracks' check allows (a town or larger;
+## with no town and no barracks, a village or hamlet too: decision 25): off the front, nearest the front first; on the
+## front only when no other will do, farthest from the enemy first. The step reads only AiKnow and AiBrief (never another
+## step module) and acts only through AiKnow.act.
 @warning_ignore_start("integer_division")
 class_name AiBarracks
 extends RefCounted

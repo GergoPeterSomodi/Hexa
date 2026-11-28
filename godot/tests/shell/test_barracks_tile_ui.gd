@@ -226,6 +226,76 @@ func test_the_compare_column_shows_no_gain_for_a_barracks() -> void:
 	assert_eq(marked.size(), 0, "a barracks is not marked better than a card that loses money")
 
 
+## Milan's villages with no barracks, in a climate where no winter halts a work.
+func _villages() -> Array[Vector2i]:
+	var g := Session.game
+	var out: Array[Vector2i] = []
+	for i: int in Territory.districts(g, Countries.by_tag(g, MLO).id):
+		if int(g.state.main_use[i]) == ImproveRules.SETTLEMENT and g.state.barracks[i] == 0 and int(g.state.level[i]) <= 2 \
+				and g.map.climate[i] != 0:
+			out.append(g.map.hex_of(i))
+	return out
+
+
+## Gives every town of Milan to Savoy, its capital and the barracks there with them (decision 25's country).
+func _lose_every_town() -> void:
+	var g := Session.game
+	var towns: Array[Vector2i] = []
+	for i: int in Territory.districts(g, Countries.by_tag(g, MLO).id):
+		if int(g.state.main_use[i]) == ImproveRules.SETTLEMENT and int(g.state.level[i]) >= 3:
+			towns.append(g.map.hex_of(i))
+	g.dev_transfer(towns, Countries.by_tag(g, &"SAV").id)
+
+
+## Decision 25: while Milan has a town its villages need one; with no town and no barracks a village offers it and begins
+## it, another village is locked while it is built, and a cancel opens it again.
+func test_a_village_needs_a_town_until_there_is_neither_town_nor_barracks() -> void:
+	var app := await _app()
+	app.settings().set_value("game/confirm_works", "always")
+	var villages := _villages()
+	assert_gt(villages.size(), 1, "precondition: Milan has two villages")
+	var first := villages[0]
+	var second := villages[1]
+	await _select(app, first)
+	var tile := _tile(app)
+	assert_eq([tile.data()["state"], tile.state_text(), tile.shows_lock(), tile.hammer().disabled],
+		[&"locked", "needs a town", true, true])
+	tile.press_hammer()
+	await _wait_frames()
+	assert_eq(app.stack().count(), 0, "a locked tile opens nothing")
+	_lose_every_town()
+	await _select(app, second)
+	await _select(app, first)
+	tile = _tile(app)
+	(app.hud().tile_window().tab_node() as TownTab).finish_now()
+	assert_eq([tile.data()["state"], tile.state_text(), tile.shows_lock(), tile.hammer().disabled],
+		[&"ready", "cost 150 · 10 timber · 10 stone · upkeep 4", false, false])
+	assert_eq(tile.hammer().tooltip_text, "Build a barracks")
+	tile.press_hammer()
+	await _wait_frames()
+	var screen := app.stack().top() as WorksPreview
+	assert_not_null(screen, "the works card opens")
+	if screen == null:
+		return
+	var card := screen.card()
+	var needs := AppFlowHelpers.labels_under(card.requirements_container())
+	assert_true(needs.any(func(text: String) -> bool: return text.contains(BarracksView.SMALL_NEED)), str(needs))
+	card.begin_pressed.emit()
+	await _wait_frames()
+	assert_not_null(Session.game.state.work_at(first), "Begin builds it on the village")
+	await _select(app, second)
+	tile = _tile(app)
+	assert_eq([tile.data()["state"], tile.state_text(), tile.hammer().disabled], [&"locked", "needs a town", true])
+	await _select(app, first)
+	var cancel := AppFlowHelpers.row_button(app, "Cancel the work")
+	assert_not_null(cancel)
+	cancel.pressed.emit()
+	await _wait_frames()
+	assert_null(Session.game.state.work_at(first))
+	await _select(app, second)
+	assert_eq(_tile(app).data()["state"], &"ready", "cancelled: on offer again")
+
+
 ## A foreign barracks being built is marked on the map only while an army sees its hex (RQ3).
 func test_a_foreign_barracks_mark_follows_sight() -> void:
 	var g := EconomyFixture.game(&"GEN")
