@@ -50,10 +50,15 @@ Hexa moves to Godot. The standard is `docs/architecture/godot-architecture.md` (
   "$GODOT" --headless --path godot -s res://tools/war_report.gd -- --seeds=1480-1484 --seasons=12   # M7 war report: per country wars, score, occupations, fortresses and garrisons; battle outcomes and sieges (--picks=8, --armies=march|none, --actions=none, --weather=real; one seed: --seed=N)
   "$GODOT" --headless --path godot -s res://tools/soak.gd -- --suite=ai --seeds=1-25 --seasons=80 --out=soak.json   # M8 soak (nightly `soak` + `soak-ranges` jobs): all-AI games, invariants every season, ranges, JSON + summary (suites ai, passive, europe; --quick: all, short; one game: --seed=17; --digest; --merge=a.json,b.json; a failure prints its replay line, exit 1)
   "$GODOT" --headless --path godot -s res://tools/probes/probe_logger.gd   # does an engine Logger (the soak's error counter) see script errors? prints PASS or FAIL
-  "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit   # GUT
+  python tools/run_gut.py --godot "$GODOT"                         # GUT, group by group with the guards (about an hour; or name groups)
   "$GODOT" --headless --path godot --export-release "Windows Desktop" build/Hexa.exe   # Windows build
   ```
-- **Tests:** GUT tests live in `godot/tests/` (`test_*.gd`). The Python test suite runs for the frozen game only.
+- **Tests:** GUT tests live in `godot/tests/` (`test_*.gd`). Run them with `python tools/run_gut.py [group ...] --godot
+  "$GODOT"` (`--list` names the groups): each group is its own process, one run at a time, and it fails on anything that
+  could pass falsely (a script that does not load, a pending test not listed in `godot/tests/pending_allowed.txt`, more
+  than 400,000 asserts in one test: assert once, never inside a loop over hexes or texts). GitHub runs one job per group;
+  a new random-play tier needs its own group in `tools/run_gut.py`. The Python test suite is for the frozen game only
+  and runs by hand: no workflow runs it.
 
 ## Commands
 
@@ -81,37 +86,37 @@ HEXA_PROP_GAMES=100 python -m unittest tests.test_properties              # more
 HEXA_PROP_SEED=7 HEXA_PROP_GAMES=1 python -m unittest tests.test_properties.ColonyGamesTest   # replay one game; failures print this line
 PYTHONHASHSEED=0 python -m tests.support.digest_run colony 5 --turns 30   # digest of a fixed-seed all-AI game (determinism test)
 
-# Nightly tools (.github/workflows/nightly.yml, 03:17 UTC or by hand); both append their table to $GITHUB_STEP_SUMMARY
+# Long runs, by hand; both append their table to $GITHUB_STEP_SUMMARY
 python -m tools.soak --quick                                              # all-AI games, invariants every turn (~15 s; no flag: the nightly ~8 min)
 python -m tools.soak conquest 17                                          # replay one soak game (suites: conquest, colony, europe, random); failures print this line
 python -m tools.perf                                                      # CPU-time medians vs tests/perf_budget.json (fails past "hard") + #29 memory row
 python -m tools.perf --only ai_season --runs 5                            # some metrics; MapView ones need the pygame venv (HEXA_REQUIRE_PYGAME=1: error, not skip)
 
-# Save compatibility (tests.yml's save-compat job, on pull requests that touch hexa/campaign/)
-git worktree add --detach /tmp/hexa-base master                           # the code whose saves must still load (CI: the merge base)
+# Save compatibility (by hand, after a change under hexa/campaign/)
+git worktree add --detach /tmp/hexa-base master                           # the code whose saves must still load (for a branch: its merge base)
 python tools/save_compat.py write /tmp/hexa-base /tmp/hexa-compat         # 3 games saved by /tmp/hexa-base's own hexa (~6 s; prints which hexa it imported)
 python tools/save_compat.py check /tmp/hexa-compat                        # load + play a season with this checkout; exit 1: a save broke (the log says which, why and how to fix it)
 git worktree remove --force /tmp/hexa-base
 
-# Behaviour oracle (.github/workflows/same-behaviour.yml, on pull requests labelled "refactor"): same fixed-seed games as the base?
+# Behaviour oracle (by hand): same fixed-seed games as the base?
 git worktree add --detach /tmp/hexa-base master                           # the base: master, or the merge base
 python tools/same_behaviour.py /tmp/hexa-base                             # 7 suites, ~21 s (below); a digest of the whole state every season; exit 1: BEHAVIOUR CHANGED (names suite and step) or ORACLE FAILED (a crash)
 python tools/same_behaviour.py /tmp/hexa-base --only conquest             # one suite (a name substring; repeatable); --quick: one season per suite
 git worktree remove --force /tmp/hexa-base
 
-pip install -r requirements-dev.txt                                       # coverage.py (CI only; config in .coveragerc)
+pip install -r requirements-dev.txt                                       # coverage.py (config in .coveragerc)
 coverage run -m unittest discover -s tests -t . && coverage report        # branch coverage; slow before Python 3.14
 
 # Window tests (tests/ui) need pygame, which has no wheels for 3.14+: use a 3.12/3.13 venv
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
 .venv/bin/python -m unittest discover -s tests/ui -t .                    # headless window tests only, about 90 s (test_monkey ~45 s: its default sessions ~30 s)
-HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # error instead of skip without pygame (CI ui job)
-HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage, as the ui job
+HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .        # error instead of skip without pygame
+HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon .venv/bin/coverage run -m unittest discover -s tests/ui -t .   # line coverage
 HEXA_MONKEY_SEEDS=30 HEXA_MONKEY_FRAMES=3000 HEXA_MONKEY_BURST=0.5 .venv/bin/python -m unittest tests.ui.test_monkey.MonkeyTest   # longer monkey runs (default seeds 1-2, 800 frames / campaign 300, burst 0.3)
 .venv/bin/python -m tools.monkey colony 7 800 --burst 0.5                 # replay one monkey session; a failure prints this line ("1-30" seeds: a batch)
 .venv/bin/python -m unittest tests.ui.test_screenshots                    # golden screenshots: skipped unless the environment matches tests/golden/linux/MANIFEST.json
 HEXA_GOLDEN_ANY_OS=1 .venv/bin/python -m unittest tests.ui.test_screenshots   # compare on macOS anyway, allowing 0.5 % of the pixels to differ
-# make the goldens as CI does (Linux only; leave out UPDATE_GOLDEN=1 to compare, HEXA_GOLDEN_STRICT=1 fails instead of skipping)
+# make the goldens (Linux only; leave out UPDATE_GOLDEN=1 to compare, HEXA_GOLDEN_STRICT=1 fails instead of skipping)
 docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -e UPDATE_GOLDEN=1 -v "$PWD":/work -w /work python:3.12-slim sh -c 'pip install -q pygame==2.6.1 && HEXA_HOME=$(mktemp -d) python -m unittest tests.ui.test_screenshots'
 ```
 
@@ -154,7 +159,7 @@ seizure order in copies of `hexa/` and a crash, and checks that each is caught (
 Use `python3` where `python` isn't on PATH. Tests do not need pygame installed, except `tests/ui/` and fourteen game
 modules that import it at the top (`tests/test_landscape.py`, `test_passes.py`, `test_playtest.py`,
 `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`, `test_goodsobjects.py`, `test_mapview_polish.py`,
-`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, `test_sprite_hashes.py`, `test_render_cache.py`, which the CI `ui` job runs too): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
+`test_town_labels.py`, `test_review_fixes.py`, `test_playtest2.py`, `test_ridge_art.py`, `test_sprite_hashes.py`, `test_render_cache.py`): they skip without it (errors under `HEXA_REQUIRE_PYGAME=1`).
 Window tests subclass `tests/support/harness.py:UITestCase`
 (SDL dummy drivers, fake `Clock`/`get_ticks`, pinned fonts, temp `HEXA_HOME`), script input with
 `self.driver.at(frame, key(...)/click(...))` and `self.driver.run_for(frames, until=...)`, call the window's real
@@ -163,7 +168,7 @@ module top. A failing one saves its last frame to `test-artifacts/` (`HEXA_TEST_
 `tests/ui/test_screenshots.py` compares 15 fixed-seed frames with `tests/golden/linux/*.png` through
 `tests/support/golden.py` (sha256 first, then at most `max_pixels` pixels off by 8 or more in a channel; a failure
 writes `<scene>.actual/.golden/.diff.png` to `test-artifacts/`). The goldens are made on Linux only (`UPDATE_GOLDEN=1`,
-the docker line above or the `goldens` workflow, which uploads them and never commits); a change that alters a
+the docker line above); a change that alters a
 window's look ships with its regenerated, reviewed goldens.
 
 `test_tech_ai` is the slowest (~1 min: AI runs of 60 and 40 seasons, both `@slow`); `test_properties` (~50 s:
@@ -354,8 +359,7 @@ The campaign is self-contained apart from `hexa/hexgrid.py`.
   attributes use `getattr`/`__dict__.setdefault` (`_known_world`, `_explored_from`) so older saves still load;
   bump `VERSION` when compatibility breaks. VERSION is 2 since `world.battles` (`state.Battle`) joined the save: a build at 1 refuses those saves quietly, and this build loads version 1 with `battles == []`. A bump alone doesn't refuse older saves (`saves.load` reads every
   version from 1 to `VERSION`): either `_migrate` fills in what they lack, or `saves.py` must refuse the old version
-  too. The `save-compat` job of `tests.yml` enforces this `VERSION` policy on pull requests that touch
-  `hexa/campaign/` (`tools/save_compat.py`): games saved by the merge base's code must load and play a season with
+  too. `tools/save_compat.py` checks this `VERSION` policy: games saved by the merge base's code must load and play a season with
   the pull request's while `VERSION` is unchanged; after a bump each must be refused quietly (`saves.load` returns
   `None`) or still play.
 - Saves and options (`hexa/settings.py`) live in `~/.hexa/`; the `HEXA_HOME` environment variable overrides
@@ -500,8 +504,7 @@ the rules as far as the current layout allows, and never makes an allowlisted of
 - **Refactor PRs** change no behaviour: label them `refactor`; they must pass tools/same_behaviour.py,
   save-compat and sha-identical goldens. A change to an art module also keeps `tests/test_sprite_hashes.py` green (sha256
   of 1,743 generated sprites against `tests/fixtures/sprite_hashes/<platform>.json`, one fixture per OS, Python, pygame and SDL).
-  CI's `ui` job compares only on a platform that has a fixture and skips otherwise; the Linux fixture is made by the goldens
-  workflow, and `UPDATE_SPRITES=1` rewrites this platform's fixture only for a change of art on purpose. Never mix a
+  The test compares only on a platform that has a fixture and skips otherwise, and `UPDATE_SPRITES=1` rewrites this platform's fixture only for a change of art on purpose. Never mix a
   refactor and a gameplay change in one commit.
 - **Where new features go:** rules -> campaign/systems/<name>.py (+ numbers in data.py, + README table);
   panel -> campaign/panels/; screen -> campaign/screens/; art -> its art module using render/draw.py.

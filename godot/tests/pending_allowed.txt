@@ -1,0 +1,8 @@
+# The tests that may report pending. tools/run_gut.py fails a run when any other test is pending or risky.
+# One "<script> <test name>" per line. Remove a line when its test passes again; add one only with a reason in the test.
+res://tests/core/test_combat_bands.gd test_known_open_four_v_two_on_farmland
+res://tests/core/test_odds_calibration.gd test_all_grounds_rise_through_the_words
+res://tests/shell/test_ink_marks.gd test_pixels_of_a_solid_fill_and_a_hatch_when_the_renderer_can_read_them
+res://tests/shell/test_tile_window.gd test_unexplored_shows_only_its_title
+res://tests/shell/test_tile_window_r3.gd test_the_fade_shows_while_more_lies_below
+res://tests/shell/test_town_tab_strips.gd.TestBuildingStrips test_a_refused_row_has_a_disabled_hammer_and_no_request

@@ -1,6 +1,6 @@
 # Hexa
 
-[![tests](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/tests.yml/badge.svg)](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/tests.yml)
+[![godot](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/godot.yml/badge.svg)](https://github.com/GergoPeterSomodi/Hexa/actions/workflows/godot.yml)
 
 A small turn-based strategy game on a hex map, made with pygame. It has three modes:
 
@@ -698,6 +698,10 @@ All colonisation numbers are in `hexa/colony/rules.py`.
 
 Version history is in [CHANGELOG.md](CHANGELOG.md).
 
+The game being developed is the Godot one in [`godot/`](godot/README.md), and GitHub runs its tests. The rest of
+this section is about the frozen Python game (v0.2.2): GitHub no longer runs its tests, and every command below
+still works by hand.
+
 The tests use Python's built-in `unittest` and, apart from the window tests in `tests/ui/` and nine game modules
 that draw (skipped without pygame, see [Window tests](#window-tests-pygame)), don't need pygame:
 
@@ -710,7 +714,7 @@ python -m unittest tests.test_game.HexGridTest.test_pixel_round_trip   # one tes
 
 `HEXA_FAST=1` skips the tests marked `@slow` (the 100-season AI history and the other AI game loops, the tech AI's
 60 and 40 seasons among them, the cavalry battle statistics, the random-world tests, the property-test games and the
-world-cache memory test); they still count as tests, shown as skipped. CI always runs everything.
+world-cache memory test); they still count as tests, shown as skipped.
 `tests/test_tech_ai.py` (its two long AI runs) and `tests/test_campaign.py` (it builds the full Europe map) are the
 slowest.
 
@@ -742,11 +746,7 @@ The game rules, AI and map generation don't use pygame; only the window, menu an
 To keep test runs or experiments away from your real saves and options, set `HEXA_HOME` to another folder
 (the default is `~/.hexa`).
 
-Python 3.10 or newer is needed (the suite passes on 3.10, the oldest version CI tests). Every push and pull
-request runs the whole suite on GitHub Actions (`.github/workflows/tests.yml`) on Python 3.10, 3.13 and the
-newest release, without installing pygame (the window tests show as skipped there; the `ui` job runs them).
-Pull requests that change `hexa/campaign/` also run the [save compatibility](#save-compatibility) job.
-To reproduce a CI run locally:
+Python 3.10 or newer is needed. The whole suite, each run in its own temporary folder:
 
 ```bash
 HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v
@@ -755,7 +755,7 @@ HEXA_HOME=$(mktemp -d) python -m unittest discover -s tests -t . -v --durations 
 
 To see which code the tests reach, install coverage.py (the only development dependency, never needed to play)
 and run the suite under it. The settings are in `.coveragerc` (branch coverage; `hexa/` and `play.py`, without the
-tests and the legacy editor). Branch coverage is about 5 times slower on Python 3.12 and older, so CI measures on 3.14:
+tests and the legacy editor). Branch coverage is about 5 times slower on Python 3.12 and older, so measure on 3.14:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -763,8 +763,7 @@ HEXA_HOME=$(mktemp -d) coverage run -m unittest discover -s tests -t .
 coverage report            # table in the terminal; coverage html writes htmlcov/index.html
 ```
 
-Every CI run also shows the coverage table on its summary page and attaches the HTML report as the `htmlcov`
-artifact. There is no minimum yet.
+There is no minimum.
 
 ### Window tests (pygame)
 
@@ -774,8 +773,7 @@ input, then checks the game state. They need pygame, which has no wheels for Pyt
 Python 3.12 (or 3.13) virtual environment. Without pygame these tests show as skipped. So do nine test modules of
 the game's own that sit next to the unit tests but import pygame at the top (`tests/test_landscape.py`,
 `test_passes.py`, `test_playtest.py`, `test_techscreen.py`, `test_uifixes.py`, `test_wfctiles.py`,
-`test_goodsobjects.py`, `test_mapview_polish.py` and `test_town_labels.py`): each skips as a whole, and the `ui`
-job runs them.
+`test_goodsobjects.py`, `test_mapview_polish.py` and `test_town_labels.py`): each skips as a whole without pygame.
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install pygame==2.6.1 -r requirements-dev.txt
@@ -785,9 +783,8 @@ HEXA_REQUIRE_PYGAME=1 python -m unittest discover -s tests/ui -t .              
 ```
 
 `HEXA_REQUIRE_PYGAME=1` turns the skips into errors, so a run that is meant to test the windows can't pass by
-skipping them; CI's `ui` job sets it. When a window test fails it saves the last frame on screen to
-`test-artifacts/<test name>.png` (`HEXA_TEST_ARTIFACTS` picks another folder), and CI attaches that folder to
-the failed run. `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` default to `dummy`; set them (e.g. `SDL_VIDEODRIVER=x11`)
+skipping them. When a window test fails it saves the last frame on screen to
+`test-artifacts/<test name>.png` (`HEXA_TEST_ARTIFACTS` picks another folder). `SDL_VIDEODRIVER` and `SDL_AUDIODRIVER` default to `dummy`; set them (e.g. `SDL_VIDEODRIVER=x11`)
 to open a real window instead, though the scripted run doesn't slow down for you to watch.
 
 The helpers are in `tests/support/harness.py`: `UITestCase` (pygame set up, a temporary `HEXA_HOME`, the
@@ -829,8 +826,8 @@ failing session prints its report and the command that replays it, `python -m to
 withheld (`KNOWN_ISSUES` in `tests/support/monkey.py`), so long runs can find other bugs; expected-failure tests pin
 those crashes, and `--hit <issue>` lets that input through to reproduce one.
 
-CI's `ui` job runs these tests on Python 3.12 with pygame 2.6.1 and adds a second coverage table, of lines
-only: on 3.12 branch coverage is slow, and `HEXA_COVERAGE_BRANCH=0` switches it off in `.coveragerc`. Locally:
+Line coverage of these tests (on 3.12 branch coverage is slow, and `HEXA_COVERAGE_BRANCH=0` switches it off in
+`.coveragerc`):
 
 ```bash
 HEXA_COVERAGE_BRANCH=0 COVERAGE_CORE=sysmon HEXA_HOME=$(mktemp -d) .venv/bin/coverage run -m unittest discover -s tests/ui -t .
@@ -845,16 +842,16 @@ the pause menu and its options, and random world #7) and compares each frame wit
 `tests/golden/linux/`. The comparison is exact first (a sha256 of the pixels); otherwise a pixel counts as
 different when a channel is off by 8 or more, and a scene may have none (`max_pixels`, 0 by default). A failing
 scene writes `<scene>.actual.png`, `<scene>.golden.png` and `<scene>.diff.png` (the frame darkened, the differing
-pixels magenta) to `test-artifacts/` (`HEXA_TEST_ARTIFACTS`); CI attaches that folder to the failed run.
+pixels magenta) to `test-artifacts/` (`HEXA_TEST_ARTIFACTS`).
 
 Text rendering differs a little between operating systems (FreeType moves some glyphs by a pixel on macOS), so the
-goldens are made and compared on Linux, the CI reference. `tests/golden/linux/MANIFEST.json` records the
+goldens are made and compared on Linux. `tests/golden/linux/MANIFEST.json` records the
 environment they were made in: the OS, Python major.minor, the pygame, SDL, SDL_ttf and FreeType versions, a hash
 of pygame's bundled font, the smoothscale backend, the video driver and the desktop size. Where anything differs
 (on a Mac, the OS), the screenshot tests are skipped and the skip names what differs. Three environment variables
 change that:
 
-- `HEXA_GOLDEN_STRICT=1` makes a different environment a failure instead of a skip, for a CI job that must compare.
+- `HEXA_GOLDEN_STRICT=1` makes a different environment a failure instead of a skip, for a run that must compare.
 - `HEXA_GOLDEN_ANY_OS=1` compares anyway, allowing 0.5 % of a frame's pixels to differ: a rough check on a Mac
   (measured: macOS differs from the goldens by 160 to 1,500 pixels a frame, 0.02 to 0.21 %).
 - `UPDATE_GOLDEN=1` makes the goldens: every frame that isn't exactly its golden (or has none) is written as the new
@@ -862,7 +859,7 @@ change that:
   `test-artifacts/golden-updates.txt`. It refuses to run anywhere but Linux.
 
 Linux arm64 and x86-64 draw the same bytes (the harness forces the GENERIC smoothscale backend), so on any machine
-with Docker, including an Apple Silicon Mac, this makes or checks the goldens exactly as CI's `ui` job does
+with Docker, including an Apple Silicon Mac, this makes or checks the goldens
 (`--user` keeps the new files yours; `HOME=/tmp` lets pip install pygame for that user):
 
 ```bash
@@ -871,21 +868,13 @@ docker run --rm --platform linux/arm64 --user "$(id -u):$(id -g)" -e HOME=/tmp -
   sh -c 'pip install -q pygame==2.6.1 && HEXA_HOME=$(mktemp -d) python -m unittest tests.ui.test_screenshots'
 ```
 
-Leave out `-e UPDATE_GOLDEN=1` (or add `-e HEXA_GOLDEN_STRICT=1`) to run the comparison instead. Without Docker,
-the `goldens` workflow (`.github/workflows/goldens.yml`, run by hand from the Actions tab, optionally for another
-branch or commit) makes them on GitHub's runner and uploads them as the `goldens` artifact; it never commits. Either
-way, look at the new pictures (and `git diff --stat tests/golden/linux`) before committing them. A change that is
-meant to alter the look of a window ships with its new goldens; only rewritten scenes change, since a golden whose
-pixels are the same is left alone.
+Leave out `-e UPDATE_GOLDEN=1` (or add `-e HEXA_GOLDEN_STRICT=1`) to run the comparison instead. Look at the new pictures (and `git diff --stat tests/golden/linux`) before
+committing them. A change that is meant to alter the look of a window ships with its new goldens; only rewritten
+scenes change, since a golden whose pixels are the same is left alone.
 
-The `ui` job compares the goldens but doesn't set `HEXA_GOLDEN_STRICT=1` yet: until a CI run has shown that the
-runner's environment matches `MANIFEST.json` (the scenes run, not skipped), a mismatch only skips them. Once one has,
-add `HEXA_GOLDEN_STRICT: "1"` to the `ui` job's `env`.
+### Long runs: soak and performance
 
-### Nightly runs: soak, performance and long monkey sessions
-
-`.github/workflows/nightly.yml` runs every night at 03:17 UTC, and by hand from the Actions tab with inputs for the
-soak scale (`full` or `quick`) and the monkey's seeds, frames and burst. Its jobs:
+Both run by hand.
 
 - **soak** (`tools/soak.py`, no pygame): all-AI games with the world invariants checked at the start and after every
   turn (Conquest and Colonisation: every side's turn; the campaign: every season): 200 Conquest games to the end
@@ -897,17 +886,10 @@ soak scale (`full` or `quick`) and the monkey's seeds, frames and burst. Its job
   `MapView`'s first draw at zoom 1 and 4, compared with `tests/perf_budget.json` (zoom 4 builds its landscape art a few
   hexes a frame within a time limit, so that draw is one such frame, not the whole picture). The table goes to the
   run's summary page. A time over its soft limit is noted; only one over its hard limit fails the job.
-- **monkey** (one job per mode, Python 3.12 with pygame): `tests.ui.test_monkey.MonkeyTest` with
-  `HEXA_MONKEY_SEEDS=50`, `HEXA_MONKEY_FRAMES=3000,campaign=600` and `HEXA_MONKEY_BURST=0.5` (a campaign session of
-  3,000 frames takes about 1.5 minutes, so the campaign plays 600).
-
-When a scheduled run fails, a last job opens an issue titled "Nightly failure" with the replay commands from the
-logs, or comments on the one that is already open. Runs started by hand never touch issues. The failed jobs' logs
-(and the monkey's last frames) are attached to the run.
 
 ```bash
 python -m tools.soak --quick                    # every suite, a few short games (about 15 seconds)
-python -m tools.soak                            # the nightly scale (about 8 minutes)
+python -m tools.soak                            # the full scale (about 8 minutes)
 python -m tools.soak colony 0-9 --turns 20      # one suite (conquest, colony, europe, random), chosen seeds and length
 python -m tools.soak conquest 17                # replay one game: a failure prints this line
 python -m tools.perf                            # the timings against tests/perf_budget.json (about 1.5 minutes)
@@ -923,22 +905,19 @@ invariants of known open bugs are counted as "known open" and don't fail. The sa
 
 `tests/perf_budget.json` holds a `soft` and a `hard` limit in CPU seconds for each metric, and `measured`, the median
 when the limits were set; its `_comment` says on what machine. The hard limits are about 4 times those medians and
-the soft ones about 2 times, because shared CI runners are slower and noisier. A change that makes something slower on
+the soft ones about 2 times, because other machines are slower and noisier. A change that makes something slower on
 purpose raises its limits in the same pull request. Timing never runs in the unit suite: `tests/test_perf.py` checks
-the tool with fake metrics. Without pygame the MapView metrics are skipped with a note (`HEXA_REQUIRE_PYGAME=1`, which
-the perf job sets, makes that an error). The last row of the table is information only: how much memory the world
+the tool with fake metrics. Without pygame the MapView metrics are skipped with a note (`HEXA_REQUIRE_PYGAME=1` makes that an error). The last row of the table is information only: how much memory the world
 module's caches keep as random worlds are built one after another (tracemalloc). `tests/test_memory.py` is the test of
 that (#29: the caches must stay bounded; it builds four random worlds, so it is `@slow`).
 
 ### Save compatibility
 
 Players keep their saves when they update the game, so a change to `hexa/campaign/` must not break games saved by
-the code before it. The `save-compat` job of the tests workflow checks every pull request that changes
-`hexa/campaign/` (or the tool): it checks out the merge base (where the pull request leaves its target branch) into a
-`git worktree`, plays and saves three games with that code (`tools/save_compat.py write`: Europe 1480 as Portugal
-after 3 seasons, the random world of seed 7 after 2 seasons, and a quicksave in the middle of Portugal's war with
-Castile), then loads each one with the pull request's code and plays one more season (`check`). On other pull
-requests the job only finds that nothing there changed and stops (plain `git diff`, no paths-filter action).
+the code before it. After such a change, run `tools/save_compat.py` against the code before it: `write` plays and saves three games
+with that code (Europe 1480 as Portugal after 3 seasons, the random world of seed 7 after 2 seasons, and a
+quicksave in the middle of Portugal's war with Castile), and `check` loads each one with this checkout's code and
+plays one more season.
 
 The rule, with `VERSION` in `hexa/campaign/saves.py`:
 

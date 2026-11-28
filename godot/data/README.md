@@ -11,7 +11,8 @@ Regenerate (only if an exporter had a mistake):
     python tools/export_geography.py
 
 `tests/test_godot_export.py` runs the exporters into a temporary folder and checks that the committed files are
-byte-for-byte what they write, that the counts are right, and that the floats round-trip.
+byte-for-byte what they write, that the counts are right, and that the floats round-trip. No workflow runs it: run it
+by hand after changing the exporters or these files.
 
 Conventions: points are `[longitude, latitude]` in degrees; hexes are `[column, row]`; colours are `[r, g, b]`
 (0..255); a missing value is `null`; levels are integers from 0 (none) upwards. Lists keep the Python order, which

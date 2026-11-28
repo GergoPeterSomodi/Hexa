@@ -351,7 +351,12 @@ check) and **Check** (the deep validation; its lines go to `facts` and the Outpu
 ## Checks in CI
 
 `.github/workflows/godot.yml`:
-- `checks`: on pull requests (and pushes) touching `godot/` or `tools/`, runs Python 3.12 UI bake verification (`tools/bake_ui.py --check`, `tests/test_bake_ui.py`), Godot `--import`, `tools/lint_godot.py`, `tools/check_scripts.gd`, main-scene headless start (`--quit`), `build_theme.gd --check`, `build_tileset.gd --check`, `build_map.gd --check`, `build_scenario.gd --check`, and the full GUT suite.
+- `checks`: on pull requests (and pushes) touching `godot/` or `tools/`, runs Python 3.12 UI bake verification (`tools/bake_ui.py --check`, `tests/test_bake_ui.py`), Godot `--import`, `tools/lint_godot.py`, `tools/check_scripts.gd`, main-scene headless start (`--quit`), `build_theme.gd --check`, `build_tileset.gd --check`, `build_map.gd --check`, `build_scenario.gd --check`, and the test runner's own tests (`tests/test_run_gut.py`).
+- `gut`: on the same changes, the GUT suite through `tools/run_gut.py`, one parallel job per group (`core`, `shell`, one
+  per random-play tier); it does not wait for `checks`. The runner fails a group on a script that does not load, a test
+  file that did not run, an unlisted pending or risky test (`tests/pending_allowed.txt`), more than 400,000 asserts in a
+  test or 1.5 million in a process, too much memory or a timeout. Locally: `python tools/run_gut.py --godot <engine>`
+  (all groups, one run at a time on a machine). A newer push cancels a branch's older run, never one on master.
 - `ui-shots`: on pull requests touching `shell/{app,ui,hud,screens,input}/` (or manual dispatch), renders 1x/2x UI screenshots (`shot_ui.gd`) and checks UI budgets (`perf_ui.gd`) under `xvfb-run` + Mesa.
 - `perf`: nightly (and manual dispatch), `tools/perf_map.gd` on the fake Europe map.
 - `export-windows` / `smoke-windows`: on a tag `v0.3.*` (or manual dispatch), builds the Windows zip and runs a smoke start on a Windows runner.

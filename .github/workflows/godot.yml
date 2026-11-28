@@ -4,8 +4,10 @@ name: godot
 # - changes: decides whether the Godot checks and the frozen-Python guard apply;
 # - frozen-python: a pull request that changes a file under hexa/ fails (hexa/ is frozen at v0.2.2, the reference);
 # - checks: the lint (layers, size limits, UI style rules), Python UI bake check, import, script parse, generated
-#   theme/tileset/map checks, main scene start (app.tscn), and the GUT tests (on pull requests and pushes that touch
-#   godot/, tools/ or this workflow);
+#   theme/tileset/map checks and main scene start (app.tscn), on pull requests and pushes that touch godot/, tools/,
+#   their Python tests or this workflow;
+# - gut: the GUT tests, on the same pushes, one parallel job per group of tools/run_gut.py (which also holds the
+#   guards against a false pass). It does not wait for `checks`, so a red check never hides the tests;
 # - ui-shots: on pull requests touching shell UI/input or by hand, renders UI pictures (1x & 2x) and checks UI budgets under xvfb;
 # - perf: nightly and by hand, tools/perf_map.gd on the made-up Europe map with the full tileset (m1-build-spec section 9), then
 #   tools/perf_core.gd (headless) on the same size of world: the season, the stats, a save and a load (m3-build-spec section 8);
@@ -22,9 +24,11 @@ on:
     branches: ["**"]
     tags: ["v0.3.*"]
 
+# A newer push cancels the older run of the same branch, but never on master: every master commit gets its verdict,
+# and a push never cancels the nightly run.
 concurrency:
-  group: godot-${{ github.ref }}
-  cancel-in-progress: true
+  group: godot-${{ github.event_name }}-${{ github.ref == 'refs/heads/master' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   contents: read
@@ -39,6 +43,7 @@ jobs:
       godot: ${{ steps.changes.outputs.godot }}
       hexa: ${{ steps.changes.outputs.hexa }}
       ui_shots: ${{ steps.changes.outputs.ui_shots }}
+      gut_groups: ${{ steps.groups.outputs.groups }}
     steps:
       # The whole history, so that the merge base with the target branch can be found.
       - uses: actions/checkout@v4
@@ -66,7 +71,7 @@ jobs:
           if [ -n "$base" ]; then
             changed=$(git diff --name-only "$base" HEAD)
             if grep -q '^hexa/' <<< "$changed"; then hexa=true; fi
-            if grep -qE '^(godot/|tools/|\.github/workflows/godot\.yml|\.github/actions/setup-godot/)' <<< "$changed"; then
+            if grep -qE '^(godot/|tools/|tests/test_(bake_ui|run_gut)\.py|\.github/workflows/godot\.yml|\.github/actions/setup-godot/)' <<< "$changed"; then
               godot=true
             else
               godot=false
@@ -85,6 +90,9 @@ jobs:
           echo "hexa=$hexa" >> "$GITHUB_OUTPUT"
           echo "ui_shots=$ui_shots" >> "$GITHUB_OUTPUT"
           echo "base=${base:-none} godot=$godot hexa=$hexa ui_shots=$ui_shots"
+      - name: List the test groups
+        id: groups
+        run: echo "groups=$(python3 tools/run_gut.py --list)" >> "$GITHUB_OUTPUT"
 
   frozen-python:
     name: hexa/ stays frozen
@@ -104,11 +112,11 @@ jobs:
           echo "No change under hexa/."
 
   checks:
-    name: lint, import, scripts, GUT
+    name: lint, import, scripts
     needs: changes
     if: needs.changes.outputs.godot == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 120   # the GUT suite alone takes about an hour
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12 (UI bake checks)
@@ -143,6 +151,8 @@ jobs:
         run: |
           python tools/bake_ui.py --check
           HEXA_REQUIRE_BAKE=1 python -m unittest tests/test_bake_ui.py
+      - name: The test runner's own tests
+        run: python -m unittest tests/test_run_gut.py
       - name: Load every script (parse errors and warnings)
         run: |
           set -uo pipefail
@@ -207,54 +217,41 @@ jobs:
             echo "::error::Committed scenario files differ from what tools/build_scenario.gd builds or fail validation: run it and commit the files."
             exit 1
           fi
-      - name: GUT tests (headless, JUnit report)
-        # The random-play tests run in groups, each in its own process: in one process with the rest they run the
-        # runner out of memory.
+  # The GUT tests. One job per group, in parallel; tools/run_gut.py runs each group in its own process and fails on
+  # anything that could pass falsely. A new random-play tier gets a new group there, and so a new job here.
+  gut:
+    name: GUT (${{ matrix.group }})
+    needs: changes
+    if: needs.changes.outputs.godot == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.changes.outputs.gut_groups) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Godot
+        uses: ./.github/actions/setup-godot
+      - name: Cache the imported assets
+        uses: actions/cache@v4
+        with:
+          path: godot/.godot/imported
+          key: godot-imported-4.7.2-${{ hashFiles('godot/assets/**', 'godot/**/*.import', 'godot/project.godot') }}
+      # Warm-up (see the checks job); with the cache it takes seconds.
+      - name: Warm up the import cache (output discarded)
+        run: '"$GODOT" --headless --path godot --import > /dev/null 2>&1 || true'
+      - name: Import the project
         run: |
-          set +e
-          set -uo pipefail
-          fail=0
-          gut() {  # a name for the run, then GUT's options
-            local name=$1; shift
-            "$GODOT" --headless --path godot -s res://addons/gut/gut_cmdln.gd "$@" -gexit \
-              -gjunit_xml_file="$RUNNER_TEMP/gut-junit-$name.xml" 2>&1 | tee "gut-$name.log"
-            local status=${PIPESTATUS[0]}
-            if [ "$status" -ne 0 ] || grep -q 'SCRIPT ERROR' "gut-$name.log"; then
-              echo "::error::GUT reported a failing test or a script error in the $name run (see the log)."
-              fail=1
-            fi
-          }
-          rest=$(cd godot && find tests -name 'test_*.gd' ! -name test_ui_monkey.gd | LC_ALL=C sort | sed 's#^#res://#' | paste -sd,)
-          gut main -gtest="$rest"
-          for group in seed_148 seed_149 seed_150 seed_151 mouse_click; do
-            gut "monkey-$group" -gtest=res://tests/shell/test_ui_monkey.gd -gunit_test_name="$group"
-          done
-          want=$(grep -c '^func test_' godot/tests/shell/test_ui_monkey.gd)
-          ran=$(cat gut-monkey-*.log | sed 's/\x1b\[[0-9;]*m//g' | awk '$1=="Tests"{n+=$2} END{print n+0}')
-          if [ "$ran" -ne "$want" ]; then
-            echo "::error::The random-play groups ran $ran of $want tests: add the missing names to the groups."
-            fail=1
-          fi
-          exit $fail
-      - name: Job summary
-        if: always()
-        run: |
-          {
-            echo "## Godot checks"
-            echo
-            echo "- Import, script load and main scene: see the step logs."
-            for report in "$RUNNER_TEMP"/gut-junit-*.xml; do
-              if [ -f "$report" ]; then
-                echo "- GUT (JUnit, $(basename "$report" .xml)): \`$(grep -o '<testsuites[^>]*>' "$report" | head -1)\`"
-              fi
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Keep the JUnit report
+          "$GODOT" --headless --path godot --import > import.log 2>&1 || { cat import.log; exit 1; }
+      - name: GUT tests
+        run: python3 tools/run_gut.py "${{ matrix.group }}" --out="$RUNNER_TEMP/gut"
+      - name: Keep the logs and JUnit reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gut-junit
-          path: ${{ runner.temp }}/gut-junit-*.xml
+          name: gut-${{ matrix.group }}
+          path: ${{ runner.temp }}/gut
           if-no-files-found: ignore
 
   # The speed job: no GPU on the runner, so the window is Mesa's software OpenGL (llvmpipe) under xvfb. Frame times
@@ -452,7 +449,7 @@ jobs:
 
   export-windows:
     name: Windows zip (tag)
-    needs: [changes, checks]
+    needs: [changes, checks, gut]
     if: startsWith(github.ref, 'refs/tags/v0.3.') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
