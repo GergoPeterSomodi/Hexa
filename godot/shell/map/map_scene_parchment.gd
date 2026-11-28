@@ -3,8 +3,10 @@
 ## takes away what lies under it (the tile ground and lines, the far picture, the capital pennants, the tile view's
 ## country names and the place plates), and it tells the HUD when the parchment is solid (Events.map_parchment). Reach,
 ## the marks, the card's preview, the paths, the army tokens, the war marks and the floaters stay above at every alpha
-## (R17). While map/parchment is on the tile view itself is never hidden: showing it again builds every tile layer
-## (0.4 s on a large map), so its parts are switched instead. It holds no rules and changes no game.
+## (R17); the next-season reach is hatched while it shows (ParchmentReach) and all reach keeps off unexplored hexes
+## (MapArmies.follow_drawn_map). While map/parchment is on the tile view itself
+## is never hidden: showing it again builds every tile layer (0.4 s on a large map), so its parts are switched instead.
+## It holds no rules and changes no game.
 class_name MapSceneParchment
 extends RefCounted
 
@@ -16,6 +18,7 @@ var _names_stale := false  # the state changed since the names read it
 var _running := false  # the scene's first frame has come: what is solid may be told
 var _loading := false  # the game begun is still being put on the view
 var _told := -1  # what Events.map_parchment last said (0 or 1), -1 nothing yet
+var _reach := ParchmentReach.new()
 # The looks: the scene's own switches and the settings it hears (what ParchmentMap is told).
 var _tint := true
 var _borders := true
@@ -110,6 +113,10 @@ func apply(far_zoom: float) -> float:
 	_scene.labels().modulate.a = 1.0 - alpha
 	MapLabelSync.block(_scene.labels(), _scene.country_labels())
 	_scene.preview_marks().set_ghost_raised(alpha > 0.0)
+	_reach.apply(_scene.view(), alpha, _scene.zoom(), _high_contrast)
+	var armies := _scene.get_node_or_null(^"MapArmies") as MapArmies  # none before the scene is ready
+	if armies != null:
+		armies.follow_drawn_map()  # at once: no frame shows reach on the drawn map's unexplored paper
 	_tell(solid)
 	return alpha
 

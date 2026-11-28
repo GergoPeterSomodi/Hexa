@@ -33,6 +33,11 @@ const GOODS_1 := Color("#a8d8b6")
 const GOODS_2 := Color("#64b17a")
 const GOODS_3 := Color("#39864f")
 
+# The army's next-season reach, hatched over the paper (amendment of 2026-11-28): a dark stripe and a pale one beside
+# it, so one of the two is 3:1 or more against every land colour.
+const REACH_INK := Color("#4a2f00")
+const REACH_LIGHT := Color("#fff3b8")
+
 # High contrast: darker ink, a paler land and halo, a darker unknown paper. A role not named here is as above.
 const HC_LAND := Color("#ece7dc")
 const HC_UNKNOWN := Color("#b49a72")
@@ -46,6 +51,8 @@ const HC_HALO := Color("#f8f3e6")
 const HC_DOT_EDGE := Color("#1e140b")
 const HC_DISC_EDGE := Color("#4a2e12")
 const HC_PIP := Color("#1e140b")
+const HC_REACH_INK := Color("#140c05")
+const HC_REACH_LIGHT := Color("#fffbe0")
 
 ## Owner mode: this much of the country's colour is mixed into the land (R6).
 const OWNER_MIX := 0.46
@@ -60,23 +67,30 @@ const HC_DISTRICT_PX := 1.0
 const HC_EXTRA_PX := 1.0
 ## The paper halo round a name (R8).
 const HALO_PX := 4
+## The next-season reach's hatch: from stripe to stripe, the dark stripe's width and the pale one's; high contrast draws
+## the dark one HC_EXTRA_PX wider.
+const REACH_PERIOD_PX := 9.0
+const REACH_INK_PX := 2.5
+const REACH_LIGHT_PX := 1.5
 
 
 ## Every colour by role, for the standard or the high-contrast set: sea, speckle, hatch, land, unknown, district,
 ## mountain, border, coast, name_ink, town_ink, halo, dot_fill, dot_edge, disc, disc_edge, pip, goods_1, goods_2,
-## goods_3. A new dictionary each time.
+## goods_3, reach_ink, reach_light. A new dictionary each time.
 static func colours(high_contrast: bool) -> Dictionary[StringName, Color]:
 	var out: Dictionary[StringName, Color] = {
 		&"sea": SEA, &"speckle": SPECKLE, &"hatch": HATCH, &"land": LAND, &"unknown": UNKNOWN,
 		&"district": DISTRICT, &"mountain": MOUNTAIN, &"border": BORDER, &"coast": COAST, &"name_ink": NAME_INK,
 		&"town_ink": TOWN_INK, &"halo": HALO, &"dot_fill": DOT_FILL, &"dot_edge": DOT_EDGE, &"disc": DISC,
 		&"disc_edge": DISC_EDGE, &"pip": PIP, &"goods_1": GOODS_1, &"goods_2": GOODS_2, &"goods_3": GOODS_3,
+		&"reach_ink": REACH_INK, &"reach_light": REACH_LIGHT,
 	}
 	if high_contrast:
 		out.merge({
 			&"land": HC_LAND, &"unknown": HC_UNKNOWN, &"district": HC_DISTRICT, &"mountain": HC_MOUNTAIN,
 			&"border": HC_BORDER, &"coast": HC_COAST, &"name_ink": HC_NAME_INK, &"town_ink": HC_TOWN_INK,
 			&"halo": HC_HALO, &"dot_edge": HC_DOT_EDGE, &"disc_edge": HC_DISC_EDGE, &"pip": HC_PIP,
+			&"reach_ink": HC_REACH_INK, &"reach_light": HC_REACH_LIGHT,
 		}, true)
 	return out
 
@@ -97,6 +111,10 @@ static func coast_px(high_contrast: bool) -> float:
 
 static func border_px(high_contrast: bool) -> float:
 	return BORDER_PX + (HC_EXTRA_PX if high_contrast else 0.0)
+
+
+static func reach_ink_px(high_contrast: bool) -> float:
+	return REACH_INK_PX + (HC_EXTRA_PX if high_contrast else 0.0)
 
 
 static func district_px(high_contrast: bool) -> float:

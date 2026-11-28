@@ -207,7 +207,7 @@ Bottom to top, in `shell/map/map_scene.tscn` (the numbers are the z index):
 | `Parchment` (`ParchmentMap`) | 81 | the parchment: sea, hatched water, land, district lines, mountain marks, borders, coast |
 | `ParchmentLabels` (after `Parchment`, at its z) | 81 | the parchment's names, town dots and goods icons, laid out in screen px |
 | `PreviewMarks` | 82 | the works card's ghost, tint and labels (the ghost is raised over a parchment) |
-| reach | 83 | where the selected army can march |
+| reach | 83 | where the selected army can march (on the parchment what only the next season reaches is hatched) |
 | `PathMarks` | 84 | marching paths |
 | `CapitalMarks`, `WorkMarks`, `ArmyTokens`, `WarMarks` | 86 to 89 | capital pennants (Owner mode and the pick), works, army tokens, sieges and battles |
 | marks | 90 | the selection, the order cursor and the build marks |
@@ -219,6 +219,12 @@ Bottom to top, in `shell/map/map_scene.tscn` (the numbers are the z index):
   With `map/parchment` off only Goods shows it.
 - **Under a solid parchment** the tile ground, lines, castle areas, borders, `FarMap`, `CapitalMarks`, the country names
   and the place plates are hidden; reach, marks, paths, previews, tokens and war marks stay on top (`MapSceneParchment`).
+- **While the parchment shows** what only the next season reaches is hatched (`ParchmentReach`,
+  `parchment_reach.gdshader`, on the view's `reach_ahead` layer), no reach lies on an undiscovered hex (`MapArmies`;
+  the tile view's reach is whole) and the key hints stand on a card strip (`shell/hud/hint_strip.gd`). A country name never lies on a capital's dot or name
+  (`ParchmentCapitalRoom`): a country with no clear spot on its own land goes unnamed. The parchment's names and icons
+  keep off the legend, the key hints, the log's button and the task flag too (`Hud.name_cover_rects`); the tile view's
+  names keep off `Hud.cover_rects` only.
 - **Its parts:** the geometry and facts are pure views (`core/views/parchment_shape.gd`, `parchment_view.gd`, which apply
   the fog); `shell/map/parchment_map.gd` and its four shaders draw the map from one texel a hex;
   `shell/mapview/parchment_labels.gd` places the names and icons; the colours are `shell/ui/parchment_tokens.gd`.

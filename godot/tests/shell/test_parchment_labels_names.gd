@@ -1,6 +1,6 @@
 ## The parchment map's country names (docs/architecture/map-overview-build-spec.md R8, R10, D7, R27): their room and
-## their slides, the capitals they make room for, their sizes and their look. (P): names left where R10 alone leaves
-## them, and names see-through in every mode: the checks report them.
+## their slides, the capitals they make room for, their sizes and their look. (P): names placed with no care for the
+## capitals, and names see-through in every mode: the checks report them.
 extends ParchmentLabelsCase
 
 
@@ -31,7 +31,8 @@ func _entry_for(g: Game, viewer: StringName, item: Dictionary, zoom: float, xfor
 
 
 ## The country names that are longer than their room, outside 14 to 48 px times the text size, moved more than 2.5
-## lines across or 0.45 of their length along, or whose line leaves their country.
+## lines across, or along by more than 0.45 of their length and past what their room leaves, or whose line leaves their
+## country.
 func _name_problems(g: Game, viewer: StringName, items: Array[Dictionary], hex_px: float, scale_to: float) -> Array[String]:
 	var out: Array[String] = []
 	var zoom := hex_px / MapTiles.CELL.x
@@ -46,7 +47,8 @@ func _name_problems(g: Game, viewer: StringName, items: Array[Dictionary], hex_p
 			out.append("%s at %d px" % [item["text"], item["size"]])
 		var axis := Vector2.from_angle(deg_to_rad(float(item["angle"])))
 		var off: Vector2 = (item["centre"] as Vector2) - xform * (entry["at"] as Vector2)
-		if absf(off.dot(axis)) > 0.45 * extent.x + SIZE_EPS or absf(off.cross(axis)) > 2.5 * extent.y + SIZE_EPS:
+		var along := maxf(0.45 * extent.x, (float(entry["span_px"]) * zoom - extent.x) * 0.5)
+		if absf(off.dot(axis)) > along + SIZE_EPS or absf(off.cross(axis)) > 2.5 * extent.y + SIZE_EPS:
 			out.append("%s moved too far: %s" % [item["text"], off])
 		var id := Countries.by_tag(g, item["tag"]).id
 		var reach := (extent.x - ParchmentTokens.HALO_PX) * 0.5
@@ -59,10 +61,27 @@ func _name_problems(g: Game, viewer: StringName, items: Array[Dictionary], hex_p
 	return out
 
 
+## The small countries with no place for their name clear of the capitals, by [hex px, text size]; every other country is
+## named.
+const NO_ROOM: Dictionary[Array, Array] = {
+	[29.0, 100]: ["Mantua"], [29.0, 150]: ["Ferrara", "Mantua", "Siena"],
+}
+
+
+## The countries of `g` with no name among `items`, by name, sorted.
+func _unnamed(g: Game, items: Array[Dictionary]) -> Array:
+	var left: Array = []
+	for entry: Dictionary in ParchmentView.country_names(g, GEN):
+		left.append(entry["text"])
+	for item: Dictionary in _of(items, ParchmentLabels.KIND_COUNTRY):
+		left.erase(item["text"])
+	left.sort()
+	return left
+
+
 func test_country_names_stay_in_their_room_and_on_their_country() -> void:
 	var g := _full()
 	var labels := _labels(g)
-	var all := ParchmentView.country_names(g, GEN).size()
 	# 68 px is north Italy's whole-map view at 1920 x 1080 (zoom 0.65); 29 px is where a large map turns solid.
 	for hex_px: float in [10.0, 20.0, 29.0, 50.0, 68.0, 104.0]:
 		for text_size: int in [100, 150]:
@@ -71,7 +90,8 @@ func test_country_names_stay_in_their_room_and_on_their_country() -> void:
 			assert_eq(_name_problems(g, GEN, items, hex_px, text_size / 100.0), [] as Array[String],
 				"%s px, text %d" % [hex_px, text_size])
 			if hex_px >= 29.0 and hex_px <= 68.0:
-				assert_eq(_of(items, ParchmentLabels.KIND_COUNTRY).size(), all, "every country at %s px" % hex_px)
+				assert_eq(_unnamed(g, items), NO_ROOM.get([hex_px, text_size], []),
+					"every country but those with no room at %s px, text %d" % [hex_px, text_size])
 
 
 func test_a_name_slides_off_a_capital_where_it_can() -> void:
@@ -178,7 +198,7 @@ func test_no_country_name_overlaps_a_name_or_a_capital_on_north_italy() -> void:
 	assert_eq(_overlaps_of_north_italy(_labels(g), g), [] as Array[String])
 
 
-func test_names_left_where_r10_leaves_them_are_reported() -> void:
+func test_names_placed_with_no_care_for_the_capitals_are_reported() -> void:
 	var g := _full()
 	var found := _overlaps_of_north_italy(_labels(g, NoRoom.new()), g)
 	assert_true(found.any(func(line: String) -> bool: return line.contains("zoom 0.65: Florence over the capital")),

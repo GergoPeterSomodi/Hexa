@@ -13,10 +13,33 @@ const FAR_ALONG: Array[float] = [0.0, -0.2, 0.2, -0.4, 0.4]
 const FAR_LINES: Array[float] = [0.0, -0.5, 0.5, -1.0, 1.0, -1.25, 1.25, -1.75, 1.75, -2.25, 2.25]
 ## The room left between a name put past a box and the box (screen px).
 const PAST_PX := 1.0
+## The last search's own places, finer than the farther ones: shifts along the line in shares of the name's length, each
+## with these lines along the normal.
+const FINE_ALONG: Array[float] = [0.0, -0.1, 0.1, -0.2, 0.2, -0.3, 0.3, -0.375, 0.375, -0.45, 0.45, -0.6, 0.6, -0.8, 0.8,
+	-1.0, 1.0]
+const FINE_LINES: Array[float] = [0.0, -0.25, 0.25, -0.5, 0.5, -0.75, 0.75, -1.0, 1.0, -1.25, 1.25, -1.5, 1.5]
+## How far the last search moves a name: lines along the normal; along its line this share of its length, or as far as its
+## room (D7) leaves it past that.
+const LAST_LINES := 2.5
+const LAST_ALONG := 0.45
 ## The stages of a search for a clear spot (see stage).
 const STAGES := 3
 
 static var _far: Array[Vector2] = []  # the farther places (share along, lines across), nearest first
+static var _fine: Array[Vector2] = []  # the finer places, the same way
+
+
+## Those of `spots` the last search may move a name of shape `shape` to from `centre`, with `room` px along its line.
+static func in_reach(spots: Array[Vector2], centre: Vector2, shape: Array[Vector2], room: float) -> Array[Vector2]:
+	var axis := shape[0]
+	var along := maxf(LAST_ALONG * shape[1].x * 2.0, room * 0.5 - shape[1].x) + 0.01
+	var across := LAST_LINES * shape[1].y * 2.0 + 0.01
+	var out: Array[Vector2] = []
+	for at: Vector2 in spots:
+		var off := at - centre
+		if absf(off.dot(axis)) <= along and absf(off.cross(axis)) <= across:
+			out.append(at)
+	return out
 
 
 ## The sizes a name of size `px` is tried at, largest first: `shares` of it and `plain`, none under `least`.
@@ -27,6 +50,14 @@ static func sizes(px: int, plain: int, shares: Array[float], least: int) -> Arra
 	out.append(maxi(least, plain))
 	out.sort()
 	out.reverse()
+	return out
+
+
+## Every size from `px` down to `least`, each `share` of the one before, largest first.
+static func steps(px: int, share: float, least: int) -> Array[int]:
+	var out: Array[int] = [maxi(least, px)]
+	while out[-1] > least:
+		out.append(maxi(least, floori(out[-1] * share)))
 	return out
 
 
@@ -59,12 +90,30 @@ static func far(centre: Vector2, shape: Array[Vector2]) -> Array[Vector2]:
 			for line: float in FAR_LINES:
 				if along != 0.0 or absf(line) > 1.0:
 					_far.append(Vector2(along, line))
-		_far.sort_custom(func(a: Vector2, b: Vector2) -> bool:
-			var da := absf(a.x) * 4.0 + absf(a.y)
-			var db := absf(b.x) * 4.0 + absf(b.y)
-			return da < db or (da == db and (a.x < b.x or (a.x == b.x and a.y < b.y))))
+		_far.sort_custom(_less_moved)
+	return _spots_of(_far, centre, shape)
+
+
+## The finer middles of the last search, the least moved first.
+static func fine(centre: Vector2, shape: Array[Vector2]) -> Array[Vector2]:
+	if _fine.is_empty():
+		for along: float in FINE_ALONG:
+			for line: float in FINE_LINES:
+				_fine.append(Vector2(along, line))
+		_fine.sort_custom(_less_moved)
+	return _spots_of(_fine, centre, shape)
+
+
+## Whether place `a` (share along, lines across) is moved less than `b`: a length along counts as four lines.
+static func _less_moved(a: Vector2, b: Vector2) -> bool:
+	var da := absf(a.x) * 4.0 + absf(a.y)
+	var db := absf(b.x) * 4.0 + absf(b.y)
+	return da < db or (da == db and (a.x < b.x or (a.x == b.x and a.y < b.y)))
+
+
+static func _spots_of(places: Array[Vector2], centre: Vector2, shape: Array[Vector2]) -> Array[Vector2]:
 	var out: Array[Vector2] = []
-	for place: Vector2 in _far:
+	for place: Vector2 in places:
 		out.append(spot(centre, shape, place))
 	return out
 
@@ -79,6 +128,30 @@ static func past(centre: Vector2, shape: Array[Vector2], boxes: Array[Rect2], sc
 				Vector2(centre.x, box.position.y - reach.y), Vector2(centre.x, box.end.y + reach.y)]:
 			if screen.has_point(at):
 				found.append(at)
+	return _nearest_first(found, centre)
+
+
+## The middles that put a name of shape `shape` just clear of one of `boxes`, moved from `centre` along its line or its
+## normal alone and no farther than that takes, nearest first; only those on `screen`.
+static func beside(centre: Vector2, shape: Array[Vector2], boxes: Array[Rect2], screen: Rect2) -> Array[Vector2]:
+	var along := shape[0]
+	var across := Vector2(-along.y, along.x)
+	var found: Array[Vector2] = []
+	for box: Rect2 in boxes:
+		var half := box.size * 0.5
+		var off := box.get_center() - centre
+		for way: Vector2 in [along, across]:
+			var own := shape[1].x if way == along else shape[1].y
+			var reach := own + absf(way.x) * half.x + absf(way.y) * half.y + PAST_PX
+			for step: float in [off.dot(way) - reach, off.dot(way) + reach]:
+				var at := centre + way * step
+				if screen.has_point(at):
+					found.append(at)
+	return _nearest_first(found, centre)
+
+
+## `found` sorted by its distance from `centre` (equal ones by x, then y).
+static func _nearest_first(found: Array[Vector2], centre: Vector2) -> Array[Vector2]:
 	found.sort_custom(func(a: Vector2, b: Vector2) -> bool:
 		var da := a.distance_squared_to(centre)
 		var db := b.distance_squared_to(centre)
@@ -123,8 +196,9 @@ static func on_region(owners: PackedByteArray, map: MapData, xform: Transform2D,
 
 ## Whether the line from `a` to `b` (map px) lies on hexes of country `id` all the way.
 static func _line_owned(owners: PackedByteArray, map: MapData, a: Vector2, b: Vector2, id: int) -> bool:
-	# The ends first: a line that leaves its country mostly does so there.
-	for end: Vector2 in [b, a]:
+	# The ends first, then a few points between: a line that leaves its country mostly does so at one of them, and these
+	# are far cheaper than the walk over every hex it crosses.
+	for end: Vector2 in [b, a, a.lerp(b, 0.5), a.lerp(b, 0.25), a.lerp(b, 0.75)]:
 		var hex := MapModes.hex_at_px(end)
 		if not map.has(hex) or int(owners[map.index_of(hex)]) != id:
 			return false

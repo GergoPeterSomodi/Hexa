@@ -13,16 +13,18 @@ func test_the_far_view_shows_countries_and_capital_dots_only() -> void:
 	var g := _full()
 	var labels := _labels(g)
 	var items := _show(labels, g, 20.0)
-	# A country is named unless even 14 px is longer than its room (a three-hex country this far off).
+	# A country is named unless even 14 px is longer than its room (a three-hex country this far off), or no place on its
+	# land is clear of the capitals: Florence, this far off.
 	var fit: Array[String] = []
 	for entry: Dictionary in ParchmentView.country_names(g, GEN):
 		if _name_width(entry["text"], 14) <= float(entry["span_px"]) * 20.0 / MapTiles.CELL.x:
 			fit.append(entry["text"])
+	assert_gte(fit.size(), 12)
+	fit.erase("Florence")
 	var named: Array[String] = []
 	for item: Dictionary in _of(items, ParchmentLabels.KIND_COUNTRY):
 		named.append(item["text"])
-	assert_eq(named, fit, "every country whose room holds its name is named")
-	assert_gte(fit.size(), 11)
+	assert_eq(named, fit, "every country whose room holds its name clear of the capitals is named")
 	var capitals := _of(items, ParchmentLabels.KIND_CAPITAL)
 	assert_eq(capitals.size(), 10, "every capital has its dot")
 	assert_true(_named(items, ParchmentLabels.KIND_CAPITAL).is_empty(), "no capital name far off")

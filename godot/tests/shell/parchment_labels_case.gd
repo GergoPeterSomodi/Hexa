@@ -19,12 +19,13 @@ class StaleViewer:
 		return held
 
 
-## Country names left where R10 alone leaves them: no search for room by the capitals (a planted fault).
+## Country names placed with no care for the capitals, as if there were none: they stay where their land puts them, over
+## a dot or a capital's name as before the capitals were a hard obstacle (a planted fault).
 class NoRoom:
 	extends ParchmentLabels
 
-	func _put_clear(_name: Dictionary, _centre: Vector2, _sizes: Array[int], _capitals: Array[Dictionary]) -> bool:
-		return false
+	func _place_country_names(hex_px: float, _capitals: Array[Dictionary]) -> void:
+		super(hex_px, [] as Array[Dictionary])
 
 
 ## A layout that places every name and icon wherever it first tries: the collision check left out (a planted fault).

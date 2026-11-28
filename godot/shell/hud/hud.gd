@@ -1,7 +1,8 @@
 ## Studiolo HUD frame coordinating TopBar, right Dock (TileWindow), bottom-right ZoomControl + ScaleBar
 ## (shifting left automatically when Dock opens), KeyHints, MapHover, LayersPopover, ToastHost, and DebugOverlay
 ## (docs/architecture/ui-and-controls-spec.md sections 3.1, 3.3, 7; ui-style-and-feedback-plan.md U14). By the map's
-## mode it shows the legend, the goods card and the Return button (map-overview-build-spec.md R20 to R23).
+## mode it shows the legend, the goods card and the Return button (map-overview-build-spec.md R20 to R23), and over the
+## drawn map the strip behind the key hints (HintStrip).
 class_name Hud
 extends CanvasLayer
 
@@ -64,6 +65,7 @@ const TOASTS_BOTTOM := -44.0
 @onready var _mode_legend: ModeLegend = $Root/Column/Main/MapArea/ModeLegend
 @onready var _layers_popover: LayersPopover = $Root/Column/Main/MapArea/LayersPopover
 @onready var _key_hints: KeyHints = $Root/Column/Main/MapArea/KeyHints
+@onready var _hint_strip: HintStrip = $Root/Column/Main/MapArea/HintStrip
 @onready var _scale_bar: ScaleBar = $Root/Column/Main/MapArea/BottomRight/ScaleBar
 @onready var _minimap: Minimap = $Root/Column/Main/MapArea/BottomRight/RightColumn/Minimap
 @onready var _zoom_control: ZoomControl = $Root/Column/Main/MapArea/BottomRight/RightColumn/ZoomControl
@@ -98,10 +100,12 @@ var _shown_mode := -1
 
 func _ready() -> void:
 	for watched: Control in [_top_bar, _bottom_right, _dock, _minimap, _goods_card, _return_btn, _map_area, _mode_legend,
-			_task_flag]:
+			_task_flag, _key_hints] + _action_log.icon_parts():
 		watched.resized.connect(_queue_cover)
 		watched.visibility_changed.connect(_queue_cover)
+	_key_hints.minimum_size_changed.connect(_queue_cover)  # the hints shown change with no resize of their row
 	(_minimap.get_parent() as Control).item_rect_changed.connect(_queue_cover)  # the minimap's column moves as it sorts
+	_mode_legend.item_rect_changed.connect(_queue_cover)  # the legend moves under the F3 panel with no resize
 	_toasts.minimum_size_changed.connect(_queue_cover)  # the toasts find their place by their size
 	_return_btn.pressed.connect(func() -> void: mode_requested.emit(int(MapModes.Mode.TERRAIN)))
 	_goods_card.good_changed.connect(_on_goods_changed.unbind(1))
@@ -238,6 +242,7 @@ func bind_map_scene(scene: Node) -> void:
 		_map_hover.reset_parchment()
 	_scene_id = scene_id
 	_mode_scene = map_scene
+	_hint_strip.follow(null if map_scene == null else map_scene.parchment())
 	_sync_mode_parts()
 	if map_scene == null:
 		_minimap.unbind()
@@ -323,6 +328,21 @@ func cover_rects() -> Array[Rect2]:
 		if c.is_visible_in_tree():
 			out.append(screen_rect(c))
 	out.append_array(_screen_cover)
+	return out
+
+
+## What else covers the drawn map's names (map-overview-build-spec.md, amendment of 2026-11-28) and no name of the tile
+## view: the legend, the key hints with their strip, the log's button and badge, and the task flag, while shown.
+func name_cover_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if not _root.visible:
+		return out
+	for c: Control in [_mode_legend, _task_flag] + _action_log.icon_parts():
+		if c.is_visible_in_tree():
+			out.append(screen_rect(c))
+	var hints := HintStrip.rect_round(_key_hints)
+	if _key_hints.is_visible_in_tree() and hints.has_area():
+		out.append(_map_area.get_global_transform_with_canvas() * hints)
 	return out
 
 

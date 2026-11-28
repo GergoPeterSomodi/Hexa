@@ -749,7 +749,7 @@ func _sync_camera_free_rect() -> void:
 ## Country names keep clear of what the HUD covers.
 func _sync_screen_cover() -> void:
 	if _map_scene != null and is_instance_valid(_map_scene) and _hud != null:
-		_map_scene.set_screen_cover(_hud.cover_rects())
+		_map_scene.set_screen_cover(_hud.cover_rects(), _hud.name_cover_rects())
 		_sync_camera_free_rect()
 		_requests.on_cover_changed()
 

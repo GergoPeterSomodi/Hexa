@@ -124,11 +124,13 @@ The **Relief**, **Yields**, **Food** and **Supply** modes keep the tiles at ever
 are choosing your country.
 
 **Reading it.** Owner mode colours each country; Terrain mode only tints them lightly (the **Country tint** switch).
-The **Borders** switch hides the parchment's borders too. Hovering a district shows one line: its place name if it has
+A country's name never covers a capital or its name: a small country with no room for both goes without its own name
+until you zoom closer. The **Borders** switch hides the parchment's borders too. Hovering a district shows one line: its place name if it has
 one, its owner, and the good it makes; land nobody holds reads "Unclaimed land". Land your country has never
 discovered is plain darker paper that reads "Unexplored", with no coast, border, name or icon on it; discovered land
 out of your sight looks like land in sight. Armies, their reach and paths, and the war marks are drawn over the
-parchment, and you give orders on it as on the tiles.
+parchment, and you give orders on it as on the tiles. On the parchment the ground a selected army can reach next season
+is striped (this season's is a plain tint), and the key hints at the foot of the map stand on a dark strip.
 
 **Goods mode** (key **7**, or **Goods** in the top bar, once you play a country) is the parchment at every zoom, showing
 one good at a time:

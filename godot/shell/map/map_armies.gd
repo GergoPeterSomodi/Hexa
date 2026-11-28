@@ -28,6 +28,8 @@ const REACH_TILE := "mark/white"
 const CURSOR_TILE := "mark/target"
 const REACH_LAYER := "reach"
 const REACH_NEXT_LAYER := "reach_next"
+## What only the next season reaches (the drawn map hatches it, ParchmentReach; the tiles never show it).
+const REACH_AHEAD_LAYER := "reach_ahead"
 ## The order kind of a march (Army.ORDER_MARCH; the view's order.kind).
 const MARCH_KIND := &"march"
 ## The tone of the toast of a hold and of the replay's line (spec 6.10); a walk's toast takes MoveWords' tone and a refusal is
@@ -52,7 +54,9 @@ var _menu: HexMenu = null
 var _army := -1
 var _cursor := NO_HEX
 var _hover := NO_HEX
-var _reach: Dictionary = {REACH_LAYER: [], REACH_NEXT_LAYER: []}
+var _reach: Dictionary = {REACH_LAYER: [], REACH_NEXT_LAYER: [], REACH_AHEAD_LAYER: []}
+## MapModes.discovered_key of the hexes the reach was kept to when it was filled; [] when it was filled whole (the tiles).
+var _reach_fog: Array = []
 var _zoom := 1.0
 var _colour_blind := false
 var _dirty := false
@@ -212,7 +216,15 @@ func stored_marks() -> PathMarks:
 	return _stored
 
 
-## How many hexes the reach layer `layer` (REACH_LAYER or REACH_NEXT_LAYER) holds for the selected army.
+## Fills the reach again when what it is kept to moved: the drawn map came or went, or, while it shows, the viewer or
+## what the viewer has discovered changed. The scene calls it each time it decides what shows (MapSceneParchment); a
+## discovery that moves with no view change also comes through sync().
+func follow_drawn_map() -> void:
+	if _army >= 0 and _reach_fog_now() != _reach_fog:
+		_fill_reach()
+
+
+## How many hexes the reach layer `layer` (one of the three REACH_*) holds for the selected army.
 func reach_count(layer: String) -> int:
 	return (_reach[layer] as Array).size()
 
@@ -671,8 +683,37 @@ func _with_beyond(preview: Dictionary, from: Vector2i) -> Dictionary:
 func _fill_reach() -> void:
 	_clear_reach()
 	var reach := MovePreview.reach(Session.game, Session.player_tag(), _army)
-	_paint(REACH_LAYER, reach["season"] as PackedInt32Array)
-	_paint(REACH_NEXT_LAYER, reach["next"] as PackedInt32Array)
+	_reach_fog = _reach_fog_now()
+	var season := _on_known(reach["season"] as PackedInt32Array)
+	var next := _on_known(reach["next"] as PackedInt32Array)
+	_paint(REACH_LAYER, season)
+	_paint(REACH_NEXT_LAYER, next)
+	var ahead := PackedInt32Array()
+	for i: int in next:
+		if not season.has(i):
+			ahead.append(i)
+	_paint(REACH_AHEAD_LAYER, ahead)
+
+
+## What the reach is to be kept to now: while the drawn map shows, the viewer's discovered hexes (by their key); else [].
+func _reach_fog_now() -> Array:
+	var game := Session.game
+	if game == null or game.map == null or not _scene.parchment().visible:
+		return []
+	return MapModes.discovered_key(game, Session.player_tag())
+
+
+## `indices` as the reach may show them: on the drawn map none on a hex the viewer has not discovered (its unexplored paper
+## would show the coast of unknown land, map-overview-build-spec.md R12, R15); on the tiles all of them.
+func _on_known(indices: PackedInt32Array) -> PackedInt32Array:
+	if _reach_fog.is_empty():
+		return indices
+	var seen := MapModes.discovered_bytes(Session.game, Session.player_tag())
+	var out := PackedInt32Array()
+	for i: int in indices:
+		if seen[i] == 1:
+			out.append(i)
+	return out
 
 
 func _paint(layer: String, indices: PackedInt32Array) -> void:
@@ -684,7 +725,7 @@ func _paint(layer: String, indices: PackedInt32Array) -> void:
 
 
 func _clear_reach() -> void:
-	for layer: String in [REACH_LAYER, REACH_NEXT_LAYER]:
+	for layer: String in _reach:
 		var cells := _reach[layer] as Array
 		for hex: Vector2i in cells:
 			_view.set_tile(layer, hex, "")

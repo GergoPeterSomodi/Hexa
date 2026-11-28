@@ -756,12 +756,13 @@ func _sync_view() -> void:
 	_sync_country_labels()
 
 
-## The HUD's covering rects (Hud.cover_rects): country names keep clear of them.
-func set_screen_cover(rects: Array[Rect2]) -> void:
+## The HUD's covering rects (Hud.cover_rects): the names keep clear of them, and the drawn map's of `drawn_only`
+## (Hud.name_cover_rects) too.
+func set_screen_cover(rects: Array[Rect2], drawn_only: Array[Rect2] = []) -> void:
 	if _country_labels != null and _labels != null:
 		_country_labels.set_cover(rects)
 		MapLabelSync.block(_labels, _country_labels)
-	_parchment.set_cover(rects)
+	_parchment.set_cover(rects + drawn_only)
 
 
 func _sync_country_labels() -> void:

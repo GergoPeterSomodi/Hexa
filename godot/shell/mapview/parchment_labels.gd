@@ -17,11 +17,14 @@
 ## meets anything placed or a cover rect is dropped, its dot stays).
 ##
 ## A country name is turned along its region and letter-spaced; in Goods mode it is see-through (NAME_ALPHA; never in
-## high contrast). To clear the capitals it first slides along its normal by up to one line; else the names of the
-## capitals in its way go to the other side of their dots; else it moves farther, along its normal and its line, on its
-## own known land; else it tries the same smaller (NAME_CLEAR_SIZES); else it stays and the capitals draw over it. Where
-## it can it keeps clear of the HUD's cover rects and of the goods icons' own spots too, moving past them on its known
-## land: it gives up the icons first, then the capitals, and stays under a cover only when no spot on its land is clear.
+## high contrast). A capital's dot and name are a hard obstacle (ParchmentCapitalRoom): a name never lies on them. To
+## clear them it first slides along its normal by up to one line; else the names of the capitals in its way go to the
+## other side of their dots; else it moves farther, along its normal and its line, on its own known land; else it tries
+## the same smaller (NAME_CLEAR_SIZES); else every step down to NAME_MIN_PX, the nearest places beside the capitals too;
+## else it is left out and its capital's name stands for it. Where it can it keeps clear of the HUD's cover rects and of
+## the goods icons' own spots too, moving past them on its known land: it gives up the icons first, and stays under a
+## cover only when no spot on its land is clear of it. A name that would still be left out is searched for once more with
+## the icons' spots given up altogether (a capital's name may then move onto one).
 ##
 ## A country name is never longer than its room (D7) nor under MIN size: where it cannot be both, it is left out. No
 ## name or icon box lies on a hex the viewer has not discovered: a country name shrinks or slides to keep off one, any
@@ -34,11 +37,6 @@
 class_name ParchmentLabels
 extends Node2D
 
-## What a country name's spot needs of the capitals round it.
-enum Need { NOTHING, MOVES, TOO_MUCH }
-## A box not worked out yet.
-const UNASKED := Rect2(0.0, 0.0, -1.0, -1.0)
-
 const KIND_COUNTRY := &"country"
 const KIND_CAPITAL := &"capital"
 const KIND_TOWN := &"town"
@@ -49,7 +47,8 @@ const NAME_PX_PER_ROOT_HEX := 8.0
 const NAME_REF_HEX_PX := 58.0
 const NAME_MIN_PX := 14
 const NAME_MAX_PX := 48
-## A name that would lie on unexplored paper is tried again at this share of its size.
+## A name with no spot at the sizes of NAME_CLEAR_SIZES is tried at every step of this share of its size down to the
+## least.
 const NAME_SHRINK := 0.85
 ## The shares of its size a name is tried at to clear the capitals, largest first (never under NAME_MIN_PX).
 const NAME_CLEAR_SIZES: Array[float] = [1.0, 0.75, 0.5]
@@ -118,6 +117,7 @@ var _dots: Dictionary[Vector2i, float] = {}  # hex -> the radius of the dot plac
 var _name_blocks: Dictionary[Vector2i, int] = {}  # hex -> the block of the name placed at its town
 var _icon_boxes: Array[Rect2] = []  # where each icon would lie with no country name in its way
 var _avoid: Array[Rect2] = []  # the boxes the country name being placed is to keep off
+var _room := ParchmentCapitalRoom.new(_space, _name_blocks, _name_box, _may_name, _give_name)
 var _widths: Dictionary[String, float] = {}  # "size name" -> text width with its halo
 var _colours := ParchmentTokens.colours(false)
 var _name_fonts: Dictionary[int, Font] = {}  # letter spacing (px) -> the country names' font
@@ -392,12 +392,8 @@ func _dot_entry(town: Dictionary, hex_px: float, fade: float) -> Dictionary:
 	var dot: Vector2 = _xform * (town["at"] as Vector2)
 	_dots[town["hex"]] = radius
 	return {"kind": KIND_CAPITAL if capital else KIND_TOWN, "hex": town["hex"], "text": "",
-		"rect": _dot_box(dot, radius), "angle": 0.0, "size": 0, "dot": dot, "dot_radius": radius, "name_alpha": fade,
-		"name": town["name"], "level": town["level"]}
-
-
-static func _dot_box(dot: Vector2, radius: float) -> Rect2:
-	return Rect2(dot, Vector2.ZERO).grow(radius + 1.0)
+		"rect": ParchmentCapitalRoom.dot_box(dot, radius), "angle": 0.0, "size": 0, "dot": dot, "dot_radius": radius,
+		"name_alpha": fade, "name": town["name"], "level": town["level"]}
 
 
 ## The box of a name of `entry` at the size `px`, below its dot or above it.
@@ -431,7 +427,8 @@ func _name_town(entry: Dictionary) -> void:
 		_give_name(entry, box, px)
 
 
-## Whether a capital's or a town's name may lie in `box`; while the country names are placed, never on an icon's spot.
+## Whether a capital's or a town's name may lie in `box`; while the country names are placed, never on an icon's spot
+## that is still held (_put_over_icons).
 func _may_name(box: Rect2) -> bool:
 	return not _is_blocked(box) and not ParchmentNameSpots.hits(_icon_boxes, box.get_center(), Vector2.RIGHT,
 		box.size * 0.5) and not _on_unknown(box.get_center(), Vector2.RIGHT, box.size * 0.5)
@@ -450,6 +447,7 @@ func _give_name(entry: Dictionary, box: Rect2, px: int) -> void:
 
 func _place_country_names(hex_px: float, capitals: Array[Dictionary]) -> void:
 	var screen := Rect2(Vector2.ZERO, _viewport)
+	_room.begin(capitals)
 	for name: Dictionary in _names:
 		var centre: Vector2 = _xform * (name["at"] as Vector2)
 		var room := float(name["span_px"]) * _zoom
@@ -462,10 +460,8 @@ func _place_country_names(hex_px: float, capitals: Array[Dictionary]) -> void:
 		# With larger text the size the name fits at 100 % is tried too, before any smaller one.
 		var plain := px if _text_scale <= 1.0 else _fit_name_px(text, wanted_name_px(name["hexes"], hex_px, 1.0), room)
 		var sizes := ParchmentNameSpots.sizes(px, plain, NAME_CLEAR_SIZES, NAME_MIN_PX)
-		if _put_name(name, centre, sizes, capitals):
-			continue
-		while px >= NAME_MIN_PX and not _put_anyway(name, centre, px):
-			px = maxi(NAME_MIN_PX, floori(px * NAME_SHRINK)) if px > NAME_MIN_PX else 0
+		if not _put_name(name, centre, sizes, capitals) and not _put_last(name, centre, sizes, capitals):
+			_put_over_icons(name, centre, sizes, capitals)  # with no spot even so the country is left unnamed
 
 
 ## The country names' font at the size `px`: its letters spaced by NAME_SPACING_EM.
@@ -492,9 +488,8 @@ func _fit_name_px(text: String, wanted: int, room: float) -> int:
 
 ## Places the name clear of the capitals, and where its land has room clear of the HUD's cover rects and the goods
 ## icons' spots too. At its full size (`sizes`[0]) it first tries clear of all three. To get out from under a cover it
-## may shrink as it does for a capital, giving up the icons and then the capitals (they draw over it). It never shrinks
-## for an icon: only its full size is moved off one. False, with nothing changed, when no spot clears the capitals (or a
-## cover).
+## may shrink as it does for a capital, giving up the icons. It never shrinks for an icon: only its full size is moved
+## off one. False, with nothing changed, when no spot clears the capitals.
 func _put_name(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: Array[Dictionary]) -> bool:
 	var half := _name_shape(name, sizes[0])[1]
 	var cover := ParchmentNameSpots.boxes_near(_cover, centre, half)
@@ -506,8 +501,6 @@ func _put_name(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: A
 	if not done and not cover.is_empty():
 		_avoid = cover
 		done = _put_clear(name, centre, sizes, capitals)
-		for size_px: int in sizes:
-			done = done or _put_anyway(name, centre, size_px)
 	if not done and not icons.is_empty():
 		_avoid = icons
 		done = _put_clear(name, centre, [sizes[0]], capitals)
@@ -515,102 +508,72 @@ func _put_name(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: A
 	return done or _put_clear(name, centre, sizes, capitals)
 
 
+## The last search, for a name that _put_name found no spot for: every step from its size down to NAME_MIN_PX, with the
+## nearest places beside the capitals too (the sizes of `tried` have had every other place); clear of the HUD's cover
+## rects first, then under them.
+func _put_last(name: Dictionary, centre: Vector2, tried: Array[int], capitals: Array[Dictionary]) -> bool:
+	var steps := ParchmentNameSpots.steps(tried[0], NAME_SHRINK, NAME_MIN_PX)
+	var cover := ParchmentNameSpots.boxes_near(_cover, centre, _name_shape(name, tried[0])[1])
+	var done := false
+	if not cover.is_empty():
+		_avoid = cover
+		done = _put_clear(name, centre, steps, capitals, tried)
+		_avoid = []
+	return done or _put_clear(name, centre, steps, capitals, tried)
+
+
+## Both searches again with the icons' spots given up altogether, so that a capital's name too may move onto one to make
+## room (_may_name refuses it while they are held). The spots are held again for the names that follow.
+func _put_over_icons(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: Array[Dictionary]) -> void:
+	if _icon_boxes.is_empty():
+		return  # the searches so far had nothing to give up
+	var held := _icon_boxes
+	_icon_boxes = []
+	if not _put_name(name, centre, sizes, capitals):
+		_put_last(name, centre, sizes, capitals)
+	_icon_boxes = held
+
+
 ## Places the name clear of every capital and of the boxes to avoid, at the first of `sizes` (largest first) that has a
 ## spot: at each size the first of a slide of R10; a slide of R10 whose capitals' names can go to the other side of their
-## dots; a farther place; a farther place with such names moved; and the same for the places just past a box to avoid. A
-## moved name is on its region and no spot is on unexplored paper. False, with nothing changed, when no size has such a
+## dots; a farther place; a farther place with such names moved; and the same for the places just past a box to avoid.
+## With `tried` (the last search) the places beside the capitals follow, and they are all that a size of `tried` gets.
+## A moved name is on its region and no spot is on unexplored paper. False, with nothing changed, when no size has such a
 ## spot.
-func _put_clear(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: Array[Dictionary]) -> bool:
-	var near := _capitals_near(capitals, centre, _name_shape(name, sizes[0])[1])
-	var taken := _taken_by(near)
-	var tried := 0
+func _put_clear(name: Dictionary, centre: Vector2, sizes: Array[int], capitals: Array[Dictionary],
+		tried: Array[int] = []) -> bool:
+	var reach := _name_shape(name, sizes[0])[1]
+	var near := _room.near(centre, reach)
+	var taken := ParchmentCapitalRoom.taken_by(near)
+	var stages := ParchmentNameSpots.STAGES + int(not tried.is_empty())
+	var before := 0
 	for size_px: int in sizes:
-		if size_px == tried:
+		if size_px == before:
 			continue
-		tried = size_px
+		before = size_px
 		var shape := _name_shape(name, size_px)
 		var screen := Rect2(Vector2.ZERO, _viewport)
-		for stage: int in ParchmentNameSpots.STAGES:
-			var spots := ParchmentNameSpots.stage(stage, centre, shape, _avoid, screen)
+		for stage: int in range(ParchmentNameSpots.STAGES if tried.has(size_px) else 0, stages):
+			var spots := ParchmentNameSpots.stage(stage, centre, shape, _avoid, screen) \
+				if stage < ParchmentNameSpots.STAGES \
+				else ParchmentCapitalRoom.last_places(near, centre, shape, screen, float(name["span_px"]) * _zoom)
 			var with_moves: Array[Vector2] = []  # the middles that need capitals' names moved
 			for at: Vector2 in spots:
 				if ParchmentNameSpots.hits(_avoid, at, shape[0], shape[1]):
 					continue  # the cheapest of the checks, first
-				var need := _need_at(taken, at, shape[0], shape[1])
-				if need == Need.MOVES:
+				var need := _room.need_at(taken, at, shape[0], shape[1])
+				if need == ParchmentCapitalRoom.Need.MOVES:
 					with_moves.append(at)
-				elif need == Need.NOTHING and _may_stand(name, centre, at, shape[0], shape[1]):
+				elif need == ParchmentCapitalRoom.Need.NOTHING and _may_stand(name, centre, at, shape[0], shape[1]) \
+						and ParchmentCapitalRoom.far_clear(capitals, centre, reach, at, shape[0], shape[1]):
 					_give_country(name, at, shape[0], shape[1], size_px)
 					return true
 			for at: Vector2 in with_moves:
 				if _may_stand(name, centre, at, shape[0], shape[1]) \
-						and _move_capital_names(near, at, shape[0], shape[1]):
+						and ParchmentCapitalRoom.far_clear(capitals, centre, reach, at, shape[0], shape[1]) \
+						and _room.move_names(near, at, shape[0], shape[1]):
 					_give_country(name, at, shape[0], shape[1], size_px)
 					return true
-	return false
-
-
-## What stands in a name's way near it: for each capital [its dot's box, its name's box (empty when none is shown),
-## the box that name would have on the other side of its dot (UNASKED until a spot asks; empty when it may not go
-## there), the capital's entry].
-func _taken_by(near: Array[Dictionary]) -> Array[Array]:
-	var out: Array[Array] = []
-	for entry: Dictionary in near:
-		var shown: Rect2 = entry["rect"] if str(entry["text"]) != "" else Rect2()
-		out.append([_dot_box(entry["dot"], entry["dot_radius"]), shown, UNASKED, entry])
-	return out
-
-
-## What a name's turned box at `at` needs of the capitals (`taken`, see _taken_by): nothing, some names moved to the
-## other side of their dots, or more than can be done (it meets a dot, or a name with nowhere to go).
-func _need_at(taken: Array[Array], at: Vector2, axis: Vector2, half: Vector2) -> Need:
-	var need := Need.NOTHING
-	var bounds := Rect2(at, Vector2.ZERO).grow_individual(absf(axis.x) * half.x + absf(axis.y) * half.y,
-		absf(axis.y) * half.x + absf(axis.x) * half.y, absf(axis.x) * half.x + absf(axis.y) * half.y,
-		absf(axis.y) * half.x + absf(axis.x) * half.y)
-	for boxes: Array in taken:
-		# Most capitals are far from the spot: the engine's level test of their boxes spares the turned ones.
-		if not bounds.intersects(boxes[0]) and not bounds.intersects(boxes[1]):
-			continue
-		if ParchmentLabelSpace.turned_hits(boxes[0], at, axis, half):
-			return Need.TOO_MUCH
-		var shown: Rect2 = boxes[1]
-		if shown.has_area() and ParchmentLabelSpace.turned_hits(shown, at, axis, half):
-			if boxes[2] == UNASKED:
-				boxes[2] = _room_over_there(boxes[3])
-			var other: Rect2 = boxes[2]
-			if not other.has_area() or ParchmentLabelSpace.turned_hits(other, at, axis, half):
-				return Need.TOO_MUCH
-			need = Need.MOVES
-	return need
-
-
-## The box a capital's name may move to on the other side of its dot; empty when something is in the way there.
-func _room_over_there(entry: Dictionary) -> Rect2:
-	var block: int = _name_blocks[entry["hex"]]
-	var box := _other_side(entry)
-	_space.lift(block)
-	var free := _may_name(box)
-	_space.put_back(block, entry["rect"])
-	return box if free else Rect2()
-
-
-## The box a capital's shown name would have on the other side of its dot.
-func _other_side(entry: Dictionary) -> Rect2:
-	var below := (entry["rect"] as Rect2).get_center().y > (entry["dot"] as Vector2).y
-	return _name_box(entry, entry["size"], below)
-
-
-## The name where R10 leaves it when no spot clears the capitals: the first slide (then place past a box to avoid) that
-## keeps off unexplored paper and the boxes to avoid and, when moved, stays on its region. False when there is none.
-func _put_anyway(name: Dictionary, centre: Vector2, px: int) -> bool:
-	var shape := _name_shape(name, px)
-	var spots := ParchmentNameSpots.near(centre, shape)
-	spots.append_array(ParchmentNameSpots.past(centre, shape, _avoid, Rect2(Vector2.ZERO, _viewport)))
-	for at: Vector2 in spots:
-		if _may_stand(name, centre, at, shape[0], shape[1]):
-			_give_country(name, at, shape[0], shape[1], px)
-			return true
 	return false
 
 
@@ -629,44 +592,6 @@ func _may_stand(name: Dictionary, home: Vector2, at: Vector2, axis: Vector2, hal
 	if at != home and not ParchmentNameSpots.on_region(_owners, _game.map, _xform, int(name["id"]), home, at, axis, half.x):
 		return false
 	return not _on_unknown(at, axis, half)
-
-
-## The capitals a name of half size `half` around `centre` could meet, wherever it is moved to.
-static func _capitals_near(capitals: Array[Dictionary], centre: Vector2, half: Vector2) -> Array[Dictionary]:
-	var reach := half.x * 2.0 + half.y * 6.0
-	var out: Array[Dictionary] = []
-	for entry: Dictionary in capitals:
-		var covers := _dot_box(entry["dot"], entry["dot_radius"]).merge(entry["rect"])
-		if covers.grow(reach).has_point(centre):
-			out.append(entry)
-	return out
-
-
-## Makes room for a turned box by putting each capital's name in its way on the other side of its dot. All of them or
-## none: false, with nothing moved, when a name has no free place over there. (The dots are the caller's to check.)
-func _move_capital_names(capitals: Array[Dictionary], centre: Vector2, axis: Vector2, half: Vector2) -> bool:
-	var in_the_way: Array[Dictionary] = []
-	for entry: Dictionary in capitals:
-		if str(entry["text"]) != "" and ParchmentLabelSpace.turned_hits(entry["rect"], centre, axis, half):
-			in_the_way.append(entry)
-	var moved: Array[Array] = []  # [entry, its old box, its old block]
-	for entry: Dictionary in in_the_way:
-		var old: Rect2 = entry["rect"]
-		var block: int = _name_blocks[entry["hex"]]
-		var box := _other_side(entry)
-		_space.lift(block)
-		if ParchmentLabelSpace.turned_hits(box, centre, axis, half) or not _may_name(box):
-			_space.put_back(block, old)
-			for undo: Array in moved:
-				var back: Dictionary = undo[0]
-				_space.lift(_name_blocks[back["hex"]])
-				_name_blocks[back["hex"]] = undo[2]
-				_space.put_back(undo[2], undo[1])
-				back["rect"] = undo[1]
-			return false
-		moved.append([entry, old, block])
-		_give_name(entry, box, entry["size"])
-	return true
 
 
 func _give_country(name: Dictionary, at: Vector2, axis: Vector2, half: Vector2, px: int) -> void:

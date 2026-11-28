@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=23 format=3]
 
 [ext_resource type="Script" path="res://shell/hud/hud.gd" id="1_hud"]
 [ext_resource type="PackedScene" path="res://shell/hud/top_bar.tscn" id="2_topbar"]
@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" path="res://shell/hud/busy_pill.tscn" id="18_pill"]
 [ext_resource type="PackedScene" path="res://shell/hud/goods_card.tscn" id="19_goods"]
 [ext_resource type="Script" path="res://shell/ui/kit_button.gd" id="20_btn"]
+[ext_resource type="Script" path="res://shell/hud/hint_strip.gd" id="21_strip"]
 
 [node name="Hud" type="CanvasLayer"]
 process_mode = 1
@@ -157,6 +158,14 @@ offset_top = 6.0
 offset_right = -12.0
 offset_bottom = 400.0
 grow_horizontal = 0
+
+[node name="HintStrip" type="PanelContainer" parent="Root/Column/Main/MapArea"]
+visible = false
+layout_mode = 0
+mouse_filter = 2
+theme_type_variation = &"PanelCard"
+script = ExtResource("21_strip")
+hints_path = NodePath("../KeyHints")
 
 [node name="KeyHints" type="HBoxContainer" parent="Root/Column/Main/MapArea"]
 layout_mode = 1

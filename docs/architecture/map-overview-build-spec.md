@@ -89,6 +89,21 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   capitals (it is drawn under a capital rather than under a cover); it stays under a cover only when no spot on its land
   is clear of it. It may shrink to get out from under a cover, never to get off an icon. Icons are still placed after
   the names.
+  Amendment (2026-11-28, owner): a capital's dot and name are a hard obstacle: no country name is drawn on them. This
+  replaces "else it is drawn over the capital" and "it is drawn under a capital rather than under a cover" above, and
+  the rule that every country is named. A name with no spot at the sizes above is tried at every step of 0.85 of its
+  size down to 14 px, there also just clear of the capital in its way (moved along its line or its normal only) and, in
+  the town view, at finer places between those above; none of these last places is more than 2.5 lines across, or
+  along its line farther than 0.45 of its length or, where that is more, as far as its room (D7) lets it. With no such
+  spot on its own known land the country name is left out; its capital's dot and name stand for it. This befalls small
+  countries in the farther views (on north Italy at 1280 x 720 Mantua, at the zooms where its three hexes are small),
+  and many countries of the made-up Europe in its far view, whose ragged shapes leave one line for the name, over the
+  capital's dot. A name still lies over the small dots of towns, which are drawn under it.
+  In Goods mode a name that would be left out only because the capitals' names are held off the icons' spots is searched
+  for once more with those spots given up: a capital's name may then move onto one (the icon takes another spot, or none).
+  Amendment (2026-11-28): the parchment's names and icons (not the tile view's) also keep off the mode legend, the key
+  hints with their strip (R30), the log's button and badge, and the "things to do" card (`Hud.name_cover_rects`,
+  beside `Hud.cover_rects`), by the cover rules above.
 - **R11** Layout runs only when the view changes (`CameraRig.view_changed`), the data changes (owners, discovery, works,
   mode, good) or the cover rects change; never every frame. Only what is on screen is laid out.
 
@@ -103,6 +118,17 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   decision, 2026-11-27; the tile view's veil is unchanged). Only undiscovered hexes differ (R12).
 - **R15** The parchment draws no armies. Army tokens, war marks, paths and previews keep their own fog rules and draw above
   it, unchanged.
+  Amendment (2026-11-28): while the parchment shows, the hexes the selected army reaches next season but not this one
+  are hatched (the tile view's 8 % fill cannot be seen on the paper): diagonal stripes in screen px, a dark ink stripe 2.5 px wide (3.5 px in high
+  contrast) and a pale one of 1.5 px beside it, every 9 px, so the land shows between them and one of the two is 3:1 or
+  more against every land colour of the three modes, in both country palettes. This season's reach stays its flat fill:
+  the two are told apart by pattern. The hatched hexes have a layer of their own (`reach_ahead`) that comes in with the
+  cross-fade and is not drawn with the parchment hidden; the tile view's two reach layers are untouched
+  (`ParchmentReach`).
+  Amendment (2026-11-28): while the parchment shows (the cross-fade too), no reach of any layer lies on a hex the viewer
+  has not discovered: on the unknown paper it would draw the coast of unknown land (R12). `MapArmies` fills the layers so
+  and fills them again as the parchment comes or goes and as the viewer's discovery moves. On the tiles the reach is as
+  before.
 
 ### Coexistence
 
@@ -140,6 +166,10 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   ramp swatches and pips, "Not here"; a last line "N districts you know make it".
 - **R22** A kit button "Return to default map" in the bottom middle of the map area, clear of the HUD's cover rects, shown
   in every mode but Terrain and not during the pick; it sets Terrain (as key 1 does). Its tooltip names the key.
+- **R30** (2026-11-28) While the parchment shows, the key hints at the foot of the map (the keys, and the line that army
+  moves are final) stand on a thin strip of the kit's card (`PanelCard`; in high contrast its black field with the gold
+  line), as wide as the hints shown, as solid as the parchment (it fades with it) and clear of the zoom control, the
+  minimap, the scale bar, the log's button and the Return button. The tile view has no strip (`HintStrip`).
 - **R23** Hover: while the parchment is solid, or in Goods mode, the hover card shows one compact line from
   `ParchmentView.tip`: "Pavia · Milan · Grain, second stage" (place if any, owner, the good and stage in Goods mode, or the
   hex's good in other modes). An undiscovered hex reads "Unexplored"; unowned land "Unclaimed land". Elsewhere the full
@@ -207,6 +237,9 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
   in the `Names` canvas layer, so army tokens, war marks, paths, previews and reach are drawn over its names; it lays out
   in screen px and draws through the view's inverse transform. Its name spots and icon spots are
   `ParchmentNameSpots` and `ParchmentIconSpots`.
+  Amendment (2026-11-28): the room a country name needs from the capitals is `ParchmentCapitalRoom`; the hatched reach is
+  `shell/map/parchment_reach.gd` with its shader, driven by `MapSceneParchment`; the strip behind the key hints is
+  `shell/hud/hint_strip.gd`, which reads the parchment's alpha from the node the HUD is bound to (no new bus signal).
   Amendment to D1 (2026-11-27): it is a `Node2D`, so the renderer culls it by what it draws. A `Control` of size 0 gave
   the renderer an empty rect, and the layer was dropped once the map's point (0, 0) left the screen.
 - **D3 Static geometry, dynamic textures.** `ParchmentShape` gives, once per map, the land polygons (12 points a hex, every
@@ -239,7 +272,8 @@ panels, legend, buttons and hover card keep the game's walnut and gold kit frame
 - **D8 Hatched water and sea in shaders.** The hatch is a strip mesh along the coast edges with UVs (along, across) and a
   small shader of wavy lines; the sea is one quad with a hash speckle. Colours reach shaders only as uniforms.
 - **D9 Colours as tokens.** A new `shell/ui/parchment_tokens.gd` (`ParchmentTokens`, standard and high-contrast sets: sea,
-  speckle, hatch, land, unknown, district line, mountain, border, coast, name ink, halo, the goods ramp, icon disc;
+  speckle, hatch, land, unknown, district line, mountain, border, coast, name ink, halo, the goods ramp, icon disc, the
+  reach's two stripes (2026-11-28);
   no veil, R14, 2026-11-27)
   is added to the lint's `UI_STYLE_ALLOWLIST`; no other new file has a `Color(` literal. `tokens.gd` is not grown.
 - **D10 The goods card is new HUD, not a new frame.** `shell/hud/goods_card.gd` and `.tscn` build on `PanelFrame`,

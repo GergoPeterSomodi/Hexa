@@ -16,7 +16,7 @@ const LINES: Array[StringName] = [&"district", &"mountain", &"border", &"coast",
 const RAMP: Array[StringName] = [&"goods_1", &"goods_2", &"goods_3"]
 const ROLES: Array[StringName] = [&"sea", &"speckle", &"hatch", &"land", &"unknown", &"district", &"mountain",
 	&"border", &"coast", &"name_ink", &"town_ink", &"halo", &"dot_fill", &"dot_edge", &"disc", &"disc_edge", &"pip",
-	&"goods_1", &"goods_2", &"goods_3"]
+	&"goods_1", &"goods_2", &"goods_3", &"reach_ink", &"reach_light"]
 const SEE_THROUGH: Array[StringName] = [&"speckle", &"hatch"]
 
 

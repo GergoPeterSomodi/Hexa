@@ -227,6 +227,11 @@ func line_count() -> int:
 
 
 ## The newest season's header button, or null when the card shows no season.
+## What the closed log shows on the map: its button and the unread badge.
+func icon_parts() -> Array[Control]:
+	return [_toggle, _badge]
+
+
 func report_button() -> Button:
 	for child: Node in _seasons.get_children():
 		if child is Button:
