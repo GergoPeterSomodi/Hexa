@@ -219,8 +219,11 @@ func _m5_assert_invariants(app: App, tag: String) -> void:
 	var game := Session.game
 	if game == null or not game.has_countries() or game.player == &"" or app.is_starting() or app.map_scene() == null:
 		return
+	var negative := PackedStringArray()
 	for i: int in game.state.people.size():
-		assert_gte(int(game.state.people[i]), 0, "%s: no hex holds a negative number of people" % tag)
+		if int(game.state.people[i]) < 0:
+			negative.append(str(game.map.hex_of(i)))
+	assert_eq(", ".join(negative), "", "%s: no hex holds a negative number of people" % tag)
 	if _m3_calm(app) and app.hud().chips().is_visible_in_tree() and app.hud().chips().people_chip().is_visible_in_tree():
 		var card := PeopleCards.people(game, game.player)
 		if not card.is_empty():

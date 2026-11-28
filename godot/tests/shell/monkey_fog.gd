@@ -160,14 +160,16 @@ func _fog_assert(app: App, game: Game, tag: String) -> void:
 	var sampled := 0
 	var idx := _fog_cursor % n
 	var scanned := 0
+	var wrong := PackedStringArray()
 	while sampled < FOG_SAMPLE and scanned < n:
 		var hex := game.map.hex_of(idx)
 		if not Knowledge.discovered(game, viewer, hex):
 			sampled += 1
-			_fog_check_hex(game, viewer, hex, tokens, tag)
+			_fog_check_hex(game, viewer, hex, tokens, wrong)
 		idx = (idx + 1) % n
 		scanned += 1
 	_fog_cursor = idx
+	assert_eq(" | ".join(wrong), "", "%s: the undiscovered hexes tell nothing" % tag)
 	_fog_check_panels(app, game, viewer, tag)
 	_fog_check_armies(game, viewer, tokens, tag)
 
@@ -182,17 +184,21 @@ func _fog_tokens(app: App) -> ArmyTokens:
 
 
 ## One undiscovered hex: its card is "Unexplored" and nothing else, no people are shown, no other country's token stands on it.
-func _fog_check_hex(game: Game, viewer: StringName, hex: Vector2i, tokens: ArmyTokens, tag: String) -> void:
+## What it tells is added to `wrong`; the caller checks the list once (GUT keeps the text of every passed check).
+func _fog_check_hex(game: Game, viewer: StringName, hex: Vector2i, tokens: ArmyTokens, wrong: PackedStringArray) -> void:
 	_bump("fog_hexes")
 	var card := HexCard.of(game, hex)
-	assert_eq(str(card.get("title", "")), "Unexplored", "%s: an undiscovered hex's card says only Unexplored" % tag)
-	assert_eq(str(card.get("owner", "")), "", "%s: an undiscovered hex's card names no owner" % tag)
-	assert_false(bool(PeopleView.at(game, viewer, hex).get("shown", false)), "%s: an undiscovered hex shows no people" % tag)
+	if str(card.get("title", "")) != "Unexplored":
+		wrong.append("the card of %s says '%s', not only Unexplored" % [str(hex), str(card.get("title", ""))])
+	if str(card.get("owner", "")) != "":
+		wrong.append("the card of %s names the owner '%s'" % [str(hex), str(card.get("owner", ""))])
+	if bool(PeopleView.at(game, viewer, hex).get("shown", false)):
+		wrong.append("%s shows people" % str(hex))
 	if tokens == null:
 		return
 	for c: Country in game.countries:
-		if c.tag != viewer:
-			assert_null(tokens.token_at(hex, c.tag), "%s: no army token of %s on an undiscovered hex" % [tag, c.tag])
+		if c.tag != viewer and tokens.token_at(hex, c.tag) != null:
+			wrong.append("an army token of %s stands on %s" % [str(c.tag), str(hex)])
 
 
 ## The hover card and the hex panel, when either shows an undiscovered hex: their visible text names no owner of it.

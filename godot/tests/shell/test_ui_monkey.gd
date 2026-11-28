@@ -93,7 +93,15 @@ var _step_slot: String = ""
 var _last_season_msec: int = -1
 
 
+## The most checks one random-play test may make. GUT keeps the text of every passed check (about 1.2 KB each), and checks
+## inside loops over hexes or texts once grew a run past the test machine's memory: gather what is wrong, check it once.
+const MAX_CHECKS := 400000
+
+var _checks_before := 0
+
+
 func before_each() -> void:
+	_checks_before = get_assert_count()
 	_forget_session_choices()
 	Bindings.reset_defaults()
 	SimClock.reset()  # issue 457: the shell's clock is the fixed one, so a seed's counters do not depend on the machine
@@ -133,6 +141,8 @@ func _clean_disk() -> void:
 
 
 func after_each() -> void:
+	var checks: int = get_assert_count() - _checks_before
+	assert_lt(checks, MAX_CHECKS, "one test made %d checks: a check inside a loop (see MAX_CHECKS)" % checks)
 	_forget_session_choices()
 	SimClock.step_s = -1.0
 	_clean_disk()

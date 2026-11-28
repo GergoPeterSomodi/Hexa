@@ -724,9 +724,13 @@ func _m7_assert_invariants(app: App, tag: String) -> void:
 		_m7_words(app.hud(), words)
 		_m7_words(app.stack(), words)
 		_m7_words(app.map_scene(), words)
+		var told := PackedStringArray()  # one check a step, not one a pair: GUT keeps the text of every passed check
 		for secret: String in hidden:
 			for text: String in words:
-				assert_false(text.contains(secret), "%s: a visible string tells of a battle or a war line the player was not told of: '%s'" % [tag, secret])
+				if text.contains(secret):
+					told.append(secret)
+					break
+		assert_eq(" | ".join(told), "", "%s: no visible string tells of a battle or a war line the player was not told of" % tag)
 		_bump("m7_checks")
 	var docks := 0
 	for child: Node in app.stack().get_children():

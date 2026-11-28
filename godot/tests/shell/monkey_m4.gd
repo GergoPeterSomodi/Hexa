@@ -645,13 +645,16 @@ func _m4_assert_invariants(app: App, tag: String) -> void:
 	var game := Session.game
 	if game == null or not game.has_countries():
 		return
+	var negative := PackedStringArray()
 	for country: Country in game.countries:
 		# A computer's country may be in debt (M8 spec 8: the soak allows up to 20 % of country-games under 0; its upkeep can outrun its
 		# taxes and AiForces then disbands); the player's treasury is never negative, as an action never spends past it.
-		if country.tag == game.player or game.player == &"":
-			assert_gte(country.treasury, 0, "%s: the treasury of %s is never negative" % [tag, str(country.tag)])
+		if (country.tag == game.player or game.player == &"") and country.treasury < 0:
+			negative.append("the treasury of %s" % str(country.tag))
 		for good: int in country.stock.size():
-			assert_gte(country.stock[good], 0, "%s: the stock %d of %s is never negative" % [tag, good, str(country.tag)])
+			if country.stock[good] < 0:
+				negative.append("the stock %d of %s" % [good, str(country.tag)])
+	assert_eq(", ".join(negative), "", "%s: neither the player's treasury nor any stock is negative" % tag)
 	if game.player == &"" or app.map_scene() == null or app.is_starting():
 		return
 	if not app.stack().has_screen(&"works_preview"):
