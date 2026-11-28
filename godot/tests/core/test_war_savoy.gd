@@ -69,12 +69,12 @@ func _events(kind: String, from: int = 0) -> Array[Dictionary]:
 
 ## Spring 1480: Milan's Army of Alessandria, the declaration, Savoy's three raises, the Pavia army (d), and the march on own land.
 func _spring_1480(with_pavia: bool = true) -> void:
-	var milan := _g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})
+	var milan := ArmyFixture.raise_now(_g, {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})
 	assert_true(bool(milan["ok"]), "Milan raises its Army of Alessandria")
 	_milan_army = int(milan["army"])
 	assert_true(bool(_g.act("declare_war", {"target": MLO, "tag": SAV})["ok"]), "Savoy declares war on Milan")
 	for h: Vector2i in [IVREA, TURIN, VERCELLI]:
-		assert_true(bool(_g.act("raise", {"hex": h, "kind": 0, "count": 2, "tag": SAV})["ok"]), "two companies at %s" % str(h))
+		assert_true(bool(ArmyFixture.raise_now(_g, {"hex": h, "kind": 0, "count": 2, "tag": SAV})["ok"]), "two companies at %s" % str(h))
 	_ivrea = Armies.at(_g, IVREA)[0].id
 	_turin = Armies.at(_g, TURIN)[0].id
 	_vercelli = Armies.at(_g, VERCELLI)[0].id
@@ -113,7 +113,7 @@ func test_1_a_war_is_declared_and_its_refusals_read_as_the_spec_says() -> void:
 	var venice := _g.check("declare_war", {"target": VEN, "tag": SAV})
 	assert_false(bool(venice["ok"]))
 	assert_eq(str(venice["reason"]), "only neighbours go to war: the Republic of Venice shares no border with the Duchy of Savoy")
-	var raised := _g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})
+	var raised := ArmyFixture.raise_now(_g, {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})
 	assert_true(bool(raised["ok"]), "Milan's army of 1,000 men at Alessandria")
 	assert_eq(_g.act("declare_war", {"target": MLO, "tag": SAV}), {"ok": true, "reason": ""}, "Savoy declares war on Milan")
 	var declared := _events("war_declared")

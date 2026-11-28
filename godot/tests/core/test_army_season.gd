@@ -4,13 +4,20 @@
 extends GutTest
 
 
-## A game with two pikemen raised in the one town of Genoa (1,000 men), before the first season ends.
-func _raised_game() -> Game:
+## A rich Genoa whose one town can raise companies.
+func _town_game() -> Game:
 	var g := ArmyFixture.game()
 	var hex := ArmyFixture.find_town(g)
 	ArmyFixture.town(g, hex)
 	ArmyFixture.rich(g)
-	assert_true(bool(g.act("raise", {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	return g
+
+
+## A game with two pikemen raised in the one town of Genoa (1,000 men), before the first season ends.
+func _raised_game() -> Game:
+	var g := _town_game()
+	var hex := ArmyFixture.find_town(g)
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	return g
 
 
@@ -20,7 +27,9 @@ func _saved(g: Game) -> Dictionary:
 
 
 func test_a_raise_and_its_upkeep_reach_the_stats_in_their_season() -> void:
-	var g := _raised_game()
+	var g := _town_game()
+	var hex := ArmyFixture.find_town(g)
+	assert_true(bool(g.act("raise", {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	assert_eq(Armies.men_of_country(g, ArmyFixture.TAG), 1000, "two pikemen of 500")
 	Season.run(g)
 	var stats := g.stats
@@ -41,7 +50,7 @@ func test_the_armies_are_in_the_digest_and_the_save() -> void:
 	var hex := ArmyFixture.find_town(g)
 	ArmyFixture.town(g, hex)
 	ArmyFixture.rich(g)
-	assert_true(bool(g.act("raise", {"hex": hex, "kind": 0, "count": 1, "tag": ArmyFixture.TAG})["ok"]))
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": hex, "kind": 0, "count": 1, "tag": ArmyFixture.TAG})["ok"]))
 	assert_ne(g.digest(), before, "an army is in the digest")
 	Season.run(g)
 	var body := _saved(g)

@@ -56,7 +56,7 @@ func test_a_season_without_armies_has_no_armies_section() -> void:
 func test_standing_names_the_men_under_arms() -> void:
 	var g := _rich_town_game()
 	var hex := ArmyFixture.find_town(g)
-	g.act("raise", {"hex": hex, "kind": 0, "count": 1, "tag": ArmyFixture.TAG})
+	ArmyFixture.raise_now(g, {"hex": hex, "kind": 0, "count": 1, "tag": ArmyFixture.TAG})
 	Season.run(g)
 	var standing := _section(SeasonSummary.of(g, ArmyFixture.TAG, g.turn - 1), &"standing")
 	if standing.is_empty():

@@ -30,7 +30,7 @@ static func war(session: Object, g: Game) -> Dictionary:
 	var iron := g.defs.good_id(&"iron")
 	session.call("dev_goods", SAV, iron, DEV_IRON - Countries.by_tag(g, SAV).stock[iron])
 	var kind := _pikemen(g)
-	var milan := session.call("act", "raise", {"hex": ALESS, "kind": kind, "count": 2, "tag": MLO}) as Dictionary
+	var milan := ArmyFixture.raise_now(g, {"hex": ALESS, "kind": kind, "count": 2, "tag": MLO}, Callable(session, "act"))
 	if not bool(milan.get("ok", false)):
 		out["problem"] = "Milan's raise was refused: %s" % str(milan.get("reason", ""))
 		return out
@@ -38,7 +38,7 @@ static func war(session: Object, g: Game) -> Dictionary:
 	if not bool(declared.get("ok", false)):
 		out["problem"] = "the declaration was refused: %s" % str(declared.get("reason", ""))
 		return out
-	var savoy := session.call("act", "raise", {"hex": VERCELLI, "kind": kind, "count": 2}) as Dictionary
+	var savoy := ArmyFixture.raise_now(g, {"hex": VERCELLI, "kind": kind, "count": 2}, Callable(session, "act"))
 	if not bool(savoy.get("ok", false)):
 		out["problem"] = "Savoy's raise was refused: %s" % str(savoy.get("reason", ""))
 		return out

@@ -9,6 +9,7 @@
 ##   army(game, tag, hex, kind, count, raised_turn): an army of `tag` on `hex` made through the door (no raise), with its full
 ##                      move points (a fresh army).
 ##   spent(game, army, points): the army has only `points` move points left (moves-build-spec.md R12; cut to 0 and its full).
+##   raise_now(game, args, door): a setup's raise, its companies standing now (the action `raise`; its verdict).
 class_name ArmyFixture
 extends RefCounted
 
@@ -92,6 +93,16 @@ static func army(g: Game, tag: StringName, hex: Vector2i, kind: int, count: int,
 	Armies.add_units(g, a, kind, count, turn, hex, 0, {})
 	Armies.set_points(g, a, Allowance.full(g, a))
 	return a
+
+
+## A raised company, standing now (docs/design/recruitment-queue.md, task RQ0): paid, levied and in an army this season.
+## A test that needs a raised company only as its setup gets it here, so the recruitment queue changes this function and not
+## the tests; a test about raising calls the action itself. Today the action `raise` does all of it at once and the action
+## log holds its record. `args` are the action's, {hex, kind, count, tag}; `door` takes (action, args) and is g.act when none
+## is given (Session.act in a window test, which adds the player's tag and sends the events). The verdict: {ok, reason, army}.
+static func raise_now(g: Game, args: Dictionary, door: Callable = Callable()) -> Dictionary:
+	var through: Callable = g.act if door.is_null() else door
+	return through.call("raise", args)
 
 
 ## The army has `points` move points left: what a walk would leave it (the walks come with the moves build).

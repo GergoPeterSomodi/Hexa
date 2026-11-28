@@ -459,7 +459,7 @@ func _armed() -> Game:
 	var town := ArmyFixture.find_town(g)
 	ArmyFixture.town(g, town)
 	ArmyFixture.rich(g)
-	assert_true(bool(g.act("raise", {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	var lost := Armies.lose_men(g, Armies.at(g, town)[0], 300, &"test")
 	assert_true(lost > 0, "the town's army lost men for the refill to make up")
 	var away := _out_of_supply(g)

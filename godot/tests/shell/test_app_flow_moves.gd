@@ -313,7 +313,8 @@ func _close_report(vp: SubViewport, app: App) -> void:
 
 
 func _console(app: App, line: String) -> void:
-	var out := DevCommands.run(line, app.context())
+	var raising := line.begins_with("raise ")  # every raise here is a setup's
+	var out := AppFlowHelpers.console_raise(app.context(), line) if raising else DevCommands.run(line, app.context())
 	assert_true(out.begins_with("Done"), "%s: %s" % [line, out])
 
 

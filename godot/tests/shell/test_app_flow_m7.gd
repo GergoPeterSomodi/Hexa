@@ -201,7 +201,7 @@ func test_m7_flow_declare_march_odds_battle_siege_dock_save_and_peace() -> void:
 	assert_eq(Bindings.SHELL_MILESTONE, "8", "the shell is at milestone 8 (M8 K28)")
 
 	# The console makes Milan's army; the war is declared from the country panel's Confirm.
-	var made := DevCommands.run("as MLO raise 7 9 pikemen 2", app.context())
+	var made := AppFlowHelpers.console_raise(app.context(), "as MLO raise 7 9 pikemen 2")
 	assert_true(made.begins_with("Done"), made)
 	assert_eq(DevCommands.run("wars", app.context()), "You are at war with no one.", "no war yet")
 	app.context().request(&"declare_war", {"target": MLO})
@@ -216,7 +216,7 @@ func test_m7_flow_declare_march_odds_battle_siege_dock_save_and_peace() -> void:
 
 	# Savoy raises at Vercelli; a season passes (the muster; moves in the month R73: no march into Milan's land in the season of
 	# the declaration). The army is selected: the odds card of Alessandria; the march asks about its battle.
-	assert_true(DevCommands.run("raise 6 9 pikemen 2", app.context()).begins_with("Done"), "Savoy raises two companies")
+	assert_true(AppFlowHelpers.console_raise(app.context(), "raise 6 9 pikemen 2").begins_with("Done"), "Savoy raises two companies")
 	var army := Armies.at(game, VERCELLI)[0]
 	await _end_season(vp, app)
 	await _close_report(vp, app)
@@ -354,7 +354,7 @@ func test_storm_by_key_and_by_click() -> void:
 	await _wait_frames(2)
 	assert_true(AppFlowHelpers.has_toast(app, WarRequests.NO_ARMY), "Shift+O with no army says so")
 	_give_money(Session.game, SAV)
-	DevCommands.run("raise 6 9 pikemen 2", app.context())
+	AppFlowHelpers.console_raise(app.context(), "raise 6 9 pikemen 2")
 	var army := Armies.at(Session.game, VERCELLI)[0]
 	_armies_node(app).select_army(army.id)
 	await _wait_frames(2)
@@ -362,7 +362,7 @@ func test_storm_by_key_and_by_click() -> void:
 	assert_false(app.requests().war.storm_at(ALESS), "a storm with no war is refused")
 	assert_gt(AppFlowHelpers.toasts(app).size(), 1, "and says why")
 	DevCommands.run("declare MLO", app.context())
-	DevCommands.run("as MLO raise 7 9 pikemen 2", app.context())
+	AppFlowHelpers.console_raise(app.context(), "as MLO raise 7 9 pikemen 2")
 	assert_false(app.requests().war.storm_at(ALESS), "there is no fortress at Alessandria to storm")
 	var verdict := Session.check("storm", {"army": army.id, "goal": PAVIA})
 	assert_eq(app.requests().war.storm_at(PAVIA), bool(verdict["ok"]), "Storm follows the rules' verdict")
@@ -411,9 +411,9 @@ func test_the_sandbox_has_no_castle_switch_and_refuses_declare() -> void:
 func _fight_a_battle(vp: SubViewport, app: App) -> int:
 	var game := Session.game
 	_give_money(game, SAV)
-	DevCommands.run("as MLO raise 7 9 pikemen 2", app.context())
+	AppFlowHelpers.console_raise(app.context(), "as MLO raise 7 9 pikemen 2")
 	DevCommands.run("declare MLO", app.context())
-	DevCommands.run("raise 6 9 pikemen 2", app.context())
+	AppFlowHelpers.console_raise(app.context(), "raise 6 9 pikemen 2")
 	var army := Armies.at(game, VERCELLI)[0]
 	await _end_season(vp, app)
 	await _close_report(vp, app)
@@ -470,7 +470,7 @@ func test_the_castle_area_layer_follows_the_setting() -> void:
 	var env := await _savoy()
 	var app := env["app"] as App
 	_give_money(Session.game, SAV)
-	DevCommands.run("raise 6 9 pikemen 2", app.context())
+	AppFlowHelpers.console_raise(app.context(), "raise 6 9 pikemen 2")
 	var army := Armies.at(Session.game, VERCELLI)[0]
 	var wars := app.map_scene().get_node("MapWars") as MapWars
 	_armies_node(app).select_army(army.id)

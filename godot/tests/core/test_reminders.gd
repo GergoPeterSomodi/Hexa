@@ -359,7 +359,7 @@ func _armed_for_reminders() -> Game:
 	var town := ArmyFixture.find_town(g)
 	ArmyFixture.town(g, town)
 	ArmyFixture.rich(g)
-	assert_true(bool(g.act("raise", {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": town, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	for i: int in Territory.districts(g, ArmyFixture.id_of(g, ArmyFixture.TAG)):
 		if not Supply.in_supply(g, ArmyFixture.TAG, g.map.hex_of(i), false):
 			ArmyFixture.army(g, ArmyFixture.TAG, g.map.hex_of(i), 0, 2)

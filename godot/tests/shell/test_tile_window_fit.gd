@@ -98,7 +98,7 @@ func _cases() -> Dictionary:
 	for unit: UnitDef in _g.defs.units:
 		if unit.key == &"pikemen":
 			kind = unit.id
-	assert_true(bool(Session.act("raise", {"hex": genoa, "kind": kind, "count": 1}).get("ok", false)), "a company raised at Genoa")
+	assert_true(bool(ArmyFixture.raise_now(_g, {"hex": genoa, "kind": kind, "count": 1}, Session.act).get("ok", false)), "a company raised at Genoa")
 	return {"own town": genoa, "foreign": _case("foreign"), "siege": _besieged_fortress(), "sea": _case("sea")}
 
 

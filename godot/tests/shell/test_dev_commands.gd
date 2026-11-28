@@ -463,7 +463,7 @@ func test_m7_commands_parse_to_their_actions() -> void:
 	assert_eq(_problem("standing 1"), "Use: standing ID hold|withdraw")
 	assert_eq(_problem("wars now"), "wars takes no arguments.")
 	var hex := _capital()
-	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	assert_true(AppFlowHelpers.console_raise(_ctx, "raise %d %d pikemen 1" % [hex.x, hex.y]).begins_with("Done"))
 	var army := Armies.of_country(_game(), &"GEN")[0]
 	assert_eq(_problem("standing %d stand" % army.id), "no such standing order 'stand': hold or withdraw.", "planted: an order that does not exist")
 	assert_eq(_problem("storm %d 999 999" % army.id), "no such hex 999 999.")
@@ -473,7 +473,7 @@ func test_m7_commands_run_through_the_console() -> void:
 	assert_eq(DevCommands.run("wars", _ctx), "You are at war with no one.")
 	var neighbour := WarFixture.neighbour_of(_game(), &"GEN")
 	var hex := _capital()
-	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	assert_true(AppFlowHelpers.console_raise(_ctx, "raise %d %d pikemen 1" % [hex.x, hex.y]).begins_with("Done"))
 	var army := Armies.of_country(_game(), &"GEN")[0]
 	assert_true(DevCommands.run("standing %d withdraw" % army.id, _ctx).begins_with("Done"), "the standing order is set")
 	assert_eq(Armies.by_id(_game(), army.id).standing, Army.STANDING_WITHDRAW)
@@ -499,7 +499,7 @@ func test_the_sandbox_refuses_declare_and_peace() -> void:
 ## 4.15: the console's storm (and `as`) tells nothing of a place the country cannot see: one sentence for walls and none.
 func test_storm_on_an_unseen_place_gets_the_one_sentence() -> void:
 	var hex := _capital()
-	assert_true(DevCommands.run("raise %d %d pikemen 1" % [hex.x, hex.y], _ctx).begins_with("Done"))
+	assert_true(AppFlowHelpers.console_raise(_ctx, "raise %d %d pikemen 1" % [hex.x, hex.y]).begins_with("Done"))
 	var army := Armies.of_country(_game(), &"GEN")[0]
 	var said: Array[String] = []
 	for i: int in _game().map.hex_count():

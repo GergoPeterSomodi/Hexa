@@ -50,7 +50,7 @@ func test_raise_wording() -> void:
 func test_disband_wording_with_the_refund_of_the_same_season() -> void:
 	var g := _rich_town_game()
 	var hex := ArmyFixture.find_town(g)
-	assert_true(bool(g.act("raise", {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	var a := Armies.at(g, hex)[0]
 	var paid := int(Military.cost_of(g, 0, 2)["ducats"])
 	assert_true(bool(g.act("disband", {"army": a.id, "unit": -1, "tag": ArmyFixture.TAG})["ok"]))

@@ -49,10 +49,10 @@ func _season() -> void:
 
 ## Spring 1480: the declaration on Milan, Savoy's three raises and the march on own land (test_summary_war's story).
 func _spring_1480() -> void:
-	assert_true(bool(_g.act("raise", {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})["ok"]), "Milan raises")
+	assert_true(bool(ArmyFixture.raise_now(_g, {"hex": ALESS, "kind": 0, "count": 2, "tag": MLO})["ok"]), "Milan raises")
 	assert_true(bool(_g.act("declare_war", {"target": MLO, "tag": SAV})["ok"]), "Savoy declares war on Milan")
 	for h: Vector2i in [IVREA, TURIN, VERCELLI]:
-		assert_true(bool(_g.act("raise", {"hex": h, "kind": 0, "count": 2, "tag": SAV})["ok"]), "two companies at %s" % str(h))
+		assert_true(bool(ArmyFixture.raise_now(_g, {"hex": h, "kind": 0, "count": 2, "tag": SAV})["ok"]), "two companies at %s" % str(h))
 	_ivrea = Armies.at(_g, IVREA)[0].id
 	_turin = Armies.at(_g, TURIN)[0].id
 	_vercelli = Armies.at(_g, VERCELLI)[0].id

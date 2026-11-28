@@ -78,7 +78,7 @@ func _in_order(via: PackedInt32Array, route: PackedInt32Array) -> bool:
 func test_a_march_with_via_round_trips_through_the_saved_log_and_replays_to_the_live_digest() -> void:
 	_g = ArmyFixture.game()  # nothing set outside the log: the replay starts from the same game
 	assert_true(_g.dev_money(SAV, 20000))
-	var raised := _g.act("raise", {"hex": TURIN, "kind": 0, "count": 2, "tag": SAV})
+	var raised := ArmyFixture.raise_now(_g, {"hex": TURIN, "kind": 0, "count": 2, "tag": SAV})
 	assert_true(bool(raised.ok), str(raised.get("reason", "")))
 	assert_true(bool(Season.run(_g).ok), "the raise musters a season")
 	var a := Armies.of_country(_g, SAV)[0]

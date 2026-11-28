@@ -122,7 +122,7 @@ func test_a_quiet_season_has_no_armies_section() -> void:
 func test_a_real_raise_season_draws_the_section_with_army_links() -> void:
 	var g := _rich_town_game()
 	var hex := ArmyFixture.find_town(g)
-	assert_true(bool(g.act("raise", {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
+	assert_true(bool(ArmyFixture.raise_now(g, {"hex": hex, "kind": 0, "count": 2, "tag": ArmyFixture.TAG})["ok"]))
 	Season.run(g)
 	var summary := SeasonSummary.of(g, ArmyFixture.TAG, g.turn - 1)
 	assert_false(_section(summary, &"armies").is_empty(), "the season has the Armies section")

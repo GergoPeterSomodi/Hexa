@@ -1,5 +1,6 @@
 ## Helpers shared by the M4 App tests (tests/shell/test_app_flow.gd and test_app_flow_m4.gd): rows of the tile window, toasts,
-## the chips' texts and the keys of a SubViewport. Pure statics: the tests own the nodes and the waiting.
+## the chips' texts and the keys of a SubViewport, and the console's setup raise. Pure statics: the tests own the nodes and the
+## waiting.
 class_name AppFlowHelpers
 extends RefCounted
 
@@ -55,6 +56,17 @@ static func toasts(app: App) -> Array[String]:
 
 static func has_toast(app: App, part: String) -> bool:
 	return toasts(app).any(func(m: String) -> bool: return m.contains(part))
+
+
+## A console raise as a test's setup ("raise c r kind [n]", also with "as TAG"): ArmyFixture.raise_now with the console as its
+## door, so the companies stand now. The console's answer. A test about the console's raise calls DevCommands.run itself.
+static func console_raise(ctx: ShellContext, line: String) -> String:
+	var said: Array[String] = [""]
+	var door := func(_action: String, _args: Dictionary) -> Dictionary:
+		said[0] = DevCommands.run(line, ctx)
+		return {"ok": said[0].begins_with("Done"), "reason": said[0]}
+	ArmyFixture.raise_now(Session.game, DevCommands.parse(line, Session.game)["args"], door)
+	return said[0]
 
 
 ## The Ducats chip's value as the bar shows it ("610").

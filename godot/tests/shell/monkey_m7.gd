@@ -326,7 +326,7 @@ func _m7_prepare(rng: Rng, vp: SubViewport, app: App) -> void:
 	for a: Army in Armies.at(game, ALESS):
 		milan_there = milan_there or a.tag == MLO
 	if not milan_there and Armies.at(game, ALESS).is_empty():
-		DevCommands.run("as MLO raise 7 9 pikemen 2", ctx)
+		AppFlowHelpers.console_raise(ctx, "as MLO raise 7 9 pikemen 2")
 	if not Wars.at_war(game, SAV, MLO):
 		await _m7_declare(rng, vp, app, MLO, true)
 	var mine: Array[Army] = Armies.of_country(game, SAV)
@@ -335,7 +335,7 @@ func _m7_prepare(rng: Rng, vp: SubViewport, app: App) -> void:
 		marching = marching or a.order == Army.ORDER_MARCH
 	if not marching:
 		if mine.is_empty() and Armies.at(game, VERCELLI).is_empty():
-			DevCommands.run("raise 6 9 pikemen 2", ctx)
+			AppFlowHelpers.console_raise(ctx, "raise 6 9 pikemen 2")
 			mine = Armies.of_country(game, SAV)
 		if not mine.is_empty():
 			var id := mine[0].id

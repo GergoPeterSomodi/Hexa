@@ -51,6 +51,13 @@ func _raise_two() -> Army:
 	return Armies.at(_g, TURIN)[0]
 
 
+## The same two companies where the army is only the setup of a march (ArmyFixture.raise_now).
+func _army_at_turin() -> Army:
+	var verdict := ArmyFixture.raise_now(_g, {"hex": TURIN, "kind": 0, "count": 2, "tag": SAV})
+	assert_true(bool(verdict["ok"]), "two companies are raised at Turin: %s" % verdict["reason"])
+	return Armies.at(_g, TURIN)[0]
+
+
 func _moved(army_id: int) -> Array:
 	var out: Array = []
 	for e: Dictionary in _g.events:
@@ -118,7 +125,7 @@ func test_e_the_spring_income_pays_the_upkeep_of_one_army() -> void:
 
 
 func test_b_ordered_to_vercelli_it_musters_in_spring_and_walks_the_bridge_in_summer() -> void:
-	var a := _raise_two()
+	var a := _army_at_turin()
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": VERCELLI, "tag": SAV}).ok))
 	_g.events.clear()
 	# It musters in spring; the End turn of spring walks summer's leg (moves-build-spec.md R22a, issue 474): across the Po.
@@ -159,7 +166,7 @@ func test_c_the_route_to_aosta_by_turin_costs_fifteen_and_waits_for_spring() -> 
 
 
 func test_d_out_of_supply_on_the_snow_the_army_starves_from_1000_to_648_and_walks_home() -> void:
-	var a := _raise_two()
+	var a := _army_at_turin()
 	assert_true(bool(Movement.march(_g, {"army": a.id, "goal": SNOW, "tag": SAV}).ok))
 	Season.run(_g)  # spring: it musters at Turin (fed there); the End turn walks summer's 11 points (R22a)
 	assert_eq(a.hex, SNOW, "eleven points: the snow at 3,169 m")
