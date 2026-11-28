@@ -2,8 +2,8 @@
   "schema": "hexa-godot/ui-kit/1",
   "tokens_sha": "af24011609f36f09a6d7d903c93e21bcfc4bc26c7383f782099b6222841d669e",
   "bytes_rgba": {
-    "kit_1x": 3754800,
-    "kit_2x": 15019200,
+    "kit_1x": 4026160,
+    "kit_2x": 16104640,
     "menu": 8812800
   },
   "pieces": {
@@ -3229,8 +3229,8 @@
       ],
       "subdir": "kit",
       "sha": {
-        "1x": "93b089097f927a00f4fbe22cd90da5a7cfacec5bc5152a1cfe6db5da00cb0406",
-        "2x": "16f2e3370b95b80599fdc8f1a2a21b7a3fcf4da40ea323dd3dae2681f4682c1d"
+        "1x": "8d993dc9282098b13fa87f90d4902f5bab6d305a037ab5b7c87c43228074eacf",
+        "2x": "c94c4f183e302a6a3ec5dd35c5a8b4457ef5e628ca37eaaf7cd4714fa2f55d83"
       },
       "check": "exact",
       "cell": [
@@ -3341,6 +3341,158 @@
         "2x": "1b223935881a4cce9fc050c132403326e1d6a3d10d5105ac1a93b937fc368c55"
       },
       "check": "exact"
+    },
+    "unit_figures": {
+      "size": [
+        256,
+        128
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "0c8f89da94625dc9ffc610cc25f901b54ef962c0fa198cbda9453c55a8575bc3",
+        "2x": "659b10e062c3361764e7e4275d5f151771d99f663e864d2c9a68654121df064c"
+      },
+      "check": "exact",
+      "cell": [
+        64,
+        64
+      ],
+      "icons": [
+        "fig_infantry_full",
+        "fig_missile_full",
+        "fig_cavalry_full",
+        "fig_artillery_full",
+        "fig_infantry_simple",
+        "fig_missile_simple",
+        "fig_cavalry_simple",
+        "fig_artillery_simple"
+      ]
+    },
+    "unit_figures_tint": {
+      "size": [
+        256,
+        128
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "8153f9bb4405ca8f1559a55704891844f63fb6c89d778925765c4ee9cc0529dc",
+        "2x": "1b5bd01cc806104116ecfa47effb405f64cf0228afd444a52421e90330e27e1d"
+      },
+      "check": "exact",
+      "cell": [
+        64,
+        64
+      ],
+      "icons": [
+        "fig_infantry_full_tint",
+        "fig_missile_full_tint",
+        "fig_cavalry_full_tint",
+        "fig_artillery_full_tint",
+        "fig_infantry_simple_tint",
+        "fig_missile_simple_tint",
+        "fig_cavalry_simple_tint",
+        "fig_artillery_simple_tint"
+      ]
+    },
+    "unit_signs": {
+      "size": [
+        96,
+        24
+      ],
+      "margin": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "content": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expand": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "axis": "stretch",
+      "fixed_height": false,
+      "min_width": 0,
+      "slice": 5,
+      "scales": [
+        1,
+        2
+      ],
+      "subdir": "kit",
+      "sha": {
+        "1x": "925f0acd8d311de819ab7eadc6339f83fad5d0da3f763f9588c9a71eefa86ec2",
+        "2x": "7335f4da8bbe2f4dad7dcd376a396d0a3a73b9bfd32ee388bf3af60cb5cc3b34"
+      },
+      "check": "exact",
+      "cell": [
+        24,
+        24
+      ],
+      "icons": [
+        "sign_infantry",
+        "sign_missile",
+        "sign_cavalry",
+        "sign_artillery"
+      ]
     },
     "badge_battle": {
       "size": [

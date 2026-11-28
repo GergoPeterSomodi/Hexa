@@ -33,6 +33,7 @@ from tools.ui_bake.pieces_frames import PieceSpec, frame_pieces
 from tools.ui_bake.pieces_hud import hud_pieces
 from tools.ui_bake.pieces_m2 import m2_pieces
 from tools.ui_bake.pieces_m6 import ARMY_ICON_NAMES, FIGURE_NAMES, check_m6_pieces, m6_pieces, write_token_sheet
+from tools.ui_bake.pieces_units import CELL as UNIT_CELL, SIGN_CELL, SIGN_NAMES, UNIT_FIGURE_NAMES, UNIT_TINT_NAMES
 from tools.ui_bake.pieces_m7 import WAR_ICON_NAMES, check_m7_pieces, m7_pieces, write_war_sheet
 from tools.ui_bake.png import load_png_rgba, rgba_sha256, save_png
 from tools.ui_bake.tokens import TokenTable, load_tokens
@@ -155,6 +156,15 @@ def build_kit_index(
         if sp.name == "figures":
             entry["cell"] = [32, 32]
             entry["icons"] = list(FIGURE_NAMES)
+        if sp.name == "unit_figures":
+            entry["cell"] = [UNIT_CELL, UNIT_CELL]
+            entry["icons"] = list(UNIT_FIGURE_NAMES)
+        if sp.name == "unit_figures_tint":
+            entry["cell"] = [UNIT_CELL, UNIT_CELL]
+            entry["icons"] = list(UNIT_TINT_NAMES)
+        if sp.name == "unit_signs":
+            entry["cell"] = [SIGN_CELL, SIGN_CELL]
+            entry["icons"] = list(SIGN_NAMES)
         if sp.name == "icons_army":
             entry["cell"] = [24, 24]
             entry["icons"] = list(ARMY_ICON_NAMES)

@@ -30,8 +30,10 @@ const SLICE4_RENAMES: Dictionary[String, String] = {"study": "study_24", "info":
 
 ## Slice 5 icons (m6-build-spec.md 6.2): four whole textures, and two atlases whose cells become 32 px figure and 24 px
 ## army icons (`fig_infantry`... `march`...), named in ui_kit.json's `icons` list of each atlas, 1x and 2x like the others.
+## UR1 (recruitment-queue.md 12.2) adds option D's unit figures: 64 px cells `fig_*_full` and `fig_*_simple` (drawn over)
+## with their `*_tint` cells (white, drawn first in the country colour), and the 24 px far-zoom signs `sign_*`.
 const SLICE5_DIRECT: Array[String] = ["army_plate", "army_plate_ring", "army_badge", "path_stop"]
-const SLICE5_ATLASES: Array[String] = ["figures", "icons_army"]
+const SLICE5_ATLASES: Array[String] = ["figures", "icons_army", "unit_figures", "unit_figures_tint", "unit_signs"]
 
 ## Slice 6 icons (m7-build-spec.md 6.2): two badges and the die face are whole icons; `icons_war` is an atlas of 24 px cells.
 const SLICE6_DIRECT: Array[String] = ["badge_battle", "badge_siege", "die_face"]
