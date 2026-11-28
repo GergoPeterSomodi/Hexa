@@ -115,7 +115,8 @@ def parse_log(text: str) -> dict:
         elif "[Pending]" in line and test:
             pending.add((script, test))
         else:
-            found = re.match(r"(Scripts|Tests|Passing Tests|Failing Tests|Risky/Pending|Asserts)\s+(\d+)$", line)
+            # With failures GUT prints the asserts as "passed/all": the last number is the count.
+            found = re.match(r"(Scripts|Tests|Passing Tests|Failing Tests|Risky/Pending|Asserts)\s+(?:\d+/)?(\d+)$", line)
             if found:
                 totals[found.group(1)] = int(found.group(2))
     return {"scripts": scripts, "pending": pending, "totals": totals}
