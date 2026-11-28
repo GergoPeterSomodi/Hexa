@@ -262,6 +262,10 @@ func _m8_while_moving(rng: Rng, vp: SubViewport, app: App) -> void:
 func _m8_while_replaying(rng: Rng, vp: SubViewport, app: App) -> void:
 	var roll := rng.randi_range(0, 3)
 	if roll == 0 or roll == 3:
+		# A screen opened while the countries moved (the study, the pause menu) may still be up: the season ends under it and
+		# its replay waits there, and Space is the screen's key (its focused button), not the map's. The player closes it first
+		# (its own Back: Esc would skip the replay itself, M6 6.4); then Space on the map must skip the replay.
+		await _m8_uncover(app)
 		_send_chord(vp, KEY_SPACE)
 		var skipped := await _m8_wait_until(func() -> bool: return app.requests().flow.state() != SeasonFlow.State.REPLAY, M8_WAIT_LIMIT)
 		assert_true(skipped, "%s: Space skips the replay" % _tag)
@@ -273,6 +277,17 @@ func _m8_while_replaying(rng: Rng, vp: SubViewport, app: App) -> void:
 	else:
 		_send_click(vp, _m8_point(rng, vp), MOUSE_BUTTON_LEFT)
 		_bump("m8_blocked_clicks")
+
+
+## Closes the screens over the map with their own Back (the stack's back), not Esc: in REPLAY Esc skips the replay before the
+## ladder (M6 6.4), and the replay step's Space must be the one that skips it.
+func _m8_uncover(app: App) -> void:
+	var guard := 0
+	while app.stack().count() > 0 and guard < 6:
+		app.stack().back()
+		await _wait_frames(2)
+		guard += 1
+	assert_eq(app.stack().count(), 0, "%s: the screens over the replay closed" % _tag)
 
 
 func _m8_console(rng: Rng, vp: SubViewport, app: App) -> void:
