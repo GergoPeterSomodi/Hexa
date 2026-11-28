@@ -319,7 +319,8 @@ Same checks and actions, no shortcut. Without the two changes below its wars sta
 
 - wanted = war goal of men / (`AiDef.companies_per_barracks` 4 x 500 men), rounded up, at least 1. The war goal is used in
   peace too, so barracks stand before the war. At the start: Milan and Venice want 3, Savoy and Switzerland 2, the rest 1;
-- it has: usable barracks plus barracks under way;
+- it has: usable barracks plus barracks under way. Neither counts on occupied land (a work that a siege or the winter
+  halts still counts);
 - with **none**, it builds as soon as it can pay (its money reserve waived); with fewer than wanted, one at a time and only
   keeping its reserve;
 - where: a town or bigger that passes the check, not on the front, nearest the front first; if all are on the front, the
