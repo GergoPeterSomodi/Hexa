@@ -52,10 +52,21 @@ static func site_check(game: Game, hex: Vector2i) -> Dictionary:
 		return _refusal(NO_SETTLEMENT)
 	if has_barracks(game, hex):
 		return _refusal(ALREADY)
-	if int(game.state.level[i]) < def.min_level:
-		var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
-		return _refusal("a barracks is built in a %s or larger" % str(words[clampi(def.min_level, 0, words.size() - 1)]))
+	var small := size_reason(game, hex)
+	if small != "":
+		return _refusal(small)
 	return {"ok": true, "reason": ""}
+
+
+## "" when the settlement of `hex` is large enough for a barracks (or there are no numbers or no hex to ask about), else
+## the town rule's words: the tile window locks the tile by them.
+static func size_reason(game: Game, hex: Vector2i) -> String:
+	var def := def_of(game)
+	var i := game.map.index_of(hex)
+	if def == null or i < 0 or int(game.state.level[i]) >= def.min_level:
+		return ""
+	var words: Array = FamilyIds.LEVEL_WORDS["settlements"]
+	return "a barracks is built in a %s or larger" % str(words[clampi(def.min_level, 0, words.size() - 1)])
 
 
 ## A barracks stands from now (a finished work, or the developer's): put, then a hex_changed, so that the district's

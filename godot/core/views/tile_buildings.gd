@@ -9,6 +9,9 @@
 ## source, Improve.build_options and the piece on the hex) with a refused verdict "one job at a time: <the work> is under
 ## way": no rule or check is changed, only the listing. A built row's gain and upkeep are the negated clearing card's
 ## year.gain and lands.upkeep: an approximation of what the piece is worth a year (the tests pin that equality).
+## The barracks (recruitment-queue.md 8) has a tile of its own in the settlement's strip: built, building, or the offer on a
+## settlement with none. Its rows carry kind &"barracks" and level 0; it has no gain, and a built settlement's figures leave
+## its upkeep out (BarracksView.settlement_alone), so the summary counts it once.
 class_name TileBuildings
 extends RefCounted
 
@@ -21,7 +24,8 @@ const STATES: Array[StringName] = [&"built", &"building", &"ready", &"short", &"
 ## {summary: {make, upkeep} (null until `full`), groups: Array[{id, name, slots ({}: no slots yet), rows}]}; {} off own land.
 ## Rows: {id, group, name, icon (a family name), option ({} for built or a work), state, state_text, tone (good, bad, plain,
 ## muted), progress (0..1, building only), gain (int or null), upkeep (int or null, a cost a year), cost {ducats, goods},
-## build_seasons, payback ({} or {seasons (-1: never), text}), hammer (the verdict is ok), reason, gate ({} until M9.5/M11)}.
+## build_seasons, payback ({} or {seasons (-1: never), text}), hammer (the verdict is ok), reason, gate ({} until M9.5/M11)};
+## a barracks row also {kind, level (0)}, its offer also {expensive}.
 static func of(game: Game, tag: StringName, hex: Vector2i, full: bool = false) -> Dictionary:
 	if game == null or game.defs == null or not _is_own(game, tag, hex):
 		return {}
@@ -93,9 +97,13 @@ static func _make(game: Game, tag: StringName, hex: Vector2i, full: bool) -> Dic
 	var piece := Improve.piece_at(game, hex)
 	if not piece.is_empty():
 		rows.append(_built_row(game, tag, hex, piece, full))
+	if Recruiting.has_barracks(game, hex):
+		rows.append(_barracks_built_row(game, full))
 	var work := WorksView.at(game, hex, tag)
 	if not work.is_empty():
 		rows.append(_work_row(work))
+	if BarracksView.offered(game, hex):
+		rows.append(_barracks_offer_row(game, tag, hex, work, full))
 	var offers: Array[Dictionary] = _busy_offers(game, hex, work) if not work.is_empty() else ImprovePreview.options_of(game, tag, hex)
 	for offer: Dictionary in offers:
 		rows.append(_option_row(game, tag, hex, offer, full))
@@ -111,6 +119,7 @@ static func _built_row(game: Game, tag: StringName, hex: Vector2i, piece: Dictio
 	var state_text := "working"
 	if full:
 		var card := ImprovePreview.of(game, tag, hex, {"action": Works.CLEAR, "family": family})
+		card = BarracksView.settlement_alone(game, hex, card)
 		gain = _card_gain(card, -1)
 		upkeep = _card_upkeep(card, -1)
 		if upkeep != null:
@@ -123,14 +132,44 @@ static func _built_row(game: Game, tag: StringName, hex: Vector2i, piece: Dictio
 	}
 
 
+## A standing barracks: working, with its upkeep a year (`full`, a game with countries) and no gain; on a village too.
+static func _barracks_built_row(game: Game, full: bool) -> Dictionary:
+	var upkeep: Variant = BarracksView.upkeep_a_year(game) if full and game.has_countries() else null
+	return {
+		"id": "built:barracks", "group": &"settlement", "name": BarracksView.NAME, "icon": BarracksView.ICON, "option": {},
+		"state": &"built", "state_text": "working" if upkeep == null else "working · upkeep %d" % int(upkeep),
+		"tone": &"good", "progress": 0.0, "gain": null, "upkeep": upkeep, "cost": {"ducats": 0, "goods": {}},
+		"build_seasons": 0, "payback": {}, "hammer": false, "reason": "", "gate": {}, "kind": BarracksView.KIND, "level": 0,
+	}
+
+
+## The barracks' tile as an offer: the check's verdict, or "one job at a time" while another work is under way; locked
+## ("needs a town") where the town rule is the first refusal.
+static func _barracks_offer_row(game: Game, tag: StringName, hex: Vector2i, work: Dictionary, full: bool) -> Dictionary:
+	var busy := not work.is_empty()
+	var offer := _offer(Works.BARRACKS, 0, BarracksView.NAME, _busy_words(work)) if busy else {"action": Works.BARRACKS,
+		"family": 0, "label": BarracksView.NAME, "verdict": game.check(Works.game_action(Works.BARRACKS), {"hex": hex, "tag": tag})}
+	var row := _option_row(game, tag, hex, offer, full)
+	var card := ImprovePreview.of(game, tag, hex, BarracksView.option())
+	row.merge({"group": &"settlement", "icon": BarracksView.ICON, "kind": BarracksView.KIND, "level": 0,
+		"expensive": bool(card.get("expensive", false))}, true)
+	var small := Recruiting.size_reason(game, hex)
+	if not busy and small != "" and str((offer["verdict"] as Dictionary).get("reason", "")) == small:
+		row.merge({"state": &"locked", "state_text": BarracksView.needs_words(game), "tone": &"muted",
+			"reason": ImprovePreview.reason_words(game, hex, BarracksView.option(), offer["verdict"])}, true)
+	return row
+
+
 ## The work under way: building, with its progress ("1 of 4 seasons" read from WorksView) and its family (WorksView.at
-## gives it; a fresh build has its own family, not the piece's). family 0 falls to Land.
+## gives it; a fresh build has its own family, not the piece's). family 0 falls to Land. A barracks work is the barracks'
+## tile.
 static func _work_row(work: Dictionary) -> Dictionary:
 	var family := int(work.get("family", 0))
+	var barracks := StringName(str(work.get("action", ""))) == Works.BARRACKS
 	var parts := str(work["progress"]).split(" ")
 	var done := int(parts[0]) if parts.size() >= 3 else 0
 	var total := maxi(int(parts[2]) if parts.size() >= 3 else 1, 1)
-	return {
+	var row := {
 		"id": "work", "group": _group_of(family), "name": _capital(str(work["label"])),
 		"icon": FamilyIds.NAMES[family] if family > 0 else "", "option": {}, "state": &"building",
 		"state_text": "building · %s" % str(work["progress"]), "tone": &"plain",
@@ -138,6 +177,9 @@ static func _work_row(work: Dictionary) -> Dictionary:
 		"cost": {"ducats": 0, "goods": {}}, "build_seasons": total, "payback": {}, "hammer": false,
 		"reason": "", "gate": {},
 	}
+	if barracks:
+		row.merge({"icon": BarracksView.ICON, "kind": BarracksView.KIND, "level": 0}, true)
+	return row
 
 
 ## A build, upgrade or clear option: its verdict (the hammer is its ok), its state and its words, and with `full` its card.
@@ -188,7 +230,7 @@ static func _option_row(game: Game, tag: StringName, hex: Vector2i, offer: Dicti
 ## upgrade and clear), each with a refused verdict "one job at a time: <the work> is under way". Listing only: the rules and
 ## the checks are not asked.
 static func _busy_offers(game: Game, hex: Vector2i, work: Dictionary) -> Array[Dictionary]:
-	var why := "one job at a time: %s is under way" % str(work["label"])
+	var why := _busy_words(work)
 	var out: Array[Dictionary] = []
 	var piece := Improve.piece_at(game, hex)
 	if piece.is_empty():
@@ -202,6 +244,10 @@ static func _busy_offers(game: Game, hex: Vector2i, work: Dictionary) -> Array[D
 		out.append(_offer(Works.UPGRADE, use, "Upgrade to %s" % HexCard.level_label(FamilyIds.NAMES[use], level + 1), why))
 	out.append(_offer(Works.CLEAR, use, "Clear %s" % WorksView.piece_name(use), why))
 	return out
+
+
+static func _busy_words(work: Dictionary) -> String:
+	return "one job at a time: %s is under way" % str(work.get("label", ""))
 
 
 static func _offer(action: StringName, family: int, label: String, why: String) -> Dictionary:

@@ -5,6 +5,8 @@
 ## Sections are {head, lines: [[label, tone, text]]}; a section with no line is left out, and the cost lines are always
 ## worked out from Works.cost_of, so a refused card keeps them. Issue 436 round 3 (H5): `heading` is the card's action ("Upgrade
 ## to city", "Build a vineyard"; the building's stage for a standing piece), `subheading` what stands now; all money is a year.
+## The barracks (recruitment-queue.md 8; option BarracksView.option()) has one card for its tile, built, being built or on
+## offer: what it is for and its upkeep a year, never a gain. A standing settlement's card leaves the barracks' upkeep out.
 class_name BuildingCard
 extends RefCounted
 
@@ -27,6 +29,8 @@ static func of(game: Game, tag: StringName, hex: Vector2i, option: Dictionary) -
 	if option.is_empty():
 		return _built(game, tag, hex)
 	var action := StringName(str(option.get("action", "")))
+	if action == Works.BARRACKS:
+		return _barracks(game, tag, hex)
 	if action == Works.BUILD:
 		return _offer(game, tag, hex, Works.BUILD, int(option.get("family", 0)), 1)
 	if action == Works.UPGRADE:
@@ -61,6 +65,41 @@ static func _offer(game: Game, tag: StringName, hex: Vector2i, action: StringNam
 	}
 
 
+## The barracks' card: standing (it stands here), being built (how far, and when ready) or on offer (the price and the
+## check's verdict); {} where the hex has no barracks tile.
+static func _barracks(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
+	var work := WorksView.at(game, hex, tag)
+	var building := StringName(str(work.get("action", ""))) == Works.BARRACKS
+	var built := Recruiting.has_barracks(game, hex)
+	if not (built or building or BarracksView.offered(game, hex)):
+		return {}
+	var sections: Array = [{"head": "", "lines": [[BarracksView.ABOUT, TONE_PLAIN]]}]
+	var upkeep := BarracksView.upkeep_a_year(game)
+	if upkeep != 0:
+		sections.append({"head": "" if built else HEAD_YEAR,
+			"lines": [["Upkeep a year", TONE_BAD, Words.signed_ducats(-upkeep)]]})
+	var title := "%s in %s" % [BarracksView.NAME, ImproveCardParts.named(game, hex)]
+	var heading := BarracksView.NAME
+	var verdict := {"ok": true, "text": BUILT_TEXT, "tone": TONE_GOOD}
+	if building:
+		verdict = {"ok": true, "text": _being_built(work), "tone": TONE_PLAIN}
+	elif not built:
+		var preview := ImprovePreview.of(game, tag, hex, BarracksView.option())
+		sections.append({"head": HEAD_COST, "lines": _cost_lines(game, Works.BARRACKS, 0, 0, preview)})
+		heading = "Build: %s" % BarracksView.NAME
+		verdict = _verdict(game, tag, preview, Works.BARRACKS, 0, 0)
+	return {"title": title, "kind": BarracksView.NAME, "sections": sections, "heading": heading, "subheading": title,
+		"verdict": verdict}
+
+
+## "Being built: 1 of 4 seasons, ready Spring 1481.", with "stopped for the winter" or "halted by war" while halted.
+static func _being_built(work: Dictionary) -> String:
+	var ready := str(work["ready"])
+	if ready == "halted by war":
+		return "Being built: halted by war."
+	return "Being built: %s, ready %s." % ["stopped for the winter" if bool(work["halted"]) else str(work["progress"]), ready]
+
+
 ## The card of a standing piece: what it makes and its upkeep (the clearing card, turned round), no cost.
 static func _built(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
 	var piece := Improve.piece_at(game, hex)
@@ -68,6 +107,7 @@ static func _built(game: Game, tag: StringName, hex: Vector2i) -> Dictionary:
 		return {}
 	var family := int(piece["family_id"])
 	var preview := ImprovePreview.of(game, tag, hex, {"action": Works.CLEAR, "family": family})
+	preview = BarracksView.settlement_alone(game, hex, preview)
 	var sections: Array = []
 	var workers := _workers(preview, true)
 	if not workers.is_empty():

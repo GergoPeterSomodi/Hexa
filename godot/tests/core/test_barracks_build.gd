@@ -275,8 +275,8 @@ func test_it_stands_after_four_seasons() -> void:
 	assert_true(changed, "a finished barracks says the hex changed")
 	assert_eq(_why(g, _town), "a barracks stands here already")
 	var line := LogLines.line_of(g, g.chronicle.entries[_entry_of(g, "work_finished", _town)], MLO)
-	assert_eq(line["text"], "Finished: %s." % WorksView.line(g, Work.from_dict(finished[0]["work"] as Dictionary)))
-	assert_string_starts_with(str(line["text"]), "Finished: barracks, ")
+	assert_eq(line["text"], "Barracks finished %s." % Words.at(g, (Work.from_dict(finished[0]["work"] as Dictionary)).hex))
+	assert_string_starts_with(str(line["text"]), "Barracks finished at ")
 	var report := JSON.stringify(SeasonSummary.of(g, MLO, g.turn - 1))
 	assert_string_contains(report, "Upkeep 1 a season.", "the report names the barracks' own upkeep")
 

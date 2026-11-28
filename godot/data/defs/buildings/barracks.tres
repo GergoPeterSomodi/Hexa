@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_barracks")
 cost = 150
-cost_goods = Dictionary[String, int]({"stone": 10, "timber": 10})
+cost_goods = Dictionary[String, int]({"timber": 10, "stone": 10})
 seasons = 4
 upkeep = 1
 min_level = 3

@@ -19,6 +19,19 @@
 ##   tile_short            Genoa short of ducats (the short tile's red rim and "!", the line under the strip)
 ##   tile_many             the Town tab with the 26-tile fixture of test_tile_window_strips.gd (the strips wrap)
 ##   tile_own_town_folded  the Town tab with People and food and Made here folded (M8)
+## The barracks' tile (recruitment-queue.md 8), each hovered so its card shows beside the window:
+##   tile_barracks_built   Genoa, whose barracks stands
+##   tile_barracks_ready   another town of Genoa's: the offer; _1024 the same in a 1024 x 600 window
+##   tile_barracks_card    that town's works card, open over the map
+##   tile_barracks_building
+##                         that town with the barracks under way (the tile's bar, the queue's row, the map's mark)
+##   tile_barracks_short   that town short of ducats
+##   tile_barracks_slot    that town with every work slot taken
+##   tile_barracks_siege   that town besieged
+##   tile_barracks_locked  that town shrunk to a village ("needs a town"; Genoa has no village of its own)
+##   tile_barracks_village the same village with a barracks standing
+##   tile_barracks_sight   another country's settlement in sight with a barracks: the land facts
+##   tile_barracks_fog     a light-fog fortress of another country with a barracks (nothing is told)
 ## Every scene prints the window's rect and the map's ("shot_ui_tile: <scene> ... window <rect> map <rect>"): the window is one
 ## size for all of them, and the map keeps its room.
 ##
@@ -46,7 +59,9 @@ const SCENES: Array[String] = [
 	"tile_own_town", "tile_own_town_facts", "tile_own_town_hover", "tile_own_army", "tile_own_ships", "tile_own_army_cap",
 	"tile_wild_town", "tile_castle_town", "tile_foreign_town", "tile_sight_town", "tile_sea_town", "tile_deep",
 	"tile_own_army_1024", "tile_own_town_1024", "tile_queue_idle", "tile_building", "tile_short", "tile_many",
-	"tile_own_town_folded",
+	"tile_own_town_folded", "tile_barracks_built", "tile_barracks_ready", "tile_barracks_ready_1024", "tile_barracks_card",
+	"tile_barracks_building", "tile_barracks_short", "tile_barracks_slot", "tile_barracks_siege", "tile_barracks_locked",
+	"tile_barracks_village", "tile_barracks_sight", "tile_barracks_fog",
 ]
 const LAND_FACTS := preload("res://shell/panels/tile_tabs/land_facts.gd")
 ## The 26-tile fixture's Town tab (as test_tile_window_strips.gd's).
@@ -65,7 +80,7 @@ func fill(game: Game, viewer: StringName, hex: Vector2i, _view: Dictionary) -> v
 """
 const MANY_STATES: Array[StringName] = [&"built", &"building", &"ready", &"short", &"locked", &"refused"]
 ## The scenes played on the thin game (UiSample.fog): deep fog and light fog exist there.
-const THIN: Array[String] = ["tile_foreign_town", "tile_deep"]
+const THIN: Array[String] = ["tile_foreign_town", "tile_deep", "tile_barracks_fog"]
 
 var _out_dir := DEFAULT_OUT_DIR
 var _scales: Array[int] = []
@@ -248,8 +263,8 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 	var ms := app.call("map_scene") as Object
 	var picks: Dictionary = UiSample.fog(g) if THIN.has(scene_name) else {}
 	LAND_FACTS.folded = {}
-	if scene_name == "tile_short":
-		session.call("dev_money", GEN, 150 - Countries.by_tag(g, GEN).treasury)
+	if scene_name == "tile_short" or scene_name == "tile_barracks_short":
+		session.call("dev_money", GEN, (150 if scene_name == "tile_short" else 120) - Countries.by_tag(g, GEN).treasury)
 	else:
 		session.call("dev_money", GEN, DEV_MONEY)
 	var hex := Vector2i(-1, -1)
@@ -292,6 +307,8 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 				return str(view.get("case", "")) == "sea" and (view["hex"] as Vector2i).distance_to(GENOA) < 3.0)
 		"tile_deep":
 			hex = picks.get("deep", Vector2i(-1, -1))
+	if scene_name.begins_with("tile_barracks_"):
+		hex = _barracks_scene(g, session, scene_name, picks)
 	if hex.x < 0:
 		printerr("shot_ui_tile: %s found no hex" % scene_name)
 		return false
@@ -329,11 +346,83 @@ func _prepare(app: Node, scene_name: String, session: Node) -> bool:
 			if not (tile.call("hammer") as Button).disabled:
 				tile.mouse_entered.emit()
 				break
+	if scene_name.begins_with("tile_barracks_"):
+		await _show_barracks(app, window, hex, scene_name)
 	_quiet(app)
 	await _wait_frames(3)
 	print("shot_ui_tile: %s hex %s tabs %s live %s" % [scene_name, str(hex), str(window.call("tab_ids")),
 		str(window.call("live_tab_ids"))])
 	return true
+
+
+## The hex of a barracks scene with the game made ready for it (see the module comment); (-1, -1) when there is none.
+func _barracks_scene(g: Game, session: Node, scene_name: String, picks: Dictionary) -> Vector2i:
+	var town := _settlement(g, 3, 5)
+	var hex := town
+	match scene_name:
+		"tile_barracks_built":
+			hex = GENOA
+		"tile_barracks_building":
+			session.call("act", "build_barracks", {"hex": town, "tag": GEN})
+		"tile_barracks_slot":
+			_fill_slots(g, session, town)
+		"tile_barracks_siege":
+			WarFixture.at_war(g, &"SAV", GEN)
+			var siege := Siege.new()
+			siege.hex = town
+			siege.besieger = &"SAV"
+			g.sieges.append(siege)
+			g.version += 1
+		"tile_barracks_locked", "tile_barracks_village":
+			g.state.level[g.map.index_of(town)] = 2
+			g.districts.clear()
+			if scene_name == "tile_barracks_village":
+				Recruiting.put(g, town)
+			g.version += 1
+		"tile_barracks_sight":
+			hex = _find(g, func(view: Dictionary) -> bool:
+				return str(view.get("case", "")) == "foreign" and str(view.get("sight", "")) == "sight" 					and not (view["header"]["picture"] as Dictionary).is_empty())
+			Recruiting.put(g, hex)
+			g.version += 1
+		"tile_barracks_fog":
+			hex = picks.get("fortress", Vector2i(-1, -1))
+			if hex.x >= 0:
+				Recruiting.put(g, hex)
+				g.version += 1
+	return hex
+
+
+## Genoa's first settlement (by index) with no barracks and a level from `from` to `to`; (-1, -1) when none.
+func _settlement(g: Game, from: int, to: int) -> Vector2i:
+	for i: int in Territory.districts(g, Countries.by_tag(g, GEN).id):
+		var level := int(g.state.level[i])
+		if int(g.state.main_use[i]) == ImproveRules.SETTLEMENT and g.state.barracks[i] == 0 and level >= from and level <= to:
+			return g.map.hex_of(i)
+	return Vector2i(-1, -1)
+
+
+## Takes every work slot of Genoa with builds away from `keep`.
+func _fill_slots(g: Game, session: Node, keep: Vector2i) -> void:
+	for i: int in Territory.districts(g, Countries.by_tag(g, GEN).id):
+		if Works.in_use(g, GEN) >= Works.slots(g, GEN):
+			return
+		var hex := g.map.hex_of(i)
+		for option: Dictionary in Improve.build_options(g, hex):
+			if hex != keep and bool(Works.build_check(g, {"hex": hex, "family": int(option["family_id"]), "tag": GEN})["ok"]):
+				session.call("act", "build", {"hex": hex, "family": int(option["family_id"]), "tag": GEN})
+				break
+
+
+## Hovers the barracks tile (its card shows), or opens its works card; the foreign scenes have no tile.
+func _show_barracks(app: Node, window: Control, hex: Vector2i, scene_name: String) -> void:
+	if scene_name == "tile_barracks_card":
+		var works: Object = (app.call("requests") as Object).get("works") as Object
+		works.call("show_card", hex, BarracksView.option(), true)
+		await _wait_frames(4)
+		return
+	for tile: Control in window.call("building_rows") as Array:
+		if (tile.call("data") as Dictionary).get("kind", &"") == BarracksView.KIND:
+			tile.mouse_entered.emit()
 
 
 ## The 26-tile fixture of test_tile_window_strips.gd: three groups of 12, 8 and 6 tiles in every state.

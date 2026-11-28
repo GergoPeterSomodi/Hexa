@@ -40,6 +40,7 @@ const FAMILY_ICONS: Dictionary = {
 	"settlements": &"settlement", "castles": &"castle", "wheat": &"good_grain", "hemp": &"good_hemp", "silk": &"good_silk",
 	"dyes": &"good_dyes", "vineyard": &"good_wine", "olives": &"good_oil", "grazing": &"good_cattle",
 	"timber": &"good_timber", "mines": &"jobs", "quarry": &"good_stone", "salt": &"good_salt", "harbour": &"port_dues",
+	"barracks": &"barracks",
 }
 ## The tile's look by row state.
 const STATE_VARIATIONS := {&"built": &"PanelTileTile", &"building": &"PanelTileTileWork", &"ready": &"PanelTileTileFree",
@@ -195,7 +196,7 @@ func press_hammer() -> void:
 		hammer_pressed.emit(_data)
 
 
-## The action of the row's option ("build", "upgrade", "clear"); "" for a built or a work row.
+## The action of the row's option ("build", "upgrade", "clear", "barracks"); "" for a built or a work row.
 func _action() -> String:
 	var option: Dictionary = _data.get("option", {})
 	return str(option.get("action", ""))
@@ -342,7 +343,7 @@ func _fill_texts() -> void:
 		_hammer.disabled = true
 	var reason := str(_data.get("reason", ""))
 	var busy := state == &"building" or reason.begins_with("one job at a time")
-	var verb := "%s %s" % [_verb_of(_action()), name_text]
+	var verb := "Build a barracks" if _action() == str(Works.BARRACKS) else "%s %s" % [_verb_of(_action()), name_text]
 	_hammer.tooltip_text = verb
 	_hammer.accessibility_name = verb
 	# The button's tooltip is its verdict's reason while it is refused: a busy hex says so in one line.

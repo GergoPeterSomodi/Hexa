@@ -340,19 +340,20 @@ static func _work_line(game: Game, entry: Dictionary, mine: bool) -> Dictionary:
 	var why := str(entry.get("why", ""))
 	var line := {"hex": work.hex, "notify": false, "floating": ""}
 	if mine:
-		var place := WorksView.line(game, work)
 		match kind:
 			"work_started":
 				line.merge({"keyword": "Begun", "tone": "plain",
 					"floating": ("Begun %s" % Words.signed(-work.paid)) if work.paid > 0 else "Begun",
-					"text": "Begun: %s. Ready %s.%s" % [place, ready_text(game, work, turn), _paid_text(entry)]}, true)
+					"text": "%s. Ready %s.%s" % [WorksView.headline(game, work, "begun", "Begun"),
+						ready_text(game, work, turn), _paid_text(entry)]}, true)
 			"work_finished":
 				line.merge({"keyword": "Finished", "tone": "good", "floating": "Finished", "notify": true,
-					"text": "Finished: %s." % place}, true)
+					"text": "%s." % WorksView.headline(game, work, "finished", "Finished")}, true)
 			_:
+				var head := WorksView.headline(game, work, "cancelled", "Cancelled")
 				line.merge({"keyword": "Cancelled", "tone": "bad", "floating": "Cancelled",
 					"notify": why == "lost" or why == "blocked",
-					"text": cancelled_text(place, why, str(entry.get("reason", ""))) + _paid_text(entry)}, true)
+					"text": cancelled_text(head, why, str(entry.get("reason", ""))) + _paid_text(entry)}, true)
 		return line
 	var who := short_name(game, StringName(str(entry.get("tag", ""))))
 	var at := "(%d, %d)" % [work.hex.x, work.hex.y]
@@ -395,13 +396,14 @@ static func _paid_text(entry: Dictionary) -> String:
 	return ""
 
 
-## "Cancelled: <place>." (by order), "Cancelled: <place>, the land was lost." or "Cancelled: <place>: <reason>."
-static func cancelled_text(place: String, why: String, reason: String) -> String:
+## The headline of a cancelled work ("Cancelled: <place>" or "Barracks cancelled at <place>") by order, "<head>, the land
+## was lost." or "<head>: <reason>."
+static func cancelled_text(head: String, why: String, reason: String) -> String:
 	if why == "lost":
-		return "Cancelled: %s, the land was lost." % place
+		return "%s, the land was lost." % head
 	if why == "blocked":
-		return "Cancelled: %s: %s." % [place, reason]
-	return "Cancelled: %s." % place
+		return "%s: %s." % [head, reason]
+	return "%s." % head
 
 
 ## "Spring 1481": the season a work begun in season `turn` stands from, skipping halted seasons (as Works.ready_turn,

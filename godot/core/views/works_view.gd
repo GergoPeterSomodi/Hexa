@@ -35,18 +35,34 @@ static func line(game: Game, work: Work) -> String:
 	return "%s, %s" % [label(game, work), Words.place(game, work.hex)]
 
 
-## The work on `hex` as {label, tag, progress ("1 of 4 seasons"), ready ("Spring 1481"), ready_turn, halted (halted in
-## the current season), started_turn}; {} when none. The progress counts the season under way. The viewer (default "": sees
-## all) gets nothing for a hex it has not discovered (R18, a foreign work is a fact of the land).
+## The headline of a work's toast or line: "Barracks begun at Asti (8, 10)" for a barracks (`verb`: begun, finished or
+## cancelled), else "<lead>: <the label and its place>" ("Work begun: vineyard, first stage, near Savona (7, 12)").
+static func headline(game: Game, work: Work, verb: String, lead: String) -> String:
+	if work.action == Works.BARRACKS:
+		return "Barracks %s %s" % [verb, Words.at(game, work.hex)]
+	return "%s: %s" % [lead, line(game, work)]
+
+
+## The work on `hex` as {label, action, tag, progress ("1 of 4 seasons"), ready ("Spring 1481"), ready_turn, halted
+## (halted in the current season), started_turn, family}; {} when none or when the viewer is not told of it (`told`). The
+## progress counts the season under way. The viewer "" (the default) sees all.
 static func at(game: Game, hex: Vector2i, viewer: StringName = &"") -> Dictionary:
 	if game == null or game.state == null:
 		return {}
-	if game.has_countries() and not Knowledge.discovered(game, viewer, hex):
-		return {}
 	for work: Work in game.state.works:
 		if work.hex == hex:
-			return _entry(game, work)
+			return _entry(game, work) if told(game, work, viewer) else {}
 	return {}
+
+
+## Whether `viewer` is told of `work`: its hex is discovered (R18, a foreign work is a fact of the land), and a barracks of
+## another country only while the hex is in sight (recruitment-queue.md 6). Everyone in a game without countries.
+static func told(game: Game, work: Work, viewer: StringName) -> bool:
+	if not game.has_countries():
+		return true
+	if not Knowledge.discovered(game, viewer, work.hex):
+		return false
+	return work.action != Works.BARRACKS or work.tag == viewer or Knowledge.sees(game, viewer, work.hex)
 
 
 ## The season from which the work stands (Works.ready_turn: halted seasons are skipped).
@@ -111,6 +127,7 @@ static func _entry(game: Game, work: Work) -> Dictionary:
 	var done := clampi(work.seasons - work.seasons_left + 1, 1, maxi(work.seasons, 1))
 	return {
 		"label": label(game, work),
+		"action": work.action,
 		"tag": work.tag,
 		"progress": "%d of %s" % [done, Words.seasons(work.seasons)],
 		"ready": Works.ready_words(game, work),

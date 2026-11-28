@@ -75,15 +75,19 @@ static func dimmed(view: Dictionary) -> String:
 
 
 ## The numbers of one row, from its option's works card (TileBuildings' rule, read in one place): an option row's gain and
-## upkeep are the card's year.gain and lands.upkeep; a built row's are the clearing card's, turned round. Null when a card has
-## no year or no lands. Static and pure; the tests compare it with TileBuildings.of(full = true).
+## upkeep are the card's year.gain and lands.upkeep; a built row's are the clearing card's, turned round, less the barracks'
+## upkeep (its own tile has it, and no gain). Null when a card has no year or no lands. Static and pure; the tests compare
+## it with TileBuildings.of(full = true).
 static func numbers_of(game: Game, tag: StringName, hex: Vector2i, row: Dictionary) -> Dictionary:
 	var state := StringName(str(row.get("state", "")))
 	if state == &"built":
+		if _is_barracks(row):
+			return {"gain": null, "upkeep": BarracksView.upkeep_a_year(game) if game.has_countries() else null}
 		var piece := Improve.piece_at(game, hex)
 		if piece.is_empty():
 			return {"gain": null, "upkeep": null}
 		var clear := ImprovePreview.of(game, tag, hex, {"action": Works.CLEAR, "family": int(piece["family_id"])})
+		clear = BarracksView.settlement_alone(game, hex, clear)
 		return {"gain": _turned(clear, "year", "gain"), "upkeep": _turned(clear, "lands", "upkeep")}
 	if state == &"building" or (row.get("option", {}) as Dictionary).is_empty():
 		return {"gain": null, "upkeep": null}
@@ -284,10 +288,9 @@ func _index(groups: Array) -> void:
 		for row: Variant in (group as Dictionary)["rows"]:
 			var data := (row as Dictionary).duplicate()
 			var option := data["option"] as Dictionary
-			data["expensive"] = false
-			if not option.is_empty():
-				data["expensive"] = _expensive_of(offers, option)
-			if StringName(str(data["state"])) == &"built":
+			if not data.has("expensive"):  # the barracks' offer brings its own: it is no row of options_of
+				data["expensive"] = not option.is_empty() and _expensive_of(offers, option)
+			if StringName(str(data["state"])) == &"built" and not data.has("level"):  # a barracks has no level to show
 				data["level"] = level
 			var id := StringName(str(data["id"]))
 			_rows_by_id[id] = data
@@ -422,7 +425,9 @@ func _row_node(data: Dictionary) -> BuildingRow:
 
 
 func _on_row_hovered(data: Dictionary, node: BuildingRow) -> void:
-	var card := BuildingCard.of(_game, _tag, _hex, data["option"] as Dictionary)
+	# A standing or building barracks has no option of its own to ask the card by.
+	var option: Dictionary = BarracksView.option() if _is_barracks(data) else data["option"]
+	var card := BuildingCard.of(_game, _tag, _hex, option)
 	row_hovered.emit(card, node.get_global_rect())
 
 
@@ -485,6 +490,10 @@ func _click(option: Dictionary, expensive: bool) -> void:
 
 
 # --- helpers ------------------------------------------------------------------------------------------------------------
+
+
+static func _is_barracks(row: Dictionary) -> bool:
+	return StringName(str(row.get("kind", ""))) == BarracksView.KIND
 
 
 static func _field(card: Dictionary, block: String, key: String, sign: int) -> Variant:

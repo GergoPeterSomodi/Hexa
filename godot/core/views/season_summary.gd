@@ -341,7 +341,7 @@ static func _under_way(game: Game, tag: StringName, turn: int) -> Array[Dictiona
 	for work: Work in game.state.works:
 		if work.tag != tag or work.started_turn >= turn:
 			continue
-		var info := WorksView.at(game, work.hex, game.player)
+		var info := WorksView.at(game, work.hex, tag)
 		var halted := Works.halted(game, work, turn)
 		var middle := "stopped for the winter" if halted else str(info["progress"])
 		var line := _line("Under way: %s: %s. Ready %s." % [WorksView.line(game, work), middle, info["ready"]],
@@ -546,8 +546,8 @@ static func _treasury_section(game: Game, lines: Array[Dictionary], opening: int
 	return {"id": &"treasury", "title": "Treasury", "count": main_count, "total": total, "lines": out, "more": 0, "unchanged": ""}
 
 
-## The text of one spending line: "Work begun: ..." or "Refund: ..." (several payments on one hex: the place and the count),
-## "Raised: 2 companies at Genoa (8, 13)" for raising.
+## The text of one spending line: "Work begun: ..." ("Barracks begun at ...") or "Refund: ..." (several payments on one
+## hex: the place and the count), "Raised: 2 companies at Genoa (8, 13)" for raising.
 static func _spending_text(game: Game, why: StringName, line: Dictionary, started: Dictionary, cancelled: Dictionary) -> String:
 	var at := line["hex"] as Vector2i
 	var count := int(line["count"])
@@ -556,6 +556,9 @@ static func _spending_text(game: Game, why: StringName, line: Dictionary, starte
 	var works := started if why == &"work" else cancelled
 	if count > 1:  # several payments merged on one hex: the label would name only the last work
 		return "%s: %s (%d)" % ["Works begun" if why == &"work" else "Refunds", Words.place(game, at), count]
+	var work: Work = works.get(at, null)
+	if why == &"work" and work != null:
+		return WorksView.headline(game, work, "begun", "Work begun")
 	return "%s: %s" % ["Work begun" if why == &"work" else "Refund", _work_label(game, at, works)]
 
 

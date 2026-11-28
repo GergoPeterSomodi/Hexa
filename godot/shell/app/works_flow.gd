@@ -273,7 +273,7 @@ func begin(hex: Vector2i, option: Dictionary) -> void:
 	var game := Session.game
 	if game == null:
 		return
-	var action := str(option["action"])
+	var action := Works.game_action(StringName(str(option["action"])))
 	var args := {"hex": hex}
 	if action == String(Works.BUILD):
 		args["family"] = int(option["family"])

@@ -138,8 +138,9 @@ func show_compare(a: Dictionary, b: Dictionary) -> void:
 
 	PanelKit.clear_children(_col_a)
 	PanelKit.clear_children(_col_b)
-	_populate_compare_col(_col_a, a, gain_a > gain_b, shared_ticks)
-	_populate_compare_col(_col_b, b, gain_b > gain_a, shared_ticks)
+	var comparable := _has_return(a) and _has_return(b)  # a card without a gain (a barracks) is neither better nor worse
+	_populate_compare_col(_col_a, a, comparable and gain_a > gain_b, shared_ticks)
+	_populate_compare_col(_col_b, b, comparable and gain_b > gain_a, shared_ticks)
 
 	var b_verdict: Dictionary = b.get("verdict", {}) if b.get("verdict", {}) is Dictionary else {}
 	if not bool(b_verdict.get("ok", true)):
@@ -561,13 +562,14 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 		col.add_child(ref)
 		return
 
-	var gain_chip := DeltaChip.new()
-	gain_chip.boxed = is_better
-	gain_chip.set_delta(_year_gain(p), "a year")
-	col.add_child(gain_chip)
-
 	var seasons_raw: Variant = p.get("by_season", [])
 	var seasons: Array = seasons_raw if seasons_raw is Array else []
+	if _has_return(p):  # a barracks has no gain to show
+		var gain_chip := DeltaChip.new()
+		gain_chip.boxed = is_better
+		gain_chip.set_delta(_year_gain(p), "a year")
+		col.add_child(gain_chip)
+
 	if not seasons.is_empty():
 		var c := InkChart.new()
 		c.kind = InkChart.Kind.PAIRED_BARS
@@ -602,6 +604,13 @@ func _populate_compare_col(col: VBoxContainer, p: Dictionary, is_better: bool, s
 		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cl.text = cost_txt
 		col.add_child(cl)
+
+
+## The card says what it gives: a year or seasons of figures.
+func _has_return(p: Dictionary) -> bool:
+	var seasons: Variant = p.get("by_season", [])
+	var year: Variant = p.get("year", {})
+	return (seasons is Array and not (seasons as Array).is_empty()) or (year is Dictionary and not (year as Dictionary).is_empty())
 
 
 func _year_gain(p: Dictionary) -> int:

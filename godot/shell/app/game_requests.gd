@@ -552,7 +552,7 @@ func _on_work_started(tag: StringName, _hex: Vector2i, work: Dictionary) -> void
 		return
 	var ready := "Halted by war" if Works.ready_turn(game, w) == Works.NO_DATE else "Ready " + Works.ready_words(game, w)
 	var paid := _paid_words(game, w)
-	var text := "Work begun: %s." % WorksView.line(game, w)
+	var text := "%s." % WorksView.headline(game, w, "begun", "Work begun")
 	if paid != "":
 		text += " %s." % paid
 	_toast("%s %s." % [text, ready], &"plain", &"game_undo_work")
@@ -563,7 +563,7 @@ func _on_work_cancelled(tag: StringName, _hex: Vector2i, work: Dictionary, why: 
 	var w := Work.from_dict(work)
 	if game == null or w == null or tag != game.player or why != &"order":
 		return
-	var text := "Work cancelled: %s." % WorksView.line(game, w)
+	var text := "%s." % WorksView.headline(game, w, "cancelled", "Work cancelled")
 	var back := _refund_words(game, w)
 	if back != "":
 		text += " %s back." % back

@@ -458,9 +458,17 @@ static func gives_text(game: Game, hex: Vector2i) -> String:
 		var fish := int(_peak(years, Economy.FISH)["loads"])
 		pieces.append("fish %s, dues %s a season" % [Words.number(fish), Words.number(dues)])
 	var upkeep := int(base["upkeep"])
+	if not _told_barracks(game, hex):  # another country's barracks is not given away by its upkeep out of sight
+		upkeep -= Recruiting.upkeep_at(game.defs, StateView.of(game.state), i)
 	if upkeep > 0:
 		pieces.append("upkeep %s a season" % Words.number(upkeep))
 	return " · ".join(pieces)
+
+
+## Whether the player may count a barracks on `hex` in what the hex costs: always without a player, on its own land and
+## in sight (recruitment-queue.md 6).
+static func _told_barracks(game: Game, hex: Vector2i) -> bool:
+	return game.player == &"" or Territory.owner_tag(game, hex) == game.player or Knowledge.sees(game, game.player, hex)
 
 
 ## The weather line of a land hex whose climate is not calm this season (4.6): "good this season: crops +20 %" or

@@ -20,6 +20,7 @@ var _game: Game = null
 var _zoom := 1.0
 var _marks: Array[Dictionary] = []  # {hex, text, halted}
 var _fog_rev := -1  # the player's explored revision the marks were read for (R37)
+var _sight_rev := -1  # and the sight's revision: another country's barracks is marked only in sight
 var _fallback_theme: Theme = null
 
 
@@ -52,7 +53,7 @@ func refresh() -> void:
 	_marks.clear()
 	if _game != null and _game.state != null:
 		for work: Work in _game.state.works:
-			if not Knowledge.discovered(_game, _game.player, work.hex):  # R37: no mark on an undiscovered hex
+			if not WorksView.told(_game, work, _game.player):  # R37: no mark on an undiscovered hex
 				continue
 			var done := clampi(work.seasons - work.seasons_left + 1, 1, maxi(work.seasons, 1))
 			_marks.append({
@@ -61,6 +62,7 @@ func refresh() -> void:
 				"halted": Works.halted(_game, work, _game.turn),
 			})
 	_fog_rev = _explored_rev()
+	_sight_rev = _seen_rev()
 	queue_redraw()
 
 
@@ -122,10 +124,15 @@ func _on_season_ended(_turn: int) -> void:
 	refresh()
 
 
-## A hex the player discovers gets its work mark back (R37): the marks are read again when the revision moves.
+## A hex the player discovers gets its work mark back (R37): the marks are read again when the revision moves, and when
+## the sight changes (a barracks work of another country shows only in sight).
 func _process(_delta: float) -> void:
-	if _explored_rev() != _fog_rev:
+	if _explored_rev() != _fog_rev or _seen_rev() != _sight_rev:
 		refresh()
+
+
+func _seen_rev() -> int:
+	return _game.sight.revision() if _game != null and _game.sight != null else -1
 
 
 ## The player's explored revision (-1 with no game or player); it grows when a hex is discovered.

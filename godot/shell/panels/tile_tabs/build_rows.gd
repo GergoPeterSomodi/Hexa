@@ -184,7 +184,7 @@ static func confirm_mode_of(p_settings: Settings) -> String:
 func _begin(option: Dictionary) -> void:
 	if bool(ask.call(&"begin_work", {"hex": _hex, "option": option})):
 		return
-	var action := str(option["action"])
+	var action := Works.game_action(StringName(str(option["action"])))
 	var args := {"hex": _hex}
 	if action == String(Works.BUILD):
 		args["family"] = int(option["family"])

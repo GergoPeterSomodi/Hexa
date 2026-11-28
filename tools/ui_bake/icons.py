@@ -1,11 +1,11 @@
-"""Slice 4 icon atlas (spec 4.5; m4-build-spec.md 6.2): 48 two-tone woodcut icons, 24 px cells.
+"""Slice 4 icon atlas (spec 4.5; m4-build-spec.md 6.2): 50 two-tone woodcut icons, 24 px cells.
 
 Each icon is an ink line (the INK token, about 0.9 px outside every filled shape) around flat pigment. Everything is
 a signed distance in logical pixels, so 2x is the same recipe at s = 2, never an upscale. Pixel paths use only
 `+ - x /`, `sqrt`, `floor` and comparisons on float64; the angles are literal constants.
 
-`icons` is 256 x 128 at 1x: 10 columns x 5 rows of 24 px cells, the first 48 used, in `ICON_NAMES` order, the cell of
-index i at column i % 10, row i // 10. The two cells after the last row's eight are spare.
+`icons` is 256 x 128 at 1x: 10 columns x 5 rows of 24 px cells, all 50 used, in `ICON_NAMES` order, the cell of
+index i at column i % 10, row i // 10. No cell is spare: the next icon needs another atlas or a larger one.
 """
 from __future__ import annotations
 
@@ -38,6 +38,8 @@ ICON_NAMES: tuple[str, ...] = (
     "food", "army", "research", "prestige",
     # The action log's button (1), baked in the spare cell of the last row
     "log",
+    # The barracks tile of the Town tab (recruitment-queue.md 8), a stand-in until the art director approves it
+    "barracks",
 )
 
 # One flat pigment each (plus a rare accent), lit enough to read on leather and on vellum beside an ink line.
@@ -389,6 +391,19 @@ def _castle(c: _Canvas) -> None:
     c.stroke(c.box(18.8, 12.5, 20.0, 15.0), "dark")
 
 
+def _barracks(c: _Canvas) -> None:
+    """A long hall between two upright pikes: wider and lower than the town's houses, with no towers."""
+    for x in (3.6, 20.4):
+        c.fill(c.cap(x, 7.0, x, 21.2, 1.4), "wood")
+        c.fill(c.poly([(x, 1.6), (x + 2.0, 5.2), (x, 8.2), (x - 2.0, 5.2)]), "steel")
+    c.fill(c.rbox(6.6, 13.0, 17.4, 21.0, 0.5), "cream")
+    c.fill(c.poly([(5.4, 13.4), (8.4, 7.6), (15.6, 7.6), (18.6, 13.4)]), "blue")
+    c.fill(np.maximum(c.circle(12.0, 17.6, 2.0), c.ly - 17.6), "bark", ink=False)
+    c.fill(c.box(10.0, 17.4, 14.0, 21.0), "bark", ink=False)
+    for x in (8.4, 15.6):
+        c.stroke(c.box(x - 0.7, 15.2, x + 0.7, 17.4), "dark")
+
+
 # ---------------------------------------------------------------- seasons and weather
 
 def _spring(c: _Canvas) -> None:
@@ -571,7 +586,7 @@ _DRAW: dict[str, Callable[[_Canvas], None]] = {
     "study": _study, "pin": _pin, "info": _info, "go": _go, "warning": _warning, "ring": _ring, "chart": _chart,
     "sold": _sold,
     "food": _food, "army": _army, "research": _research, "prestige": _prestige,
-    "log": _log_icon,
+    "log": _log_icon, "barracks": _barracks,
 }
 
 

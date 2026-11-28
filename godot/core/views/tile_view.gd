@@ -264,7 +264,7 @@ static func _other_strip(game: Game, viewer: StringName, hex: Vector2i) -> Array
 	return [
 		_cell("people", _people_text(PeopleView.at(game, viewer, hex)), "People", &"plain"),
 		_cell("garrison", garrison_text, "Garrison", &"plain"),
-		_cell("buildings", str(_built_count(game, hex)), "Buildings", &"plain"),
+		_cell("buildings", str(_built_count(game, viewer, hex)), "Buildings", &"plain"),
 		_cell("armies", armies_text, "Armies", &"plain"),
 	]
 
@@ -381,12 +381,15 @@ static func _loads_of(output: Dictionary, good: int) -> int:
 	return int(goods[good]) if good >= 0 and good < goods.size() else 0
 
 
-## The buildings of foreign and unowned land: each built piece (working) and the work under way (building, its progress).
+## The buildings of foreign and unowned land: each built piece (working), the barracks while the tile is in sight, and the
+## work under way (building, its progress; a barracks work too only in sight: WorksView.told).
 static func _other_buildings(game: Game, viewer: StringName, hex: Vector2i) -> Array:
 	var rows: Array = []
 	var piece := Improve.piece_at(game, hex)
 	if not piece.is_empty():
 		rows.append({"name": HexCard.family_word(str(piece["family"]), str(piece["extra"])), "state_text": "working"})
+	if _barracks_in_sight(game, viewer, hex):
+		rows.append({"name": BarracksView.NAME, "state_text": "working"})
 	var work := WorksView.at(game, hex, viewer)
 	if not work.is_empty():
 		rows.append({"name": str(work["label"]), "state_text": "building " + str(work["progress"])})
@@ -454,8 +457,15 @@ static func _armies_here(game: Game, viewer: StringName, hex: Vector2i) -> Array
 	return out
 
 
-static func _built_count(game: Game, hex: Vector2i) -> int:
-	return 0 if Improve.piece_at(game, hex).is_empty() else 1
+## The buildings the viewer is told of: the piece, and a barracks in sight.
+static func _built_count(game: Game, viewer: StringName, hex: Vector2i) -> int:
+	var piece := 0 if Improve.piece_at(game, hex).is_empty() else 1
+	return piece + (1 if _barracks_in_sight(game, viewer, hex) else 0)
+
+
+## Another country's barracks is a fact only while its tile is in sight (recruitment-queue.md 6).
+static func _barracks_in_sight(game: Game, viewer: StringName, hex: Vector2i) -> bool:
+	return Recruiting.has_barracks(game, hex) and sight_of(game, viewer, hex) == &"sight"
 
 
 static func _beside_land(game: Game, hex: Vector2i) -> bool:

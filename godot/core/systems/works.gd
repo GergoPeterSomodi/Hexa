@@ -176,6 +176,11 @@ static func build_barracks(game: Game, args: Dictionary) -> Dictionary:
 	return verdict
 
 
+## The name in Actions of a work's action: build_barracks for a barracks, else the same word.
+static func game_action(action: StringName) -> String:
+	return "build_barracks" if action == BARRACKS else String(action)
+
+
 ## Appends the work (id next_work_id) and emits work_started. Nothing on the map changes.
 static func _begin(game: Game, action: StringName, hex: Vector2i, tag: StringName, family: int, level_to: int) -> void:
 	var work := Work.new()

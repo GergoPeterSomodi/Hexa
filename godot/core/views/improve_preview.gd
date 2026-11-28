@@ -15,7 +15,8 @@ const PAYBACK_HORIZON := PeopleView.HORIZON
 const NO_HEX := Vector2i(-1, -1)
 
 
-## The card of option {action: &"build"|&"upgrade"|&"clear", family: int} on `hex` for `tag`, cached by version. Keys:
+## The card of option {action: &"build"|&"upgrade"|&"clear"|&"barracks", family: int (0 for a barracks)} on `hex` for
+## `tag`, cached by version (a barracks changes no output: BarracksView.fill_card). Keys:
 ## verdict {ok, reason}, blocked_by (&"" ok, &"slot", &"ducats", &"goods" or &"rule"), reason_words, title, subtitle, cost
 ## {ducats, goods [{good, name, n}], seasons, ready_turn, first_yield_turn, text}, requirements [{text, ok}], brings [{field,
 ## label, before, after, per}], by_season (four cells in calendar order, Spring first: {season (name), turn, now, note, goods
@@ -186,6 +187,9 @@ static func _target(game: Game, hex: Vector2i, action: StringName, family: int) 
 	elif action == Works.CLEAR:
 		out["valid"] = int(game.state.main_use[i]) > 0
 		out["family"] = int(game.state.main_use[i])
+	elif action == Works.BARRACKS:  # beside the piece: the check says where
+		out["valid"] = true
+		out["pair"] = Vector2i(int(out["old_family"]), int(out["old_level"]))
 	return out
 
 
@@ -209,7 +213,8 @@ static func _make(game: Game, tag: StringName, hex: Vector2i, action: StringName
 	var args := {"hex": hex, "tag": tag}
 	if action == Works.BUILD:
 		args["family"] = family
-	var verdict := game.check(String(action), args) if bool(target["valid"]) else {"ok": false, "reason": "nothing can be done here"}
+	var verdict := game.check(Works.game_action(action), args) if bool(target["valid"]) else {"ok": false,
+		"reason": "nothing can be done here"}
 	var blocked := _blocked_by(verdict)
 	var out := _blank()
 	out["verdict"] = verdict
@@ -223,6 +228,11 @@ static func _make(game: Game, tag: StringName, hex: Vector2i, action: StringName
 	var seasons := Works.seasons_for(game, action, int(target["family"]), int(target["level_to"]))
 	var ready := WorksView.ready_turn_of(game, hex, seasons)
 	var cost := Works.cost_of(game, action, int(target["family"]), int(target["level_to"]))
+	if action == Works.BARRACKS:
+		out["cost"] = _cost(game, cost, seasons, ready, {"turn": 0, "word": ""}, not bool(verdict["ok"]), c != null)
+		out["expensive"] = c != null and _expensive(game, c, int(cost["ducats"]), seasons)
+		BarracksView.fill_card(game, tag, hex, cost, out)
+		return out
 	var cells := _cells(game, c, hex, target)
 	var gain := _gains(cells)
 	var first := _first_yield(game, target, cells, ready)
